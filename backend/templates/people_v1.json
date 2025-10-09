@@ -1,0 +1,122 @@
+{
+  "index_patterns": ["people-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 6,
+      "number_of_replicas": 0,
+      "refresh_interval": "-1",
+      "analysis": {
+        "tokenizer": {
+          "address_tokenizer": {
+            "type": "pattern",
+            "pattern": "!+"
+          }
+        },
+        "analyzer": {
+          "name_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "edge_ngram_filter"]
+          },
+          "address_analyzer": {
+            "type": "custom",
+            "tokenizer": "address_tokenizer",
+            "filter": ["lowercase", "trim"]
+          }
+        },
+        "filter": {
+          "edge_ngram_filter": {
+            "type": "edge_ngram",
+            "min_gram": 2,
+            "max_gram": 20
+          }
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "mobile": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "text",
+          "analyzer": "name_analyzer",
+          "fields": {
+            "keyword": {
+              "type": "keyword"
+            },
+            "exact": {
+              "type": "text",
+              "analyzer": "standard"
+            }
+          }
+        },
+        "fname": {
+          "type": "text",
+          "analyzer": "name_analyzer",
+          "fields": {
+            "keyword": {
+              "type": "keyword"
+            }
+          }
+        },
+        "address": {
+          "type": "text",
+          "analyzer": "address_analyzer",
+          "fields": {
+            "keyword": {
+              "type": "keyword"
+            },
+            "parts": {
+              "type": "text",
+              "analyzer": "standard"
+            }
+          }
+        },
+        "alt_address": {
+          "type": "text",
+          "analyzer": "address_analyzer",
+          "fields": {
+            "keyword": {
+              "type": "keyword"
+            },
+            "parts": {
+              "type": "text",
+              "analyzer": "standard"
+            }
+          }
+        },
+        "alt": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "standard"
+            }
+          }
+        },
+        "id": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "standard"
+            }
+          }
+        },
+        "email": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "standard"
+            }
+          }
+        },
+        "year_of_registration": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

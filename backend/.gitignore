@@ -1,0 +1,126 @@
+# ─────────────────────────────
+# Go Build Artifacts
+# ─────────────────────────────
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace and cache
+*.log
+*.tmp
+*.bak
+*.swp
+vendor/
+bin/
+build/
+dist/
+coverage.out
+
+# Go modules (keep go.mod and go.sum, ignore replace test)
+# !go.mod
+# !go.sum
+
+# ─────────────────────────────
+# OS-Specific Files
+# ─────────────────────────────
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ─────────────────────────────
+# IDE / Editor Configs
+# ─────────────────────────────
+# VS Code
+.vscode/
+.history/
+.code-workspace
+
+# GoLand / IntelliJ IDEA
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ─────────────────────────────
+# Security / Secrets
+# ─────────────────────────────
+# Never commit private credentials
+.env
+.env.*
+.envrc
+*.key
+*.pem
+*.crt
+*.csr
+*.p12
+*.pfx
+*.jks
+config.yaml
+config.yml
+config.json
+secrets/
+private/
+credentials.json
+firebase-service-account.json
+
+# ─────────────────────────────
+# Docker & Containers
+# ─────────────────────────────
+# Docker build artifacts
+*.pid
+*.cid
+*.tar
+docker-compose.override.yml
+
+# ─────────────────────────────
+# Logs and runtime data
+# ─────────────────────────────
+logs/
+*.log
+tmp/
+*.pid
+*.seed
+*.pid.lock
+
+# ─────────────────────────────
+# Testing
+# ─────────────────────────────
+testdata/
+coverage.txt
+profile.out
+
+# ─────────────────────────────
+# Miscellaneous
+# ─────────────────────────────
+node_modules/
+*.db
+*.sqlite
+*.sqlite3
+*.lock
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# ─────────────────────────────
+# Local / development overrides
+# ─────────────────────────────
+.env.local
+.env
+.env.development.local
+.env.production.local
+.env.test.local
