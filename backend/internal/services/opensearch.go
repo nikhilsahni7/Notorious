@@ -217,19 +217,130 @@ func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Doc
 	return doc
 }
 
-func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
-	// Build query based on AND/OR logic
-	var query map[string]interface{}
+// buildFieldQuery creates the appropriate query based on field type
+func buildFieldQuery(field, value string) map[string]interface{} {
+	// Keyword fields (exact match) - mobile, alt, id, email
+	keywordFields := map[string]bool{
+		"mobile": true,
+		"alt":    true,
+		"id":     true,
+		"email":  true,
+	}
 
-	if len(req.Fields) == 1 {
-		// Single field search
-		query = map[string]interface{}{
-			"match": map[string]interface{}{
-				req.Fields[0]: req.Query,
+	if keywordFields[field] {
+		// For keyword fields, use wildcard for partial matching
+		return map[string]interface{}{
+			"wildcard": map[string]interface{}{
+				field: map[string]interface{}{
+					"value":            "*" + strings.ToLower(value) + "*",
+					"case_insensitive": true,
+				},
 			},
 		}
-	} else {
-		// Multi-field search
+	}
+
+	// Special handling for name - use .exact subfield for precise matching
+	if field == "name" {
+		return map[string]interface{}{
+			"match_phrase": map[string]interface{}{
+				"name.exact": map[string]interface{}{
+					"query": value,
+					"slop":  0,
+				},
+			},
+		}
+	}
+
+	// Special handling for fname - use wildcard on .keyword for case-insensitive exact matching
+	if field == "fname" {
+		return map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should": []map[string]interface{}{
+					{
+						// Try exact match on keyword field (case-sensitive)
+						"term": map[string]interface{}{
+							"fname.keyword": value,
+						},
+					},
+					{
+						// Fallback to wildcard for case-insensitive
+						"wildcard": map[string]interface{}{
+							"fname.keyword": map[string]interface{}{
+								"value":            "*" + value + "*",
+								"case_insensitive": true,
+							},
+						},
+					},
+				},
+				"minimum_should_match": 1,
+			},
+		}
+	}
+
+	// Special handling for address - search on .parts subfield
+	if field == "address" {
+		return map[string]interface{}{
+			"match_phrase": map[string]interface{}{
+				"address.parts": map[string]interface{}{
+					"query": value,
+					"slop":  0,
+				},
+			},
+		}
+	}
+
+	// Default: exact phrase match
+	return map[string]interface{}{
+		"match_phrase": map[string]interface{}{
+			field: map[string]interface{}{
+				"query": value,
+				"slop":  0,
+			},
+		},
+	}
+}
+
+// parseFieldQuery parses query string like "name:john AND fname:smith" into field-value pairs
+func parseFieldQuery(query string, operator string) []map[string]string {
+	result := []map[string]string{}
+
+	// Split by AND or OR
+	delimiter := " OR "
+	if strings.ToUpper(operator) == "AND" {
+		delimiter = " AND "
+	}
+
+	parts := strings.Split(query, delimiter)
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Check if it contains field:value syntax
+		if strings.Contains(part, ":") {
+			colonIdx := strings.Index(part, ":")
+			field := strings.TrimSpace(part[:colonIdx])
+			value := strings.TrimSpace(part[colonIdx+1:])
+
+			if field != "" && value != "" {
+				result = append(result, map[string]string{field: value})
+			}
+		}
+	}
+
+	return result
+}
+
+func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
+	// Parse query for field:value syntax
+	fieldQueries := parseFieldQuery(req.Query, req.AndOr)
+
+	var query map[string]interface{}
+
+	if len(fieldQueries) == 0 {
+		// No field:value pairs found, use multi-field search
 		var mustOrShould []map[string]interface{}
 		operator := "should"
 		if strings.ToUpper(req.AndOr) == "AND" {
@@ -237,11 +348,31 @@ func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 		}
 
 		for _, field := range req.Fields {
-			mustOrShould = append(mustOrShould, map[string]interface{}{
-				"match": map[string]interface{}{
-					field: req.Query,
-				},
-			})
+			mustOrShould = append(mustOrShould, buildFieldQuery(field, req.Query))
+		}
+
+		query = map[string]interface{}{
+			"bool": map[string]interface{}{
+				operator: mustOrShould,
+			},
+		}
+	} else if len(fieldQueries) == 1 {
+		// Single field:value query
+		for field, value := range fieldQueries[0] {
+			query = buildFieldQuery(field, value)
+		}
+	} else {
+		// Multiple field:value queries with AND/OR
+		var mustOrShould []map[string]interface{}
+		operator := "should"
+		if strings.ToUpper(req.AndOr) == "AND" {
+			operator = "must"
+		}
+
+		for _, fq := range fieldQueries {
+			for field, value := range fq {
+				mustOrShould = append(mustOrShould, buildFieldQuery(field, value))
+			}
 		}
 
 		query = map[string]interface{}{

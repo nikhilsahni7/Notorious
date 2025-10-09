@@ -3,11 +3,13 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"notorious-backend/internal/config"
 	"notorious-backend/internal/handlers"
 	"notorious-backend/internal/services"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -32,6 +34,16 @@ func main() {
 	// Setup routes
 	r := gin.Default()
 
+	// CORS middleware
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3001"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -44,7 +56,8 @@ func main() {
 	uploadGroup.POST("/complete", uploadHandler.CompleteUpload)
 	uploadGroup.POST("/abort", uploadHandler.AbortUpload)
 
-	// Search routes
+	// Search routes (support both GET and POST)
+	r.GET("/search", searchHandler.Search)
 	r.POST("/search", searchHandler.Search)
 	r.GET("/search/suggest", searchHandler.Suggest)
 
