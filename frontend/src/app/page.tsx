@@ -83,7 +83,13 @@ export default function Home() {
       }
 
       const queryString = queries.join(` ${operator} `);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+      if (!apiUrl) {
+        throw new Error(
+          "NEXT_PUBLIC_API_URL is not set. Please configure the backend URL."
+        );
+      }
 
       console.log("Search query:", queryString); // Debug log
 
