@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -19,6 +20,10 @@ type UploadService struct {
 	cfg      *config.Config
 }
 
+type S3StreamService struct {
+	s3Client *s3.Client
+}
+
 type InitUploadResponse struct {
 	UploadID string `json:"upload_id"`
 	Bucket   string `json:"bucket"`
@@ -27,28 +32,17 @@ type InitUploadResponse struct {
 }
 
 func NewUploadService(cfg *config.Config) *UploadService {
-	// Load AWS config
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO(),
-		awsconfig.WithRegion(cfg.AWSRegion),
-		awsconfig.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
-			return aws.Credentials{
-				AccessKeyID:     cfg.AWSAccessKeyID,
-				SecretAccessKey: cfg.AWSSecretAccessKey,
-			}, nil
-		})),
-	)
-	if err != nil {
-		log.Fatalf("Error loading AWS config: %v", err)
-	}
-
-	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.UseAccelerate = true
-	})
+	s3Client := createS3Client(cfg)
 
 	return &UploadService{
 		s3Client: s3Client,
 		cfg:      cfg,
 	}
+}
+
+func NewS3StreamService(cfg *config.Config) (*S3StreamService, error) {
+	client := createS3Client(cfg)
+	return &S3StreamService{s3Client: client}, nil
 }
 
 func (s *UploadService) InitMultipartUpload(filename string, partSizeMB int64) (*InitUploadResponse, error) {
@@ -74,6 +68,21 @@ func (s *UploadService) InitMultipartUpload(filename string, partSizeMB int64) (
 		Key:      key,
 		PartSize: partSizeMB,
 	}, nil
+}
+
+func (s *S3StreamService) GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+
+	result, err := s.s3Client.GetObject(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching S3 object %s/%s: %w", bucket, key, err)
+	}
+
+	log.Printf("Opened S3 object stream: s3://%s/%s (content-length=%d)", bucket, key, result.ContentLength)
+	return result.Body, nil
 }
 
 func (s *UploadService) PresignPartUpload(uploadID, key string, partNumber int32) (string, error) {
@@ -128,4 +137,23 @@ func (s *UploadService) AbortMultipartUpload(uploadID, key string) error {
 		return fmt.Errorf("error aborting multipart upload: %v", err)
 	}
 	return nil
+}
+
+func createS3Client(cfg *config.Config) *s3.Client {
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO(),
+		awsconfig.WithRegion(cfg.AWSRegion),
+		awsconfig.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     cfg.AWSAccessKeyID,
+				SecretAccessKey: cfg.AWSSecretAccessKey,
+			}, nil
+		})),
+	)
+	if err != nil {
+		log.Fatalf("Error loading AWS config: %v", err)
+	}
+
+	return s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.UseAccelerate = true
+	})
 }

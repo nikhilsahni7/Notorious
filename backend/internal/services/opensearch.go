@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -168,18 +169,72 @@ func (s *OpenSearchService) BulkIndex(documents []Document) error {
 		buf.WriteString("\n")
 	}
 
-	resp, err := s.api.Bulk(
-		context.Background(),
-		opensearchapi.BulkReq{
-			Body: bytes.NewReader(buf.Bytes()),
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("error bulk indexing: %v", err)
+	var lastErr error
+	maxAttempts := int(math.Max(1, float64(s.cfg.OpenSearchBulkMaxAttempts)))
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		resp, err := s.api.Bulk(
+			context.Background(),
+			opensearchapi.BulkReq{
+				Body: bytes.NewReader(buf.Bytes()),
+			},
+		)
+		if err != nil {
+			lastErr = fmt.Errorf("bulk request failed on attempt %d/%d: %w", attempt, maxAttempts, err)
+		} else {
+			if resp.Errors {
+				if bulkErr := s.inspectBulkErrors(resp); bulkErr != nil {
+					lastErr = fmt.Errorf("bulk request returned item errors on attempt %d/%d: %w", attempt, maxAttempts, bulkErr)
+				} else {
+					log.Printf("Bulk indexed %d documents with recoverable errors on attempt %d", len(documents), attempt)
+					return nil
+				}
+			} else {
+				log.Printf("Bulk indexed %d documents on attempt %d", len(documents), attempt)
+				return nil
+			}
+		}
+
+		if attempt < maxAttempts {
+			backoff := s.cfg.OpenSearchBulkRetryBase * time.Duration(1<<uint(attempt-1))
+			jitter := time.Duration(rand.Int63n(int64(time.Second)))
+			wait := backoff + jitter
+			log.Printf("Retrying bulk index (attempt %d/%d) after %s due to error: %v", attempt, maxAttempts, wait, lastErr)
+			time.Sleep(wait)
+		}
 	}
 
-	log.Printf("Bulk indexed %d documents (errors=%t)", len(documents), resp.Errors)
-	return nil
+	return lastErr
+}
+
+func (s *OpenSearchService) inspectBulkErrors(resp *opensearchapi.BulkResp) error {
+	if resp == nil || !resp.Errors {
+		return nil
+	}
+
+	var failureMessages []string
+	failedCount := 0
+	for idx, item := range resp.Items {
+		for action, result := range item {
+			if result.Error != nil {
+				failedCount++
+				failureMessages = append(failureMessages, fmt.Sprintf("item %d action %s status %d type=%s reason=%s", idx, action, result.Status, result.Error.Type, result.Error.Reason))
+			} else if result.Status >= 300 {
+				failedCount++
+				failureMessages = append(failureMessages, fmt.Sprintf("item %d action %s returned status %d", idx, action, result.Status))
+			}
+		}
+	}
+
+	if failedCount == 0 {
+		return nil
+	}
+
+	if len(failureMessages) > 5 {
+		failureMessages = failureMessages[:5]
+	}
+
+	return fmt.Errorf("bulk had %d failed items, sample: %s", failedCount, strings.Join(failureMessages, "; "))
 }
 
 func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Document {

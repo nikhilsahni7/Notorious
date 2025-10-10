@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,10 +14,11 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/joho/godotenv"
-)
+ )
 
 func main() {
 	// Load environment variables
@@ -33,19 +35,21 @@ func main() {
 	// Initialize OpenSearch service
 	openSearchService := services.NewOpenSearchService(cfg)
 
-	// Get file path from command line argument
+	// Get input path from command line argument
 	args := flag.Args()
 	if len(args) < 1 {
-		log.Fatal("Usage: go run cmd/ingest/main.go [--resume=N] <path-to-json-file>")
+		log.Fatal("Usage: go run cmd/ingest/main.go [--resume=N] <path-to-json-file|s3://bucket/key|->")
 	}
-	filePath := args[0]
+	inputPath := args[0]
 
-	// Check if file exists
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		log.Fatalf("File does not exist: %s", filePath)
+	// Resolve input reader (local file, S3 object, or stdin)
+	inputReader, err := resolveInput(inputPath, cfg)
+	if err != nil {
+		log.Fatalf("Error resolving input %s: %v", inputPath, err)
 	}
+	defer inputReader.Close()
 
-	log.Printf("Starting ingestion of file: %s", filePath)
+	log.Printf("Starting ingestion of input: %s", inputPath)
 
 	// Apply index template
 	log.Println("Applying index template...")
@@ -60,7 +64,7 @@ func main() {
 	}
 
 	// Process file
-	if err := processFile(filePath, *offset, openSearchService); err != nil {
+	if err := processFile(inputReader, *offset, openSearchService); err != nil {
 		log.Fatalf("Error processing file: %v", err)
 	}
 
@@ -73,22 +77,20 @@ func main() {
 	log.Println("Ingestion completed successfully!")
 }
 
-func processFile(filePath string, alreadyProcessed int, openSearchService *services.OpenSearchService) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("error opening file: %v", err)
-	}
-	defer file.Close()
+func processFile(input io.Reader, alreadyProcessed int, openSearchService *services.OpenSearchService) error {
+	reader := bufio.NewReader(input)
 
-	reader := bufio.NewReader(file)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	totalProcessed := 0
+	var totalProcessed int64
 	startTime := time.Now()
-	skippedMalformed := 0
+	var skippedMalformed int64
 
 	numWorkers := runtime.NumCPU()
 	docChan := make(chan map[string]interface{}, 1000)
-	doneChan := make(chan bool, numWorkers)
+	doneChan := make(chan struct{}, numWorkers)
+	firstErr := make(chan error, 1)
 
 	skipUntil := alreadyProcessed
 	if skipUntil > 0 {
@@ -96,25 +98,46 @@ func processFile(filePath string, alreadyProcessed int, openSearchService *servi
 	}
 
 	for i := 0; i < numWorkers; i++ {
+		workerID := i
 		go func() {
-			defer func() { doneChan <- true }()
+			defer func() { doneChan <- struct{}{} }()
 
 			batch := make([]services.Document, 0, 5000)
-			for rawDoc := range docChan {
-				transformedDoc := openSearchService.TransformDocument(rawDoc)
-				batch = append(batch, transformedDoc)
 
-				if len(batch) >= 5000 {
-					if err := openSearchService.BulkIndex(batch); err != nil {
-						log.Printf("Error bulk indexing batch: %v", err)
-					}
-					batch = batch[:0]
+			flush := func() bool {
+				if len(batch) == 0 {
+					return true
 				}
+				if err := openSearchService.BulkIndex(batch); err != nil {
+					select {
+					case firstErr <- fmt.Errorf("worker %d bulk index error: %w", workerID, err):
+					default:
+					}
+					cancel()
+					return false
+				}
+				batch = batch[:0]
+				return true
 			}
 
-			if len(batch) > 0 {
-				if err := openSearchService.BulkIndex(batch); err != nil {
-					log.Printf("Error bulk indexing final batch: %v", err)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case rawDoc, ok := <-docChan:
+					if !ok {
+						flush()
+						return
+					}
+
+					transformedDoc := openSearchService.TransformDocument(rawDoc)
+					batch = append(batch, transformedDoc)
+
+					if len(batch) >= 5000 {
+						if !flush() {
+							return
+						}
+					}
 				}
 			}
 		}()
@@ -132,13 +155,7 @@ func processFile(filePath string, alreadyProcessed int, openSearchService *servi
 		return fmt.Errorf("unable to inspect file format: %w", err)
 	}
 
-	logProgress := func() {
-		if totalProcessed%10000 == 0 {
-			elapsed := time.Since(startTime)
-			rate := float64(totalProcessed) / elapsed.Seconds()
-			log.Printf("Processed %d documents (%.2f docs/sec)", totalProcessed, rate)
-		}
-	}
+	const logEvery = int64(10000)
 
 	skipDocIfNeeded := func() bool {
 		if skipUntil > 0 {
@@ -148,6 +165,48 @@ func processFile(filePath string, alreadyProcessed int, openSearchService *servi
 		return false
 	}
 
+	enqueueDocument := func(rawDoc map[string]interface{}) error {
+		if skipDocIfNeeded() {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case docChan <- rawDoc:
+			total := atomic.AddInt64(&totalProcessed, 1)
+			if total%logEvery == 0 {
+				elapsed := time.Since(startTime)
+				rate := float64(total) / elapsed.Seconds()
+				log.Printf("Processed %d documents (%.2f docs/sec)", total, rate)
+			}
+		}
+
+		return nil
+	}
+
+	monitorTicker := time.NewTicker(30 * time.Second)
+	defer monitorTicker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-monitorTicker.C:
+				processed := atomic.LoadInt64(&totalProcessed)
+				skipped := atomic.LoadInt64(&skippedMalformed)
+				elapsed := time.Since(startTime)
+				rate := float64(0)
+				if elapsed.Seconds() > 0 {
+					rate = float64(processed) / elapsed.Seconds()
+				}
+				log.Printf("[monitor] processed=%d skipped=%d queue=%d elapsed=%s rate=%.2f docs/sec",
+					processed, skipped, len(docChan), elapsed.Round(time.Second), rate)
+			}
+		}
+	}()
+
 	switch firstByte {
 	case '[':
 		dec := json.NewDecoder(reader)
@@ -155,34 +214,31 @@ func processFile(filePath string, alreadyProcessed int, openSearchService *servi
 			return fmt.Errorf("error reading JSON array start: %w", err)
 		}
 		for dec.More() {
+			if ctx.Err() != nil {
+				break
+			}
 			var rawDoc map[string]interface{}
 			if err := dec.Decode(&rawDoc); err != nil {
 				log.Printf("Error decoding JSON object: %v", err)
-				skippedMalformed++
+				atomic.AddInt64(&skippedMalformed, 1)
 				continue
 			}
 
-			if skipDocIfNeeded() {
-				continue
+			if err := enqueueDocument(rawDoc); err != nil {
+				break
 			}
-
-			docChan <- rawDoc
-			totalProcessed++
-			logProgress()
 		}
 		if _, err := dec.Token(); err != nil {
 			return fmt.Errorf("error reading JSON array end: %w", err)
 		}
 	default:
-		if err := streamBareObjects(reader, func(rawDoc map[string]interface{}) {
-			if skipDocIfNeeded() {
-				return
+		if err := streamBareObjects(ctx, reader, func(rawDoc map[string]interface{}) error {
+			if err := enqueueDocument(rawDoc); err != nil {
+				return err
 			}
-			docChan <- rawDoc
-			totalProcessed++
-			logProgress()
+			return nil
 		}, func(err error) {
-			skippedMalformed++
+			atomic.AddInt64(&skippedMalformed, 1)
 			log.Printf("Malformed document skipped: %v", err)
 		}); err != nil {
 			close(docChan)
@@ -198,14 +254,71 @@ func processFile(filePath string, alreadyProcessed int, openSearchService *servi
 		<-doneChan
 	}
 
+	select {
+	case err := <-firstErr:
+		if err != nil {
+			return err
+		}
+	default:
+	}
+
 	totalTime := time.Since(startTime)
+	finalTotal := atomic.LoadInt64(&totalProcessed)
+	finalSkipped := atomic.LoadInt64(&skippedMalformed)
+	rate := float64(0)
+	if totalTime.Seconds() > 0 {
+		rate = float64(finalTotal) / totalTime.Seconds()
+	}
+
 	log.Printf("Total documents processed: %d in %v (%.2f docs/sec)",
-		totalProcessed, totalTime, float64(totalProcessed)/totalTime.Seconds())
-	if skippedMalformed > 0 {
-		log.Printf("Skipped %d malformed documents", skippedMalformed)
+		finalTotal, totalTime, rate)
+	if finalSkipped > 0 {
+		log.Printf("Skipped %d malformed documents", finalSkipped)
 	}
 
 	return nil
+}
+
+func resolveInput(path string, cfg *config.Config) (io.ReadCloser, error) {
+	if path == "-" {
+		log.Println("Reading data from stdin")
+		return io.NopCloser(os.Stdin), nil
+	}
+
+	if strings.HasPrefix(path, "s3://") {
+		bucket, key, err := parseS3URI(path)
+		if err != nil {
+			return nil, err
+		}
+
+		s3Service, err := services.NewS3StreamService(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("error creating S3 stream service: %w", err)
+		}
+
+		log.Printf("Streaming input from S3: s3://%s/%s", bucket, key)
+		reader, err := s3Service.GetObject(context.Background(), bucket, key)
+		if err != nil {
+			return nil, err
+		}
+		return reader, nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file %s: %w", path, err)
+	}
+	log.Printf("Reading input from local file: %s", path)
+	return file, nil
+}
+
+func parseS3URI(uri string) (string, string, error) {
+	trimmed := strings.TrimPrefix(uri, "s3://")
+	parts := strings.SplitN(trimmed, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("invalid S3 URI: %s", uri)
+	}
+	return parts[0], parts[1], nil
 }
 
 func peekFirstNonWhitespace(r *bufio.Reader) (byte, error) {
@@ -252,7 +365,7 @@ func peekFirstNonWhitespace(r *bufio.Reader) (byte, error) {
 	}
 }
 
-func streamBareObjects(r *bufio.Reader, emit func(map[string]interface{}), onMalformed func(error)) error {
+func streamBareObjects(ctx context.Context, r *bufio.Reader, emit func(map[string]interface{}) error, onMalformed func(error)) error {
 	var (
 		builder strings.Builder
 		depth   int
@@ -268,17 +381,28 @@ func streamBareObjects(r *bufio.Reader, emit func(map[string]interface{}), onMal
 			onMalformed(fmt.Errorf("error decoding JSON object: %w", err))
 			return nil
 		}
-		emit(rawDoc)
+		if err := emit(rawDoc); err != nil {
+			return err
+		}
 		builder.Reset()
 		return nil
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		b, err := r.ReadByte()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				if err := flush(); err != nil {
 					return err
+				}
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr
 				}
 				return nil
 			}
