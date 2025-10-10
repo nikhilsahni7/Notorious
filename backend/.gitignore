@@ -9,6 +9,10 @@
 *.test
 *.out
 
+
+task.txt
+
+
 # Go workspace and cache
 *.log
 *.tmp
