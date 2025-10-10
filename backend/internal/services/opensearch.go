@@ -3,6 +3,8 @@ package services
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +41,7 @@ type Document struct {
 	ID                 string `json:"id"`
 	Email              string `json:"email"`
 	YearOfRegistration int    `json:"year_of_registration"`
+	InternalID         string `json:"-"`
 }
 
 type SearchRequest struct {
@@ -46,6 +49,7 @@ type SearchRequest struct {
 	Fields []string `json:"fields"`
 	AndOr  string   `json:"and_or"` // "AND" or "OR"
 	Size   int      `json:"size"`
+	From   int      `json:"from"` // Pagination offset
 }
 
 type SearchResponse struct {
@@ -153,9 +157,15 @@ func (s *OpenSearchService) BulkIndex(documents []Document) error {
 	var buf bytes.Buffer
 	for _, doc := range documents {
 		// Create index action
+		docID := doc.InternalID
+		if docID == "" {
+			docID = generateDocumentID(doc)
+		}
+
 		indexAction := map[string]interface{}{
 			"index": map[string]interface{}{
 				"_index": s.cfg.OpenSearchIndex,
+				"_id":    docID,
 			},
 		}
 
@@ -268,62 +278,61 @@ func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Doc
 	if val, ok := rawDoc["email"].(string); ok {
 		doc.Email = val
 	}
+	if val, ok := rawDoc["_id"].(map[string]interface{}); ok {
+		if oid, ok := val["$oid"].(string); ok && oid != "" {
+			doc.InternalID = oid
+		}
+	}
 
 	return doc
 }
 
+func generateDocumentID(doc Document) string {
+	h := sha1.New()
+	components := []string{
+		doc.InternalID,
+		doc.Mobile,
+		doc.Name,
+		doc.Fname,
+		doc.Address,
+		doc.Alt,
+		doc.ID,
+		doc.Email,
+	}
+
+	for idx, part := range components {
+		if idx > 0 {
+			h.Write([]byte("|"))
+		}
+		h.Write([]byte(strings.ToLower(part)))
+	}
+
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // buildFieldQuery creates the appropriate query based on field type
+// Uses STRICT EXACT matching - NO fuzzy/partial matches for names
+// Phone numbers support prefix for typing partial numbers
 func buildFieldQuery(field, value string) map[string]interface{} {
-	// Keyword fields (exact match) - mobile, alt, id, email
-	keywordFields := map[string]bool{
-		"mobile": true,
-		"alt":    true,
-		"id":     true,
-		"email":  true,
-	}
+	value = strings.TrimSpace(value)
+	valueLower := strings.ToLower(value)
 
-	if keywordFields[field] {
-		// For keyword fields, use wildcard for partial matching
-		return map[string]interface{}{
-			"wildcard": map[string]interface{}{
-				field: map[string]interface{}{
-					"value":            "*" + strings.ToLower(value) + "*",
-					"case_insensitive": true,
-				},
-			},
-		}
-	}
-
-	// Special handling for name - use .exact subfield for precise matching
-	if field == "name" {
-		return map[string]interface{}{
-			"match_phrase": map[string]interface{}{
-				"name.exact": map[string]interface{}{
-					"query": value,
-					"slop":  0,
-				},
-			},
-		}
-	}
-
-	// Special handling for fname - use wildcard on .keyword for case-insensitive exact matching
-	if field == "fname" {
+	// Phone number fields (mobile, alt) - exact term or prefix
+	if field == "mobile" || field == "alt" {
+		// Exact match or prefix for typing partial numbers
 		return map[string]interface{}{
 			"bool": map[string]interface{}{
 				"should": []map[string]interface{}{
 					{
-						// Try exact match on keyword field (case-sensitive)
+						// Exact match
 						"term": map[string]interface{}{
-							"fname.keyword": value,
+							field: valueLower,
 						},
 					},
 					{
-						// Fallback to wildcard for case-insensitive
-						"wildcard": map[string]interface{}{
-							"fname.keyword": map[string]interface{}{
-								"value":            "*" + value + "*",
-								"case_insensitive": true,
-							},
+						// Prefix for partial numbers
+						"prefix": map[string]interface{}{
+							field: valueLower,
 						},
 					},
 				},
@@ -332,24 +341,181 @@ func buildFieldQuery(field, value string) map[string]interface{} {
 		}
 	}
 
-	// Special handling for address - search on .parts subfield
-	if field == "address" {
+	// ID field - exact term or prefix
+	if field == "id" {
 		return map[string]interface{}{
-			"match_phrase": map[string]interface{}{
-				"address.parts": map[string]interface{}{
-					"query": value,
-					"slop":  0,
+			"bool": map[string]interface{}{
+				"should": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							field: valueLower,
+						},
+					},
+					{
+						"prefix": map[string]interface{}{
+							field: valueLower,
+						},
+					},
 				},
+				"minimum_should_match": 1,
 			},
 		}
 	}
 
-	// Default: exact phrase match
+	// Email field - exact term or prefix
+	if field == "email" {
+		return map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							field: valueLower,
+						},
+					},
+					{
+						"prefix": map[string]interface{}{
+							field: valueLower,
+						},
+					},
+				},
+				"minimum_should_match": 1,
+			},
+		}
+	}
+
+	// Name field - exact keyword match with AND token requirement (no fuzziness)
+	if field == "name" {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return nil
+		}
+
+		tokens := tokenize(trimmed)
+		shouldClauses := make([]map[string]interface{}, 0, 2)
+		shouldClauses = append(shouldClauses, map[string]interface{}{
+			"term": map[string]interface{}{
+				"name.keyword": map[string]interface{}{
+					"value":            trimmed,
+					"case_insensitive": true,
+				},
+			},
+		})
+
+		if len(tokens) > 0 {
+			mustTerms := make([]map[string]interface{}, 0, len(tokens))
+			for _, token := range tokens {
+				mustTerms = append(mustTerms, map[string]interface{}{
+					"term": map[string]interface{}{
+						"name.exact": token,
+					},
+				})
+			}
+			shouldClauses = append(shouldClauses, map[string]interface{}{
+				"bool": map[string]interface{}{
+					"must": mustTerms,
+				},
+			})
+		}
+
+		return map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should":               shouldClauses,
+				"minimum_should_match": 1,
+			},
+		}
+	}
+
+	// Father name - exact keyword match with AND token requirement
+	if field == "fname" {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return nil
+		}
+
+		tokens := tokenize(trimmed)
+		shouldClauses := make([]map[string]interface{}, 0, 2)
+		shouldClauses = append(shouldClauses, map[string]interface{}{
+			"term": map[string]interface{}{
+				"fname.keyword": map[string]interface{}{
+					"value":            trimmed,
+					"case_insensitive": true,
+				},
+			},
+		})
+
+		if len(tokens) > 0 {
+			mustTerms := make([]map[string]interface{}, 0, len(tokens))
+			for _, token := range tokens {
+				mustTerms = append(mustTerms, map[string]interface{}{
+					"term": map[string]interface{}{
+						"fname.exact": token,
+					},
+				})
+			}
+			shouldClauses = append(shouldClauses, map[string]interface{}{
+				"bool": map[string]interface{}{
+					"must": mustTerms,
+				},
+			})
+		}
+
+		return map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should":               shouldClauses,
+				"minimum_should_match": 1,
+			},
+		}
+	}
+
+	// Address - keyword or token AND match
+	if field == "address" {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return nil
+		}
+
+		tokens := tokenize(trimmed)
+		shouldClauses := []map[string]interface{}{
+			{
+				"term": map[string]interface{}{
+					"address.keyword": map[string]interface{}{
+						"value":            trimmed,
+						"case_insensitive": true,
+					},
+				},
+			},
+		}
+
+		if len(tokens) > 0 {
+			mustTerms := make([]map[string]interface{}, 0, len(tokens))
+			for _, token := range tokens {
+				mustTerms = append(mustTerms, map[string]interface{}{
+					"term": map[string]interface{}{
+						"address.parts": token,
+					},
+				})
+			}
+			shouldClauses = append(shouldClauses, map[string]interface{}{
+				"bool": map[string]interface{}{
+					"must": mustTerms,
+				},
+			})
+		}
+
+		return map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should":               shouldClauses,
+				"minimum_should_match": 1,
+			},
+		}
+	}
+
+	// Default: exact term match
 	return map[string]interface{}{
-		"match_phrase": map[string]interface{}{
+		"term": map[string]interface{}{
 			field: map[string]interface{}{
-				"query": value,
-				"slop":  0,
+				"value":            valueLower,
+				"case_insensitive": true,
 			},
 		},
 	}
@@ -437,24 +603,62 @@ func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 		}
 	}
 
+	// Limit results to 50 per page for better performance
+	size := req.Size
+	if size <= 0 || size > 100 {
+		size = 50 // Default to 50 results
+	}
+
+	// Pagination offset
+	from := req.From
+	if from < 0 {
+		from = 0
+	}
+
 	searchBody := map[string]interface{}{
 		"query":   query,
-		"size":    req.Size,
+		"size":    size,
+		"from":    from, // Pagination offset
 		"_source": true,
+		"timeout": "5s", // Fail fast if query takes too long
+		"sort": []map[string]interface{}{
+			{
+				"_score": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
 	}
 
 	bodyJSON, _ := json.Marshal(searchBody)
 
+	// Log the query for debugging performance issues
+	log.Printf("Search query: %s", string(bodyJSON))
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	startTime := time.Now()
 	resp, err := s.api.Search(
-		context.Background(),
+		ctx,
 		&opensearchapi.SearchReq{
 			Indices: []string{s.cfg.OpenSearchIndex},
 			Body:    bytes.NewReader(bodyJSON),
+			Params: opensearchapi.SearchParams{
+				RequestCache: opensearchapi.ToPointer(true), // Enable request cache
+			},
 		},
 	)
+	queryDuration := time.Since(startTime)
+
 	if err != nil {
+		log.Printf("Search failed after %v: %v", queryDuration, err)
 		return nil, fmt.Errorf("error searching: %v", err)
 	}
+
+	log.Printf("Search completed in %v (OpenSearch took: %dms, total hits: %d)",
+		queryDuration, resp.Took, resp.Hits.Total.Value)
 
 	// Map the SDK response into our SearchResponse struct
 	result := &SearchResponse{
@@ -501,4 +705,29 @@ func (s *OpenSearchService) FinalizeIndex() error {
 
 	log.Printf("Index finalized with replicas and refresh enabled: acknowledged=%t", resp.Acknowledged)
 	return nil
+}
+
+func tokenize(value string) []string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+
+	lower := strings.ToLower(trimmed)
+	split := strings.FieldsFunc(lower, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+	})
+
+	if len(split) == 0 {
+		return nil
+	}
+
+	normalized := make([]string, 0, len(split))
+	for _, token := range split {
+		if token == "" {
+			continue
+		}
+		normalized = append(normalized, token)
+	}
+	return normalized
 }
