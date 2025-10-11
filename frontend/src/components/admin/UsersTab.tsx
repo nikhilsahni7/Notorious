@@ -1,23 +1,27 @@
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { adminService, User } from "@/services/admin.service";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Edit, Trash2, Check, X } from "lucide-react";
+import { Plus, Edit, Trash2, Check, X, History, Key } from "lucide-react";
 import { CreateUserModal } from "./CreateUserModal";
 import { EditUserModal } from "./EditUserModal";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 
 interface UsersTabProps {
   token: string;
 }
 
 export function UsersTab({ token }: UsersTabProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [changingPasswordUser, setChangingPasswordUser] = useState<User | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -145,15 +149,38 @@ export function UsersTab({ token }: UsersTabProps) {
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setEditingUser(user)}
+                        onClick={() => router.push(`/admin/users/${user.id}/history`)}
+                        className="text-green-400 hover:text-green-300 transition-colors"
+                        title="View search history"
+                      >
+                        <History className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingUser(user);
+                        }}
                         className="text-blue-400 hover:text-blue-300 transition-colors"
                         title="Edit user"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setChangingPasswordUser(user);
+                        }}
+                        className="text-orange-400 hover:text-orange-300 transition-colors"
+                        title="Change password"
+                      >
+                        <Key className="h-4 w-4" />
+                      </button>
                       {user.role !== "admin" && (
                         <button
-                          onClick={() => handleDelete(user.id, user.name)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(user.id, user.name);
+                          }}
                           className="text-red-400 hover:text-red-300 transition-colors"
                           title="Delete user"
                         >
@@ -193,6 +220,19 @@ export function UsersTab({ token }: UsersTabProps) {
           onClose={() => setEditingUser(null)}
           onSuccess={() => {
             setEditingUser(null);
+            loadUsers();
+          }}
+        />
+      )}
+
+      {changingPasswordUser && (
+        <ChangePasswordModal
+          userId={changingPasswordUser.id}
+          userName={changingPasswordUser.name}
+          token={token}
+          onClose={() => setChangingPasswordUser(null)}
+          onSuccess={() => {
+            setChangingPasswordUser(null);
             loadUsers();
           }}
         />

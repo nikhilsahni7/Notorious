@@ -14,18 +14,19 @@ const (
 )
 
 type User struct {
-	ID               uuid.UUID `json:"id" db:"id"`
-	Email            string    `json:"email" db:"email"`
-	PasswordHash     string    `json:"-" db:"password_hash"`
-	Name             string    `json:"name" db:"name"`
-	Phone            string    `json:"phone" db:"phone"`
-	Role             Role      `json:"role" db:"role"`
-	DailySearchLimit int       `json:"daily_search_limit" db:"daily_search_limit"`
-	SearchesUsedToday int      `json:"searches_used_today" db:"searches_used_today"`
-	IsActive         bool      `json:"is_active" db:"is_active"`
-	CreatedAt        time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
-	LastResetDate    time.Time `json:"last_reset_date" db:"last_reset_date"`
+	ID                uuid.UUID `json:"id" db:"id"`
+	Email             string    `json:"email" db:"email"`
+	PasswordHash      string    `json:"-" db:"password_hash"`
+	Name              string    `json:"name" db:"name"`
+	Phone             string    `json:"phone" db:"phone"`
+	Role              Role      `json:"role" db:"role"`
+	DailySearchLimit  int       `json:"daily_search_limit" db:"daily_search_limit"`
+	SearchesUsedToday int       `json:"searches_used_today" db:"searches_used_today"`
+	IsActive          bool      `json:"is_active" db:"is_active"`
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
+	LastResetDate     time.Time `json:"last_reset_date" db:"last_reset_date"`
+	LastSearchQuery   string    `json:"last_search_query" db:"last_search_query"`
 }
 
 type UserRequest struct {
@@ -54,3 +55,20 @@ type SearchHistoryWithUser struct {
 	UserName  string `json:"user_name" db:"user_name"`
 }
 
+type PasswordChangeRequest struct {
+	ID              uuid.UUID  `json:"id" db:"id"`
+	UserID          uuid.UUID  `json:"user_id" db:"user_id"`
+	Reason          string     `json:"reason" db:"reason"`
+	Status          string     `json:"status" db:"status"`
+	AdminNotes      *string    `json:"admin_notes,omitempty" db:"admin_notes"`
+	NewPasswordHash *string    `json:"-" db:"new_password_hash"`
+	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
+	ProcessedBy     *uuid.UUID `json:"processed_by,omitempty" db:"processed_by"`
+}
+
+type PasswordChangeRequestWithUser struct {
+	PasswordChangeRequest
+	UserEmail string `json:"user_email" db:"user_email"`
+	UserName  string `json:"user_name" db:"user_name"`
+}

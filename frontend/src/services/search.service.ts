@@ -17,6 +17,16 @@ export interface SearchResponse {
   searches_used_today?: number;
   daily_search_limit?: number;
   searches_remaining?: number;
+  is_duplicate?: boolean;
+}
+
+export interface SearchHistoryItem {
+  id: string;
+  user_id: string;
+  query: string;
+  total_results: number;
+  top_results: Person[];
+  searched_at: string;
 }
 
 export const searchService = {
@@ -52,7 +62,7 @@ export const searchService = {
     );
   },
 
-  getHistory: async (token: string): Promise<any[]> => {
+  getHistory: async (token: string): Promise<SearchHistoryItem[]> => {
     return apiRequest(API_CONFIG.ENDPOINTS.USER.SEARCH_HISTORY, {
       method: "GET",
       token,

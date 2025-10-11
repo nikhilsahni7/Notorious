@@ -36,6 +36,7 @@ func main() {
 	var authHandler *handlers.AuthGinHandler
 	var adminHandler *handlers.AdminGinHandler
 	var userHandler *handlers.UserGinHandler
+	var userPasswordHandler *handlers.UserPasswordGinHandler
 	var searchHandler *handlers.SearchHandler
 
 	if databaseURL != "" && jwtSecret != "" {
@@ -46,16 +47,23 @@ func main() {
 		} else {
 			log.Println("Successfully connected to PostgreSQL database")
 
+			// Run migrations
+			if err := db.RunMigrations("./migrations"); err != nil {
+				log.Fatalf("Failed to run migrations: %v", err)
+			}
+
 			userRepo := repository.NewUserRepository(db)
 			userRequestRepo := repository.NewUserRequestRepository(db)
 			searchHistoryRepo := repository.NewSearchHistoryRepository(db)
+			passwordChangeRepo := repository.NewPasswordChangeRepository(db)
 
 			jwtManager := auth.NewJWTManager(jwtSecret, 24*time.Hour)
 			authMiddleware = middleware.NewGinAuthMiddleware(jwtManager)
 
 			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, jwtManager)
-			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo)
+			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo)
 			userHandler = handlers.NewUserGinHandler(searchHistoryRepo)
+			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo)
 			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
 
 			resetter := scheduler.NewSearchLimitResetter(userRepo)
@@ -96,6 +104,15 @@ func main() {
 		}
 	}
 
+	if authMiddleware != nil && userPasswordHandler != nil {
+		passwordRoutes := r.Group("/api/user/password-change")
+		passwordRoutes.Use(authMiddleware.AuthRequired())
+		{
+			passwordRoutes.POST("/request", userPasswordHandler.RequestPasswordChange)
+			passwordRoutes.GET("/requests", userPasswordHandler.GetPasswordChangeRequests)
+		}
+	}
+
 	if authMiddleware != nil && adminHandler != nil {
 		adminRoutes := r.Group("/api/admin")
 		adminRoutes.Use(authMiddleware.AuthRequired(), authMiddleware.RequireRole("admin"))
@@ -105,11 +122,15 @@ func main() {
 			adminRoutes.GET("/users/:id", adminHandler.GetUser)
 			adminRoutes.PUT("/users/:id", adminHandler.UpdateUser)
 			adminRoutes.DELETE("/users/:id", adminHandler.DeleteUser)
+			adminRoutes.POST("/users/:id/change-password", adminHandler.ChangeUserPassword)
 			adminRoutes.GET("/user-requests", adminHandler.ListUserRequests)
 			adminRoutes.POST("/user-requests/:id/approve", adminHandler.ApproveUserRequest)
 			adminRoutes.POST("/user-requests/:id/reject", adminHandler.RejectUserRequest)
 			adminRoutes.GET("/search-history", adminHandler.GetSearchHistory)
 			adminRoutes.GET("/users/:id/search-history", adminHandler.GetUserSearchHistory)
+			adminRoutes.GET("/password-change-requests", adminHandler.ListPasswordChangeRequests)
+			adminRoutes.POST("/password-change-requests/:id/approve", adminHandler.ApprovePasswordChangeRequest)
+			adminRoutes.POST("/password-change-requests/:id/reject", adminHandler.RejectPasswordChangeRequest)
 		}
 	}
 

@@ -1,117 +1,96 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { SearchFields, SearchOperator } from "@/types/person";
-import { Search } from "lucide-react";
 
 interface SearchFormProps {
   searchFields: SearchFields;
   operator: SearchOperator;
-  loading: boolean;
   onFieldChange: (field: keyof SearchFields, value: string) => void;
   onOperatorChange: (operator: SearchOperator) => void;
-  onSearch: () => void;
+  onSearch?: () => void;
 }
 
 export function SearchForm({
   searchFields,
   operator,
-  loading,
   onFieldChange,
   onOperatorChange,
   onSearch,
 }: SearchFormProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && onSearch) {
       onSearch();
     }
   };
 
   return (
-    <div className="mb-6 space-y-3">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <Input
           id="id"
-          placeholder="Enter master ID..."
+          placeholder="Master ID"
           value={searchFields.id}
           onChange={(e) => onFieldChange("id", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400"
+          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
         />
         <Input
           id="name"
-          placeholder="Enter name..."
+          placeholder="Name"
           value={searchFields.name}
           onChange={(e) => onFieldChange("name", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400"
+          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
         />
         <Input
           id="fname"
-          placeholder="Enter father's name..."
+          placeholder="Father's Name"
           value={searchFields.fname}
           onChange={(e) => onFieldChange("fname", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400"
+          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
         />
         <Input
           id="mobile"
-          placeholder="Enter mobile number..."
+          placeholder="Mobile"
           value={searchFields.mobile}
           onChange={(e) => onFieldChange("mobile", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400"
+          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <Input
           id="alt"
-          placeholder="Enter alternate number..."
+          placeholder="Alternate Number"
           value={searchFields.alt}
           onChange={(e) => onFieldChange("alt", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400 md:col-span-1"
+          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
         />
         <Input
           id="email"
-          placeholder="Enter email..."
+          placeholder="Email"
           value={searchFields.email}
           onChange={(e) => onFieldChange("email", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400 md:col-span-1"
+          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
         />
         <Input
           id="address"
-          placeholder="Enter address..."
+          placeholder="Address"
           value={searchFields.address}
           onChange={(e) => onFieldChange("address", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400 md:col-span-2"
+          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm md:col-span-2"
         />
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <Button
-          onClick={onSearch}
-          disabled={loading}
-          className="bg-pink-500 hover:bg-pink-600 text-white px-6"
-        >
-          {loading ? (
-            <>
-              <Spinner size="sm" className="mr-2" />
-              Searching...
-            </>
-          ) : (
-            <>
-              <Search className="h-4 w-4 mr-2" />
-              Search
-            </>
-          )}
-        </Button>
-        <div className="flex items-center gap-2 text-white text-sm">
-          <span className={operator === "AND" ? "text-white" : "text-gray-400"}>
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-xs text-gray-400">Search Mode:</span>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs ${operator === "AND" ? "text-white font-medium" : "text-gray-500"}`}>
             AND
           </span>
           <Switch
@@ -121,7 +100,7 @@ export function SearchForm({
               onOperatorChange(checked ? "OR" : "AND")
             }
           />
-          <span className={operator === "OR" ? "text-white" : "text-gray-400"}>
+          <span className={`text-xs ${operator === "OR" ? "text-white font-medium" : "text-gray-500"}`}>
             OR
           </span>
         </div>

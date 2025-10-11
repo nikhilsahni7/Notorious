@@ -115,15 +115,6 @@ export default function LoginPage() {
                 Request Access
               </Link>
             </p>
-            <p className="text-center text-sm text-gray-400">
-              Admin user?{" "}
-              <Link
-                href="/admin/login"
-                className="text-purple-400 hover:text-purple-300 font-medium"
-              >
-                Admin Login
-              </Link>
-            </p>
           </div>
         </div>
       </div>

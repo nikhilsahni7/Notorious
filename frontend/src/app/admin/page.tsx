@@ -4,14 +4,15 @@ import { SearchHistoryTab } from "@/components/admin/SearchHistoryTab";
 import { StatsTab } from "@/components/admin/StatsTab";
 import { UserRequestsTab } from "@/components/admin/UserRequestsTab";
 import { UsersTab } from "@/components/admin/UsersTab";
+import { PasswordRequestsTab } from "@/components/admin/PasswordRequestsTab";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { BarChart3, History, LogOut, UserPlus, Users } from "lucide-react";
+import { BarChart3, History, LogOut, UserPlus, Users, Key } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type Tab = "users" | "requests" | "history" | "stats";
+type Tab = "users" | "requests" | "history" | "stats" | "password-requests";
 
 export default function AdminDashboard() {
   const { user, token, logout, isLoading } = useAuth();
@@ -43,7 +44,8 @@ export default function AdminDashboard() {
   const tabs = [
     { id: "stats" as Tab, label: "Dashboard", icon: BarChart3 },
     { id: "users" as Tab, label: "Users", icon: Users },
-    { id: "requests" as Tab, label: "Requests", icon: UserPlus },
+    { id: "requests" as Tab, label: "Access Requests", icon: UserPlus },
+    { id: "password-requests" as Tab, label: "Password Requests", icon: Key },
     { id: "history" as Tab, label: "Search History", icon: History },
   ];
 
@@ -101,6 +103,7 @@ export default function AdminDashboard() {
             {activeTab === "stats" && <StatsTab token={token!} />}
             {activeTab === "users" && <UsersTab token={token!} />}
             {activeTab === "requests" && <UserRequestsTab token={token!} />}
+            {activeTab === "password-requests" && <PasswordRequestsTab token={token!} />}
             {activeTab === "history" && <SearchHistoryTab token={token!} />}
           </div>
         </div>

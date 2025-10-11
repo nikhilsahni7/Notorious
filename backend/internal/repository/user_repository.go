@@ -41,7 +41,8 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 	var user models.User
 	query := `
 		SELECT id, email, password_hash, name, phone, role, daily_search_limit, 
-		       searches_used_today, is_active, created_at, updated_at, last_reset_date
+		       searches_used_today, is_active, created_at, updated_at, last_reset_date, 
+		       COALESCE(last_search_query, '') as last_search_query
 		FROM users
 		WHERE email = $1
 	`
@@ -59,6 +60,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastResetDate,
+		&user.LastSearchQuery,
 	)
 	
 	if err == pgx.ErrNoRows {
@@ -72,7 +74,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 	var user models.User
 	query := `
 		SELECT id, email, password_hash, name, phone, role, daily_search_limit, 
-		       searches_used_today, is_active, created_at, updated_at, last_reset_date
+		       searches_used_today, is_active, created_at, updated_at, last_reset_date,
+		       COALESCE(last_search_query, '') as last_search_query
 		FROM users
 		WHERE id = $1
 	`
@@ -90,6 +93,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastResetDate,
+		&user.LastSearchQuery,
 	)
 	
 	if err == pgx.ErrNoRows {
@@ -139,7 +143,8 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 	if role != "" {
 		query = `
 			SELECT id, email, password_hash, name, phone, role, daily_search_limit, 
-			       searches_used_today, is_active, created_at, updated_at, last_reset_date
+			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
+			       COALESCE(last_search_query, '') as last_search_query
 			FROM users
 			WHERE role = $1
 			ORDER BY created_at DESC
@@ -149,7 +154,8 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 	} else {
 		query = `
 			SELECT id, email, password_hash, name, phone, role, daily_search_limit, 
-			       searches_used_today, is_active, created_at, updated_at, last_reset_date
+			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
+			       COALESCE(last_search_query, '') as last_search_query
 			FROM users
 			ORDER BY created_at DESC
 			LIMIT $1 OFFSET $2
@@ -178,6 +184,7 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 			&user.CreatedAt,
 			&user.UpdatedAt,
 			&user.LastResetDate,
+			&user.LastSearchQuery,
 		); err != nil {
 			return users, err
 		}
@@ -194,6 +201,16 @@ func (r *UserRepository) IncrementSearchUsage(ctx context.Context, userID uuid.U
 		WHERE id = $1
 	`
 	_, err := r.db.Pool.Exec(ctx, query, userID)
+	return err
+}
+
+func (r *UserRepository) UpdateLastSearchQuery(ctx context.Context, userID uuid.UUID, query string) error {
+	sql := `
+		UPDATE users
+		SET last_search_query = $1
+		WHERE id = $2
+	`
+	_, err := r.db.Pool.Exec(ctx, sql, query, userID)
 	return err
 }
 

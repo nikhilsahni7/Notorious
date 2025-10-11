@@ -123,7 +123,10 @@ func (h *SearchHandler) Search(c *gin.Context) {
 
 	totalResults := response.Hits.Total.Value
 
-	if totalResults > 0 {
+	// Check if this is a duplicate search (same query as last search)
+	isDuplicate := user.LastSearchQuery == req.Query
+	
+	if totalResults > 0 && !isDuplicate {
 		h.userRepo.IncrementSearchUsage(c.Request.Context(), user.ID)
 
 		topResults := make([]map[string]interface{}, 0)
@@ -151,7 +154,13 @@ func (h *SearchHandler) Search(c *gin.Context) {
 			TopResults:   topResults,
 		}
 		h.searchHistoryRepo.Create(c.Request.Context(), history)
+		
+		// Update user's searches_used_today counter if not duplicate
+		user.SearchesUsedToday++
 	}
+	
+	// Always update last search query
+	h.userRepo.UpdateLastSearchQuery(c.Request.Context(), user.ID, req.Query)
 
 	results := make([]map[string]interface{}, 0, len(response.Hits.Hits))
 	for _, hit := range response.Hits.Hits {
@@ -168,8 +177,6 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		})
 	}
 
-	user.SearchesUsedToday++
-
 	c.JSON(http.StatusOK, gin.H{
 		"total":               totalResults,
 		"results":             results,
@@ -177,6 +184,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		"searches_used_today": user.SearchesUsedToday,
 		"daily_search_limit":  user.DailySearchLimit,
 		"searches_remaining":  user.DailySearchLimit - user.SearchesUsedToday,
+		"is_duplicate":        isDuplicate && totalResults > 0,
 	})
 }
 
