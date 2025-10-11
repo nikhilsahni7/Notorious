@@ -72,7 +72,7 @@ func main() {
 
 			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, jwtManager)
 			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo)
-			userHandler = handlers.NewUserGinHandler(searchHistoryRepo)
+			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo)
 			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo)
 			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
 
@@ -111,6 +111,7 @@ func main() {
 		userRoutes.Use(authMiddleware.AuthRequired())
 		{
 			userRoutes.GET("/search-history", userHandler.GetSearchHistory)
+		userRoutes.GET("/metadata", userHandler.GetMetadata)
 		}
 	}
 

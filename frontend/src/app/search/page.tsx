@@ -17,6 +17,7 @@ import {
   LogOut,
   RotateCcw,
   Search as SearchIcon,
+  User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -243,6 +244,16 @@ export default function SearchPage() {
             </div>
 
             <Button
+              onClick={() => router.push("/profile")}
+              variant="outline"
+              size="sm"
+              className="bg-transparent border-purple-500 text-purple-400 hover:bg-purple-500/10"
+            >
+              <User className="h-4 w-4 mr-1" />
+              Profile
+            </Button>
+
+            <Button
               onClick={() => router.push("/history")}
               variant="outline"
               size="sm"
@@ -299,8 +310,8 @@ export default function SearchPage() {
 
         {searchesUsed >= searchLimit && (
           <div className="mb-3 bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm">
-            <strong>Daily limit reached!</strong> You&apos;ve used all {searchLimit}{" "}
-            searches. Resets at 12 AM IST.
+            <strong>Daily limit reached!</strong> You&apos;ve used all{" "}
+            {searchLimit} searches. Resets at 12 AM IST.
           </div>
         )}
 

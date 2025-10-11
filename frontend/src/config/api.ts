@@ -12,6 +12,7 @@ export const API_CONFIG = {
     USER: {
       PROFILE: "/api/user/profile",
       SEARCH_HISTORY: "/api/user/search-history",
+      METADATA: "/api/user/metadata",
     },
     ADMIN: {
       USERS: "/api/admin/users",

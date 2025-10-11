@@ -7,6 +7,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  phone?: string;
   role: string;
   daily_search_limit: number;
   searches_used_today: number;

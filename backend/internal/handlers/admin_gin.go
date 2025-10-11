@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -13,12 +14,12 @@ import (
 )
 
 type AdminGinHandler struct {
-	userRepo              *repository.UserRepository
-	userRequestRepo       *repository.UserRequestRepository
-	searchHistoryRepo     *repository.SearchHistoryRepository
-	passwordChangeRepo    *repository.PasswordChangeRepository
-	metadataRepo          *repository.MetadataRepository
-	adminSessionRepo      *repository.AdminSessionRepository
+	userRepo           *repository.UserRepository
+	userRequestRepo    *repository.UserRequestRepository
+	searchHistoryRepo  *repository.SearchHistoryRepository
+	passwordChangeRepo *repository.PasswordChangeRepository
+	metadataRepo       *repository.MetadataRepository
+	adminSessionRepo   *repository.AdminSessionRepository
 }
 
 func NewAdminGinHandler(
@@ -30,12 +31,12 @@ func NewAdminGinHandler(
 	adminSessionRepo *repository.AdminSessionRepository,
 ) *AdminGinHandler {
 	return &AdminGinHandler{
-		userRepo:              userRepo,
-		userRequestRepo:       userRequestRepo,
-		searchHistoryRepo:     searchHistoryRepo,
-		passwordChangeRepo:    passwordChangeRepo,
-		metadataRepo:          metadataRepo,
-		adminSessionRepo:      adminSessionRepo,
+		userRepo:           userRepo,
+		userRequestRepo:    userRequestRepo,
+		searchHistoryRepo:  searchHistoryRepo,
+		passwordChangeRepo: passwordChangeRepo,
+		metadataRepo:       metadataRepo,
+		adminSessionRepo:   adminSessionRepo,
 	}
 }
 
@@ -240,7 +241,13 @@ func (h *AdminGinHandler) ApproveUserRequest(c *gin.Context) {
 			OS:         userRequest.OS,
 			UserAgent:  userRequest.UserAgent,
 		}
-		_ = h.metadataRepo.CreateUserMetadata(c.Request.Context(), metadata)
+		if err := h.metadataRepo.CreateUserMetadata(c.Request.Context(), metadata); err != nil {
+			log.Printf("Failed to store user metadata: %v", err)
+		} else {
+			log.Printf("Successfully stored metadata for user %s", user.ID)
+		}
+	} else {
+		log.Printf("Metadata not stored - metadataRepo: %v, IPAddress: %v", h.metadataRepo != nil, userRequest.IPAddress)
 	}
 
 	approvedNote := "User created successfully"
@@ -508,7 +515,7 @@ func (h *AdminGinHandler) GetRequestCounts(c *gin.Context) {
 
 	// Count pending user requests
 	userRequests, _ := h.userRequestRepo.ListByStatus(ctx, "pending", 1000, 0)
-	
+
 	// Count pending password change requests
 	passwordRequests, _ := h.passwordChangeRepo.ListByStatus(ctx, "pending", 1000, 0)
 
@@ -517,4 +524,3 @@ func (h *AdminGinHandler) GetRequestCounts(c *gin.Context) {
 		"pending_password_requests": len(passwordRequests),
 	})
 }
-

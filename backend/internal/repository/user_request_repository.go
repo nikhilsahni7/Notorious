@@ -19,8 +19,11 @@ func NewUserRequestRepository(db *database.DB) *UserRequestRepository {
 
 func (r *UserRequestRepository) Create(ctx context.Context, req *models.UserRequest) error {
 	query := `
-		INSERT INTO user_requests (email, name, phone, requested_searches_per_day)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO user_requests (
+			email, name, phone, requested_searches_per_day,
+			ip_address, country, city, device_type, browser, os, user_agent
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, status
 	`
 	
@@ -29,13 +32,21 @@ func (r *UserRequestRepository) Create(ctx context.Context, req *models.UserRequ
 		req.Name,
 		req.Phone,
 		req.RequestedSearchesPerDay,
+		req.IPAddress,
+		req.Country,
+		req.City,
+		req.DeviceType,
+		req.Browser,
+		req.OS,
+		req.UserAgent,
 	).Scan(&req.ID, &req.CreatedAt, &req.Status)
 }
 
 func (r *UserRequestRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.UserRequest, error) {
 	var req models.UserRequest
 	query := `
-		SELECT id, email, name, phone, requested_searches_per_day, status, created_at, admin_notes
+		SELECT id, email, name, phone, requested_searches_per_day, status, created_at, admin_notes,
+		       ip_address, country, city, device_type, browser, os, user_agent
 		FROM user_requests
 		WHERE id = $1
 	`
@@ -49,6 +60,13 @@ func (r *UserRequestRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 		&req.Status,
 		&req.CreatedAt,
 		&req.AdminNotes,
+		&req.IPAddress,
+		&req.Country,
+		&req.City,
+		&req.DeviceType,
+		&req.Browser,
+		&req.OS,
+		&req.UserAgent,
 	)
 	
 	if err == pgx.ErrNoRows {
@@ -61,7 +79,8 @@ func (r *UserRequestRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 func (r *UserRequestRepository) ListByStatus(ctx context.Context, status string, limit, offset int) ([]*models.UserRequest, error) {
 	requests := make([]*models.UserRequest, 0)
 	query := `
-		SELECT id, email, name, phone, requested_searches_per_day, status, created_at, admin_notes
+		SELECT id, email, name, phone, requested_searches_per_day, status, created_at, admin_notes,
+		       ip_address, country, city, device_type, browser, os, user_agent
 		FROM user_requests
 		WHERE status = $1
 		ORDER BY created_at DESC
@@ -85,6 +104,13 @@ func (r *UserRequestRepository) ListByStatus(ctx context.Context, status string,
 			&req.Status,
 			&req.CreatedAt,
 			&req.AdminNotes,
+			&req.IPAddress,
+			&req.Country,
+			&req.City,
+			&req.DeviceType,
+			&req.Browser,
+			&req.OS,
+			&req.UserAgent,
 		); err != nil {
 			return requests, err
 		}
