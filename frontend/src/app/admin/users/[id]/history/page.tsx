@@ -47,8 +47,8 @@ export default function UserHistoryPage() {
   const loadData = async () => {
     try {
       const [historyData, userData] = await Promise.all([
-        adminService.getUserSearchHistory(token!, userId),
-        adminService.getUser(token!, userId),
+        adminService.getUserSearchHistory(userId, token!),
+        adminService.getUser(userId, token!),
       ]);
       setHistory(historyData || []);
       setUser(userData);

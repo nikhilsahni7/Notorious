@@ -14,6 +14,30 @@ export interface User {
   updated_at: string;
 }
 
+export interface UserMetadata {
+  id: string;
+  user_id: string;
+  ip_address?: string;
+  country?: string;
+  country_code?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  timezone?: string;
+  device_type?: string;
+  browser?: string;
+  browser_version?: string;
+  os?: string;
+  os_version?: string;
+  user_agent?: string;
+  created_at: string;
+}
+
+export interface UserWithMetadata {
+  user: User;
+  metadata: UserMetadata | null;
+}
+
 export interface UserRequest {
   id: string;
   email: string;
@@ -22,160 +46,213 @@ export interface UserRequest {
   requested_searches_per_day: number;
   status: string;
   created_at: string;
-  admin_notes: string;
+  admin_notes?: string;
+  ip_address?: string;
+  country?: string;
+  city?: string;
+  device_type?: string;
+  browser?: string;
+  os?: string;
+  user_agent?: string;
 }
 
 export interface SearchHistoryItem {
   id: string;
   user_id: string;
-  user_email?: string;
-  user_name?: string;
+  user_email: string;
+  user_name: string;
   query: string;
   total_results: number;
-  top_results: Record<string, unknown>[];
   searched_at: string;
 }
 
-export interface CreateUserData {
-  email: string;
-  password: string;
-  name: string;
-  phone: string;
-  daily_search_limit: number;
-  is_active: boolean;
+export interface PasswordChangeRequestWithUser {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string;
+  reason: string;
+  status: string;
+  admin_notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface UpdateUserData {
-  name: string;
-  phone: string;
-  daily_search_limit: number;
+export interface AdminSession {
+  id: string;
+  admin_id: string;
+  admin_email: string;
+  admin_name: string;
+  ip_address?: string;
+  country?: string;
+  country_code?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  timezone?: string;
+  device_type?: string;
+  browser?: string;
+  browser_version?: string;
+  os?: string;
+  os_version?: string;
+  user_agent?: string;
   is_active: boolean;
+  created_at: string;
+  last_used_at: string;
+  expires_at: string;
+}
+
+export interface RequestCounts {
+  pending_user_requests: number;
+  pending_password_requests: number;
 }
 
 export const adminService = {
-  // User Management
-  listUsers: async (
-    token: string,
-    params?: { limit?: number; offset?: number; role?: string }
-  ): Promise<User[]> => {
-    const queryParams = new URLSearchParams();
-    if (params?.limit) queryParams.append("limit", params.limit.toString());
-    if (params?.offset) queryParams.append("offset", params.offset.toString());
-    if (params?.role) queryParams.append("role", params.role);
-
-    return apiRequest(
-      `${API_CONFIG.ENDPOINTS.ADMIN.USERS}?${queryParams.toString()}`,
-      { method: "GET", token }
-    );
+  // Users
+  listUsers: async (token: string, limit = 100): Promise<User[]> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}?limit=${limit}`, {
+      method: "GET",
+      token,
+    });
   },
 
-  getUser: async (token: string, userId: string): Promise<User> => {
+  getUser: async (userId: string, token: string): Promise<User> => {
     return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}`, {
       method: "GET",
       token,
     });
   },
 
-  createUser: async (token: string, data: CreateUserData): Promise<User> => {
+  getUserDetails: async (userId: string, token: string): Promise<UserWithMetadata> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/details`, {
+      method: "GET",
+      token,
+    });
+  },
+
+  createUser: async (userData: Partial<User> & { password: string }, token: string): Promise<User> => {
     return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.USERS, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(userData),
       token,
     });
   },
 
-  updateUser: async (
-    token: string,
-    userId: string,
-    data: UpdateUserData
-  ): Promise<User> => {
+  updateUser: async (userId: string, userData: Partial<User>, token: string): Promise<User> => {
     return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(userData),
       token,
     });
   },
 
-  deleteUser: async (token: string, userId: string): Promise<void> => {
+  deleteUser: async (userId: string, token: string): Promise<void> => {
     return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}`, {
       method: "DELETE",
       token,
     });
   },
 
+  changeUserPassword: async (userId: string, newPassword: string, token: string): Promise<{ message: string }> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/change-password`, {
+      method: "POST",
+      body: JSON.stringify({ new_password: newPassword }),
+      token,
+    });
+  },
+
   // User Requests
-  listUserRequests: async (
-    token: string,
-    params?: { limit?: number; offset?: number; status?: string }
-  ): Promise<UserRequest[]> => {
-    const queryParams = new URLSearchParams();
-    if (params?.limit) queryParams.append("limit", params.limit.toString());
-    if (params?.offset) queryParams.append("offset", params.offset.toString());
-    if (params?.status) queryParams.append("status", params.status);
-
-    return apiRequest(
-      `${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}?${queryParams.toString()}`,
-      { method: "GET", token }
-    );
+  listUserRequests: async (token: string, status = "pending", limit = 100): Promise<UserRequest[]> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}?status=${status}&limit=${limit}`, {
+      method: "GET",
+      token,
+    });
   },
 
-  approveUserRequest: async (
-    token: string,
-    requestId: string,
-    data: { password: string; daily_search_limit: number }
-  ): Promise<User> => {
-    return apiRequest(
-      `${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/approve`,
-      {
-        method: "POST",
-        body: JSON.stringify(data),
-        token,
-      }
-    );
+  approveUserRequest: async (requestId: string, password: string, dailySearchLimit: number, token: string): Promise<User> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ password, daily_search_limit: dailySearchLimit }),
+      token,
+    });
   },
 
-  rejectUserRequest: async (
-    token: string,
-    requestId: string,
-    reason?: string
-  ): Promise<void> => {
-    return apiRequest(
-      `${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/reject`,
-      {
-        method: "POST",
-        body: JSON.stringify({ reason: reason || "" }),
-        token,
-      }
-    );
+  rejectUserRequest: async (requestId: string, reason: string, token: string): Promise<void> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+      token,
+    });
   },
 
   // Search History
-  getSearchHistory: async (
-    token: string,
-    params?: { limit?: number; offset?: number }
-  ): Promise<SearchHistoryItem[]> => {
-    const queryParams = new URLSearchParams();
-    if (params?.limit) queryParams.append("limit", params.limit.toString());
-    if (params?.offset) queryParams.append("offset", params.offset.toString());
-
-    return apiRequest(
-      `${API_CONFIG.ENDPOINTS.ADMIN.SEARCH_HISTORY}?${queryParams.toString()}`,
-      { method: "GET", token }
-    );
+  getSearchHistory: async (token: string, limit = 50): Promise<SearchHistoryItem[]> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.SEARCH_HISTORY}?limit=${limit}`, {
+      method: "GET",
+      token,
+    });
   },
 
-  getUserSearchHistory: async (
-    token: string,
-    userId: string,
-    params?: { limit?: number; offset?: number }
-  ): Promise<SearchHistoryItem[]> => {
-    const queryParams = new URLSearchParams();
-    if (params?.limit) queryParams.append("limit", params.limit.toString());
-    if (params?.offset) queryParams.append("offset", params.offset.toString());
+  getUserSearchHistory: async (userId: string, token: string, limit = 50): Promise<SearchHistoryItem[]> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/search-history?limit=${limit}`, {
+      method: "GET",
+      token,
+    });
+  },
 
-    return apiRequest(
-      `${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/search-history?${queryParams.toString()}`,
-      { method: "GET", token }
-    );
+  // Password Change Requests
+  listPasswordChangeRequests: async (token: string, status = "pending"): Promise<PasswordChangeRequestWithUser[]> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}?status=${status}&limit=100`, {
+      method: "GET",
+      token,
+    });
+  },
+
+  approvePasswordChangeRequest: async (
+    requestId: string,
+    newPassword: string,
+    adminNotes: string | undefined,
+    token: string
+  ): Promise<{ message: string }> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}/${requestId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ new_password: newPassword, admin_notes: adminNotes }),
+      token,
+    });
+  },
+
+  rejectPasswordChangeRequest: async (
+    requestId: string,
+    adminNotes: string,
+    token: string
+  ): Promise<{ message: string }> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}/${requestId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ admin_notes: adminNotes }),
+      token,
+    });
+  },
+
+  // Sessions
+  getAdminSessions: async (token: string, limit = 100): Promise<AdminSession[]> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.SESSIONS}?limit=${limit}`, {
+      method: "GET",
+      token,
+    });
+  },
+
+  invalidateSession: async (sessionId: string, token: string): Promise<{ message: string }> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.SESSIONS}/${sessionId}`, {
+      method: "DELETE",
+      token,
+    });
+  },
+
+  // Request Counts
+  getRequestCounts: async (token: string): Promise<RequestCounts> => {
+    return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.REQUEST_COUNTS, {
+      method: "GET",
+      token,
+    });
   },
 };

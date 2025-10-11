@@ -26,10 +26,10 @@ export function EditUserModal({ token, user, onClose, onSuccess }: EditUserModal
     setLoading(true);
 
     try {
-      await adminService.updateUser(token, user.id, {
+      await adminService.updateUser(user.id, {
         ...formData,
         daily_search_limit: parseInt(formData.daily_search_limit),
-      });
+      }, token);
       onSuccess();
     } catch (error) {
       console.error("Failed to update user:", error);

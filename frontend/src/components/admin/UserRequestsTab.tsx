@@ -6,9 +6,10 @@ import { ApproveRequestModal } from "./ApproveRequestModal";
 
 interface UserRequestsTabProps {
   token: string;
+  onApprove?: () => void;
 }
 
-export function UserRequestsTab({ token }: UserRequestsTabProps) {
+export function UserRequestsTab({ token, onApprove }: UserRequestsTabProps) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<UserRequest[]>([]);
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected">(
@@ -26,10 +27,7 @@ export function UserRequestsTab({ token }: UserRequestsTabProps) {
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const data = await adminService.listUserRequests(token, {
-        status: filter,
-        limit: 100,
-      });
+      const data = await adminService.listUserRequests(token, filter, 100);
       setRequests(data);
     } catch (error) {
       console.error("Failed to load requests:", error);
@@ -46,7 +44,7 @@ export function UserRequestsTab({ token }: UserRequestsTabProps) {
     if (reason === null) return;
 
     try {
-      await adminService.rejectUserRequest(token, requestId, reason);
+      await adminService.rejectUserRequest(requestId, reason, token);
       await loadRequests();
     } catch (error) {
       console.error("Failed to reject request:", error);
@@ -190,6 +188,7 @@ export function UserRequestsTab({ token }: UserRequestsTabProps) {
           onSuccess={() => {
             setApprovingRequest(null);
             loadRequests();
+            onApprove?.();
           }}
         />
       )}

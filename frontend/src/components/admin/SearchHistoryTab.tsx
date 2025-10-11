@@ -38,7 +38,7 @@ export function SearchHistoryTab({ token }: SearchHistoryTabProps) {
 
   const loadHistory = async () => {
     try {
-      const data = await adminService.getSearchHistory(token, { limit: 100 });
+      const data = await adminService.getSearchHistory(token, 100);
       setHistory(data);
       setFilteredHistory(data);
     } catch (error) {

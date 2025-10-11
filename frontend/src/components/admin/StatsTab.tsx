@@ -24,9 +24,9 @@ export function StatsTab({ token }: StatsTabProps) {
   const loadStats = async () => {
     try {
       const [users, requests, history] = await Promise.all([
-        adminService.listUsers(token, { limit: 100 }).catch(() => []),
-        adminService.listUserRequests(token, { status: "pending", limit: 100 }).catch(() => []),
-        adminService.getSearchHistory(token, { limit: 1000 }).catch(() => []),
+        adminService.listUsers(token, 100).catch(() => []),
+        adminService.listUserRequests(token, "pending", 100).catch(() => []),
+        adminService.getSearchHistory(token, 1000).catch(() => []),
       ]);
 
       setStats({

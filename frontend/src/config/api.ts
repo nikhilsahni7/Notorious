@@ -17,6 +17,9 @@ export const API_CONFIG = {
       USERS: "/api/admin/users",
       USER_REQUESTS: "/api/admin/user-requests",
       SEARCH_HISTORY: "/api/admin/search-history",
+      PASSWORD_CHANGE_REQUESTS: "/api/admin/password-change-requests",
+      SESSIONS: "/api/admin/sessions",
+      REQUEST_COUNTS: "/api/admin/request-counts",
     },
   },
 } as const;

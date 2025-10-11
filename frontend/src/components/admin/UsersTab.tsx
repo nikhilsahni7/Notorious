@@ -46,7 +46,7 @@ export function UsersTab({ token }: UsersTabProps) {
 
   const loadUsers = async () => {
     try {
-      const data = await adminService.listUsers(token, { limit: 100 });
+      const data = await adminService.listUsers(token, 100);
       setUsers(data);
       setFilteredUsers(data);
     } catch (error) {
@@ -63,7 +63,7 @@ export function UsersTab({ token }: UsersTabProps) {
     }
 
     try {
-      await adminService.deleteUser(token, userId);
+      await adminService.deleteUser(userId, token);
       await loadUsers();
     } catch (error) {
       console.error("Failed to delete user:", error);

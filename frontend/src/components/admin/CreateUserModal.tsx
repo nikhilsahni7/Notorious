@@ -27,10 +27,10 @@ export function CreateUserModal({ token, onClose, onSuccess }: CreateUserModalPr
     setLoading(true);
 
     try {
-      await adminService.createUser(token, {
+      await adminService.createUser({
         ...formData,
         daily_search_limit: parseInt(formData.daily_search_limit),
-      });
+      }, token);
       onSuccess();
     } catch (error) {
       console.error("Failed to create user:", error);

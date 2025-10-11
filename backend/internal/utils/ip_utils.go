@@ -61,12 +61,12 @@ func CloseGeoIP() {
 // Handles various proxy headers properly
 func GetClientIP(r *http.Request) string {
 	// Check CF-Connecting-IP (Cloudflare)
-	if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" {
+	if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" && !isPrivateIP(cfIP) {
 		return cfIP
 	}
 
 	// Check X-Real-IP
-	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+	if realIP := r.Header.Get("X-Real-IP"); realIP != "" && !isPrivateIP(realIP) {
 		return realIP
 	}
 
@@ -74,21 +74,34 @@ func GetClientIP(r *http.Request) string {
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 		// Take the first IP in the chain (client IP)
 		ips := strings.Split(forwarded, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
+		for _, ip := range ips {
+			trimmedIP := strings.TrimSpace(ip)
+			if trimmedIP != "" && !isPrivateIP(trimmedIP) {
+				return trimmedIP
+			}
 		}
 	}
 
 	// Check True-Client-IP (Akamai)
-	if trueIP := r.Header.Get("True-Client-IP"); trueIP != "" {
+	if trueIP := r.Header.Get("True-Client-IP"); trueIP != "" && !isPrivateIP(trueIP) {
 		return trueIP
 	}
 
 	// Fall back to RemoteAddr
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		// Return as-is if we can't parse
+		if r.RemoteAddr != "" {
+			return r.RemoteAddr
+		}
+		return "127.0.0.1" // Default fallback
 	}
+	
+	// If it's a local IP, try to get public IP (you might want to remove this in production)
+	if ip == "" || ip == "::1" || ip == "127.0.0.1" {
+		return "127.0.0.1" // Return localhost marker
+	}
+	
 	return ip
 }
 

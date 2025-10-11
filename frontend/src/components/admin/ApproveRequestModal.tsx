@@ -27,10 +27,7 @@ export function ApproveRequestModal({
     setLoading(true);
 
     try {
-      await adminService.approveUserRequest(token, request.id, {
-        password,
-        daily_search_limit: parseInt(dailyLimit),
-      });
+      await adminService.approveUserRequest(request.id, password, parseInt(dailyLimit), token);
       onSuccess();
     } catch (error) {
       console.error("Failed to approve request:", error);
