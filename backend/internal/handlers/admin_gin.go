@@ -17,6 +17,8 @@ type AdminGinHandler struct {
 	userRequestRepo       *repository.UserRequestRepository
 	searchHistoryRepo     *repository.SearchHistoryRepository
 	passwordChangeRepo    *repository.PasswordChangeRepository
+	metadataRepo          *repository.MetadataRepository
+	adminSessionRepo      *repository.AdminSessionRepository
 }
 
 func NewAdminGinHandler(
@@ -24,12 +26,16 @@ func NewAdminGinHandler(
 	userRequestRepo *repository.UserRequestRepository,
 	searchHistoryRepo *repository.SearchHistoryRepository,
 	passwordChangeRepo *repository.PasswordChangeRepository,
+	metadataRepo *repository.MetadataRepository,
+	adminSessionRepo *repository.AdminSessionRepository,
 ) *AdminGinHandler {
 	return &AdminGinHandler{
 		userRepo:              userRepo,
 		userRequestRepo:       userRequestRepo,
 		searchHistoryRepo:     searchHistoryRepo,
 		passwordChangeRepo:    passwordChangeRepo,
+		metadataRepo:          metadataRepo,
+		adminSessionRepo:      adminSessionRepo,
 	}
 }
 
@@ -220,6 +226,21 @@ func (h *AdminGinHandler) ApproveUserRequest(c *gin.Context) {
 	if err := h.userRepo.Create(c.Request.Context(), user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
+	}
+
+	// Store user metadata from the original signup request
+	if h.metadataRepo != nil && userRequest.IPAddress != nil {
+		metadata := &models.UserMetadata{
+			UserID:     user.ID,
+			IPAddress:  userRequest.IPAddress,
+			Country:    userRequest.Country,
+			City:       userRequest.City,
+			DeviceType: userRequest.DeviceType,
+			Browser:    userRequest.Browser,
+			OS:         userRequest.OS,
+			UserAgent:  userRequest.UserAgent,
+		}
+		_ = h.metadataRepo.CreateUserMetadata(c.Request.Context(), metadata)
 	}
 
 	approvedNote := "User created successfully"
@@ -421,3 +442,79 @@ func (h *AdminGinHandler) RejectPasswordChangeRequest(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "password change rejected"})
 }
+
+// GetUserDetails retrieves user with metadata (IP, location, device info)
+func (h *AdminGinHandler) GetUserDetails(c *gin.Context) {
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	var metadata *models.UserMetadata
+	if h.metadataRepo != nil {
+		metadata, _ = h.metadataRepo.GetUserMetadata(c.Request.Context(), userID)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user":     user,
+		"metadata": metadata,
+	})
+}
+
+// GetAdminSessions retrieves all active admin sessions
+func (h *AdminGinHandler) GetAdminSessions(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	if limit > 500 {
+		limit = 500
+	}
+
+	sessions, err := h.adminSessionRepo.GetActiveSessions(c.Request.Context(), limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch sessions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, sessions)
+}
+
+// InvalidateSession invalidates/deletes an admin session
+func (h *AdminGinHandler) InvalidateSession(c *gin.Context) {
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session ID"})
+		return
+	}
+
+	if err := h.adminSessionRepo.InvalidateSession(c.Request.Context(), sessionID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to invalidate session"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "session invalidated successfully"})
+}
+
+// GetRequestCounts returns counts of pending requests for admin dashboard
+func (h *AdminGinHandler) GetRequestCounts(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Count pending user requests
+	userRequests, _ := h.userRequestRepo.ListByStatus(ctx, "pending", 1000, 0)
+	
+	// Count pending password change requests
+	passwordRequests, _ := h.passwordChangeRepo.ListByStatus(ctx, "pending", 1000, 0)
+
+	c.JSON(http.StatusOK, gin.H{
+		"pending_user_requests":     len(userRequests),
+		"pending_password_requests": len(passwordRequests),
+	})
+}
+

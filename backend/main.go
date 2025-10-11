@@ -15,6 +15,7 @@ import (
 	"notorious-backend/internal/middleware"
 	"notorious-backend/internal/repository"
 	"notorious-backend/internal/scheduler"
+	"notorious-backend/internal/utils"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -56,12 +57,21 @@ func main() {
 			userRequestRepo := repository.NewUserRequestRepository(db)
 			searchHistoryRepo := repository.NewSearchHistoryRepository(db)
 			passwordChangeRepo := repository.NewPasswordChangeRepository(db)
+			metadataRepo := repository.NewMetadataRepository(db)
+			adminSessionRepo := repository.NewAdminSessionRepository(db)
+
+			// Initialize GeoIP (optional - falls back to API if not available)
+			geoipPath := os.Getenv("GEOIP_DB_PATH")
+			if geoipPath == "" {
+				geoipPath = "./GeoLite2-City.mmdb"
+			}
+			utils.InitGeoIP(geoipPath)
 
 			jwtManager := auth.NewJWTManager(jwtSecret, 24*time.Hour)
 			authMiddleware = middleware.NewGinAuthMiddleware(jwtManager)
 
-			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, jwtManager)
-			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo)
+			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, jwtManager)
+			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo)
 			userHandler = handlers.NewUserGinHandler(searchHistoryRepo)
 			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo)
 			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
@@ -117,20 +127,35 @@ func main() {
 		adminRoutes := r.Group("/api/admin")
 		adminRoutes.Use(authMiddleware.AuthRequired(), authMiddleware.RequireRole("admin"))
 		{
+			// User management
 			adminRoutes.GET("/users", adminHandler.ListUsers)
 			adminRoutes.POST("/users", adminHandler.CreateUser)
 			adminRoutes.GET("/users/:id", adminHandler.GetUser)
+			adminRoutes.GET("/users/:id/details", adminHandler.GetUserDetails) // NEW: Get user with metadata
 			adminRoutes.PUT("/users/:id", adminHandler.UpdateUser)
 			adminRoutes.DELETE("/users/:id", adminHandler.DeleteUser)
 			adminRoutes.POST("/users/:id/change-password", adminHandler.ChangeUserPassword)
+
+			// User requests
 			adminRoutes.GET("/user-requests", adminHandler.ListUserRequests)
 			adminRoutes.POST("/user-requests/:id/approve", adminHandler.ApproveUserRequest)
 			adminRoutes.POST("/user-requests/:id/reject", adminHandler.RejectUserRequest)
-			adminRoutes.GET("/search-history", adminHandler.GetSearchHistory)
-			adminRoutes.GET("/users/:id/search-history", adminHandler.GetUserSearchHistory)
+
+			// Password change requests
 			adminRoutes.GET("/password-change-requests", adminHandler.ListPasswordChangeRequests)
 			adminRoutes.POST("/password-change-requests/:id/approve", adminHandler.ApprovePasswordChangeRequest)
 			adminRoutes.POST("/password-change-requests/:id/reject", adminHandler.RejectPasswordChangeRequest)
+
+			// Search history
+			adminRoutes.GET("/search-history", adminHandler.GetSearchHistory)
+			adminRoutes.GET("/users/:id/search-history", adminHandler.GetUserSearchHistory)
+
+			// Session management
+			adminRoutes.GET("/sessions", adminHandler.GetAdminSessions)         // NEW: Get all admin sessions
+			adminRoutes.DELETE("/sessions/:id", adminHandler.InvalidateSession) // NEW: Invalidate session
+
+			// Dashboard stats
+			adminRoutes.GET("/request-counts", adminHandler.GetRequestCounts) // NEW: Get pending request counts
 		}
 	}
 

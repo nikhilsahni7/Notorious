@@ -38,6 +38,14 @@ type UserRequest struct {
 	Status                  string    `json:"status" db:"status"`
 	CreatedAt               time.Time `json:"created_at" db:"created_at"`
 	AdminNotes              *string   `json:"admin_notes,omitempty" db:"admin_notes"`
+	// Metadata fields for tracking signup requests
+	IPAddress   *string `json:"ip_address,omitempty" db:"ip_address"`
+	Country     *string `json:"country,omitempty" db:"country"`
+	City        *string `json:"city,omitempty" db:"city"`
+	DeviceType  *string `json:"device_type,omitempty" db:"device_type"`
+	Browser     *string `json:"browser,omitempty" db:"browser"`
+	OS          *string `json:"os,omitempty" db:"os"`
+	UserAgent   *string `json:"user_agent,omitempty" db:"user_agent"`
 }
 
 type SearchHistory struct {
