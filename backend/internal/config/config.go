@@ -18,6 +18,8 @@ type Config struct {
 	AWSSecretAccessKey        string
 	OpenSearchBulkMaxAttempts int
 	OpenSearchBulkRetryBase   time.Duration
+	IngestBatchSize           int
+	IngestWorkerMultiplier    int
 }
 
 func Load() *Config {
@@ -33,7 +35,19 @@ func Load() *Config {
 		AWSSecretAccessKey:        getEnv("AWS_SECRET_ACCESS_KEY", ""),
 		OpenSearchBulkMaxAttempts: getEnvInt("OPENSEARCH_BULK_MAX_ATTEMPTS", 5),
 		OpenSearchBulkRetryBase:   getEnvDuration("OPENSEARCH_BULK_RETRY_BASE", 2*time.Second),
+		IngestBatchSize:           clampInt(getEnvInt("INGEST_BATCH_SIZE", 7500), 1000, 20000),
+		IngestWorkerMultiplier:    clampInt(getEnvInt("INGEST_WORKER_MULTIPLIER", 2), 1, 8),
 	}
+}
+
+func clampInt(val, min, max int) int {
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
 }
 
 func getEnv(key, defaultValue string) string {

@@ -39,6 +39,7 @@ type Document struct {
 	AltAddress         string `json:"alt_address"`
 	Alt                string `json:"alt"`
 	ID                 string `json:"id"`
+	OID                string `json:"oid"`
 	Email              string `json:"email"`
 	YearOfRegistration int    `json:"year_of_registration"`
 	InternalID         string `json:"-"`
@@ -275,12 +276,23 @@ func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Doc
 	if val, ok := rawDoc["id"].(string); ok {
 		doc.ID = val
 	}
+	if val, ok := rawDoc["oid"].(string); ok {
+		doc.OID = val
+	}
+	if doc.OID == "" {
+		if val, ok := rawDoc["_id"].(string); ok {
+			doc.OID = val
+		}
+	}
 	if val, ok := rawDoc["email"].(string); ok {
 		doc.Email = val
 	}
 	if val, ok := rawDoc["_id"].(map[string]interface{}); ok {
 		if oid, ok := val["$oid"].(string); ok && oid != "" {
 			doc.InternalID = oid
+			if doc.OID == "" {
+				doc.OID = oid
+			}
 		}
 	}
 
@@ -289,8 +301,12 @@ func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Doc
 
 func generateDocumentID(doc Document) string {
 	h := sha1.New()
+	bump := doc.OID
+	if bump == "" {
+		bump = doc.InternalID
+	}
 	components := []string{
-		doc.InternalID,
+		bump,
 		doc.Mobile,
 		doc.Name,
 		doc.Fname,
@@ -342,7 +358,7 @@ func buildFieldQuery(field, value string) map[string]interface{} {
 	}
 
 	// ID field - exact term or prefix
-	if field == "id" {
+	if field == "id" || field == "oid" {
 		return map[string]interface{}{
 			"bool": map[string]interface{}{
 				"should": []map[string]interface{}{
@@ -569,7 +585,9 @@ func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 		}
 
 		for _, field := range req.Fields {
-			mustOrShould = append(mustOrShould, buildFieldQuery(field, req.Query))
+			if q := buildFieldQuery(field, req.Query); q != nil {
+				mustOrShould = append(mustOrShould, q)
+			}
 		}
 
 		query = map[string]interface{}{
@@ -592,7 +610,9 @@ func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 
 		for _, fq := range fieldQueries {
 			for field, value := range fq {
-				mustOrShould = append(mustOrShould, buildFieldQuery(field, value))
+				if q := buildFieldQuery(field, value); q != nil {
+					mustOrShould = append(mustOrShould, q)
+				}
 			}
 		}
 

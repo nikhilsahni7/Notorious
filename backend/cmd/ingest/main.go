@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
- )
+)
 
 func main() {
 	// Load environment variables
@@ -64,7 +64,7 @@ func main() {
 	}
 
 	// Process file
-	if err := processFile(inputReader, *offset, openSearchService); err != nil {
+	if err := processFile(inputReader, *offset, cfg, openSearchService); err != nil {
 		log.Fatalf("Error processing file: %v", err)
 	}
 
@@ -77,7 +77,7 @@ func main() {
 	log.Println("Ingestion completed successfully!")
 }
 
-func processFile(input io.Reader, alreadyProcessed int, openSearchService *services.OpenSearchService) error {
+func processFile(input io.Reader, alreadyProcessed int, cfg *config.Config, openSearchService *services.OpenSearchService) error {
 	reader := bufio.NewReader(input)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -87,8 +87,16 @@ func processFile(input io.Reader, alreadyProcessed int, openSearchService *servi
 	startTime := time.Now()
 	var skippedMalformed int64
 
-	numWorkers := runtime.NumCPU()
-	docChan := make(chan map[string]interface{}, 1000)
+	numWorkers := runtime.NumCPU() * cfg.IngestWorkerMultiplier
+	if numWorkers < 1 {
+		numWorkers = 1
+	}
+	batchSize := cfg.IngestBatchSize
+	queueSize := batchSize * cfg.IngestWorkerMultiplier
+	if queueSize < batchSize {
+		queueSize = batchSize
+	}
+	docChan := make(chan map[string]interface{}, queueSize)
 	doneChan := make(chan struct{}, numWorkers)
 	firstErr := make(chan error, 1)
 
@@ -102,7 +110,7 @@ func processFile(input io.Reader, alreadyProcessed int, openSearchService *servi
 		go func() {
 			defer func() { doneChan <- struct{}{} }()
 
-			batch := make([]services.Document, 0, 5000)
+			batch := make([]services.Document, 0, batchSize)
 
 			flush := func() bool {
 				if len(batch) == 0 {
@@ -133,7 +141,7 @@ func processFile(input io.Reader, alreadyProcessed int, openSearchService *servi
 					transformedDoc := openSearchService.TransformDocument(rawDoc)
 					batch = append(batch, transformedDoc)
 
-					if len(batch) >= 5000 {
+					if len(batch) >= batchSize {
 						if !flush() {
 							return
 						}
@@ -155,7 +163,11 @@ func processFile(input io.Reader, alreadyProcessed int, openSearchService *servi
 		return fmt.Errorf("unable to inspect file format: %w", err)
 	}
 
-	const logEvery = int64(10000)
+	const logEveryDefault = int64(10000)
+	logEvery := int64(batchSize)
+	if logEvery < logEveryDefault {
+		logEvery = logEveryDefault
+	}
 
 	skipDocIfNeeded := func() bool {
 		if skipUntil > 0 {

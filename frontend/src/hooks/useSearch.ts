@@ -36,7 +36,16 @@ export function useSearch(token: string | null) {
       const data = await searchService.search(
         {
           query: queryString,
-          fields: ["id", "name", "fname", "mobile", "alt", "email", "address"],
+          fields: [
+            "id",
+            "oid",
+            "name",
+            "fname",
+            "mobile",
+            "alt",
+            "email",
+            "address",
+          ],
           and_or: operator,
           size: pageSize,
           from: from,

@@ -24,6 +24,16 @@ import { useEffect, useState } from "react";
 
 const PAGE_SIZE = 50;
 const LAST_SEARCH_KEY = "notorious_last_search";
+const DEFAULT_SEARCH_FIELDS: SearchFields = {
+  id: "",
+  oid: "",
+  name: "",
+  fname: "",
+  mobile: "",
+  alt: "",
+  email: "",
+  address: "",
+};
 
 interface LastSearchData {
   fields: SearchFields;
@@ -40,13 +50,7 @@ export default function SearchPage() {
   const { performSearch, loading } = useSearch(token);
 
   const [searchFields, setSearchFields] = useState<SearchFields>({
-    id: "",
-    name: "",
-    fname: "",
-    mobile: "",
-    alt: "",
-    email: "",
-    address: "",
+    ...DEFAULT_SEARCH_FIELDS,
   });
   const [operator, setOperator] = useState<SearchOperator>("AND");
   const [results, setResults] = useState<Person[]>([]);
@@ -68,7 +72,11 @@ export default function SearchPage() {
       if (savedSearch) {
         try {
           const lastSearch: LastSearchData = JSON.parse(savedSearch);
-          setSearchFields(lastSearch.fields);
+          setSearchFields({
+            ...DEFAULT_SEARCH_FIELDS,
+            ...lastSearch.fields,
+            oid: lastSearch.fields.oid ?? "",
+          });
           setOperator(lastSearch.operator);
           setResults(lastSearch.results || []);
           setTotalResults(lastSearch.totalResults || 0);
@@ -101,15 +109,7 @@ export default function SearchPage() {
   };
 
   const resetSearch = () => {
-    setSearchFields({
-      id: "",
-      name: "",
-      fname: "",
-      mobile: "",
-      alt: "",
-      email: "",
-      address: "",
-    });
+    setSearchFields({ ...DEFAULT_SEARCH_FIELDS });
     setResults([]);
     setTotalResults(0);
     setClientSearchQuery("");
@@ -147,7 +147,7 @@ export default function SearchPage() {
 
       // Save last search with results to localStorage
       const lastSearchData: LastSearchData = {
-        fields: searchFields,
+        fields: { ...searchFields },
         operator,
         results: data.results || [],
         totalResults: data.total || 0,

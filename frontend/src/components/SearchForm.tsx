@@ -17,6 +17,8 @@ export function SearchForm({
   onOperatorChange,
   onSearch,
 }: SearchFormProps) {
+  const safeValue = (value: string | undefined) => value ?? "";
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && onSearch) {
       onSearch();
@@ -25,19 +27,27 @@ export function SearchForm({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
         <Input
           id="id"
           placeholder="Master ID"
-          value={searchFields.id}
+          value={safeValue(searchFields.id)}
           onChange={(e) => onFieldChange("id", e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
+        />
+        <Input
+          id="oid"
+          placeholder="OID"
+          value={safeValue(searchFields.oid)}
+          onChange={(e) => onFieldChange("oid", e.target.value)}
           onKeyDown={handleKeyDown}
           className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
         />
         <Input
           id="name"
           placeholder="Name"
-          value={searchFields.name}
+          value={safeValue(searchFields.name)}
           onChange={(e) => onFieldChange("name", e.target.value)}
           onKeyDown={handleKeyDown}
           className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
@@ -45,7 +55,7 @@ export function SearchForm({
         <Input
           id="fname"
           placeholder="Father's Name"
-          value={searchFields.fname}
+          value={safeValue(searchFields.fname)}
           onChange={(e) => onFieldChange("fname", e.target.value)}
           onKeyDown={handleKeyDown}
           className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
@@ -53,7 +63,7 @@ export function SearchForm({
         <Input
           id="mobile"
           placeholder="Mobile"
-          value={searchFields.mobile}
+          value={safeValue(searchFields.mobile)}
           onChange={(e) => onFieldChange("mobile", e.target.value)}
           onKeyDown={handleKeyDown}
           className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
@@ -64,7 +74,7 @@ export function SearchForm({
         <Input
           id="alt"
           placeholder="Alternate Number"
-          value={searchFields.alt}
+          value={safeValue(searchFields.alt)}
           onChange={(e) => onFieldChange("alt", e.target.value)}
           onKeyDown={handleKeyDown}
           className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
@@ -72,7 +82,7 @@ export function SearchForm({
         <Input
           id="email"
           placeholder="Email"
-          value={searchFields.email}
+          value={safeValue(searchFields.email)}
           onChange={(e) => onFieldChange("email", e.target.value)}
           onKeyDown={handleKeyDown}
           className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
@@ -80,7 +90,7 @@ export function SearchForm({
         <Input
           id="address"
           placeholder="Address"
-          value={searchFields.address}
+          value={safeValue(searchFields.address)}
           onChange={(e) => onFieldChange("address", e.target.value)}
           onKeyDown={handleKeyDown}
           className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm md:col-span-2"
@@ -90,7 +100,11 @@ export function SearchForm({
       <div className="flex items-center justify-end gap-2">
         <span className="text-xs text-gray-400">Search Mode:</span>
         <div className="flex items-center gap-2">
-          <span className={`text-xs ${operator === "AND" ? "text-white font-medium" : "text-gray-500"}`}>
+          <span
+            className={`text-xs ${
+              operator === "AND" ? "text-white font-medium" : "text-gray-500"
+            }`}
+          >
             AND
           </span>
           <Switch
@@ -100,7 +114,11 @@ export function SearchForm({
               onOperatorChange(checked ? "OR" : "AND")
             }
           />
-          <span className={`text-xs ${operator === "OR" ? "text-white font-medium" : "text-gray-500"}`}>
+          <span
+            className={`text-xs ${
+              operator === "OR" ? "text-white font-medium" : "text-gray-500"
+            }`}
+          >
             OR
           </span>
         </div>

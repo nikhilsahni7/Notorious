@@ -112,7 +112,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		req.AndOr = "OR"
 	}
 	if len(req.Fields) == 0 {
-		req.Fields = []string{"name", "fname", "address", "mobile", "alt", "id", "email"}
+		req.Fields = []string{"name", "fname", "address", "mobile", "alt", "id", "oid", "email"}
 	}
 
 	response, err := h.openSearchService.Search(req)
@@ -125,7 +125,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 
 	// Check if this is a duplicate search (same query as last search)
 	isDuplicate := user.LastSearchQuery == req.Query
-	
+
 	if totalResults > 0 && !isDuplicate {
 		h.userRepo.IncrementSearchUsage(c.Request.Context(), user.ID)
 
@@ -154,11 +154,11 @@ func (h *SearchHandler) Search(c *gin.Context) {
 			TopResults:   topResults,
 		}
 		h.searchHistoryRepo.Create(c.Request.Context(), history)
-		
+
 		// Update user's searches_used_today counter if not duplicate
 		user.SearchesUsedToday++
 	}
-	
+
 	// Always update last search query
 	h.userRepo.UpdateLastSearchQuery(c.Request.Context(), user.ID, req.Query)
 
@@ -172,6 +172,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 			"alt_address":          hit.Source.AltAddress,
 			"alt":                  hit.Source.Alt,
 			"id":                   hit.Source.ID,
+			"oid":                  hit.Source.OID,
 			"email":                hit.Source.Email,
 			"year_of_registration": hit.Source.YearOfRegistration,
 		})
@@ -262,6 +263,7 @@ func (h *SearchHandler) Suggest(c *gin.Context) {
 			"alt_address":          hit.Source.AltAddress,
 			"alt":                  hit.Source.Alt,
 			"id":                   hit.Source.ID,
+			"oid":                  hit.Source.OID,
 			"email":                hit.Source.Email,
 			"year_of_registration": hit.Source.YearOfRegistration,
 		})

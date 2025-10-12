@@ -1,12 +1,15 @@
 export function TableHeader() {
   return (
-    <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-2 mb-2 text-sm font-semibold">
+    <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-2 mb-2 text-sm font-semibold">
       <div className="col-span-2 bg-[#4A5568] text-white p-2 rounded">Name</div>
       <div className="col-span-1 bg-[#4A5568] text-white p-2 rounded text-center">
         Father Name
       </div>
       <div className="col-span-1 bg-[#4A5568] text-white p-2 rounded text-center">
         Master ID
+      </div>
+      <div className="col-span-1 bg-[#4A5568] text-white p-2 rounded text-center">
+        OID
       </div>
       <div className="col-span-2 bg-[#9AE6B4] text-gray-900 p-2 rounded">
         Address

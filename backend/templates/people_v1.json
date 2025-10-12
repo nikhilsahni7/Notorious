@@ -24,6 +24,12 @@
             "filter": ["lowercase", "trim"]
           }
         },
+        "normalizer": {
+          "lowercase_keyword": {
+            "type": "custom",
+            "filter": ["lowercase", "asciifolding"]
+          }
+        },
         "filter": {
           "edge_ngram_filter": {
             "type": "edge_ngram",
@@ -36,14 +42,16 @@
     "mappings": {
       "properties": {
         "mobile": {
-          "type": "keyword"
+          "type": "keyword",
+          "normalizer": "lowercase_keyword"
         },
         "name": {
           "type": "text",
           "analyzer": "name_analyzer",
           "fields": {
             "keyword": {
-              "type": "keyword"
+              "type": "keyword",
+              "normalizer": "lowercase_keyword"
             },
             "exact": {
               "type": "text",
@@ -56,7 +64,8 @@
           "analyzer": "name_analyzer",
           "fields": {
             "keyword": {
-              "type": "keyword"
+              "type": "keyword",
+              "normalizer": "lowercase_keyword"
             }
           }
         },
@@ -65,7 +74,8 @@
           "analyzer": "address_analyzer",
           "fields": {
             "keyword": {
-              "type": "keyword"
+              "type": "keyword",
+              "normalizer": "lowercase_keyword"
             },
             "parts": {
               "type": "text",
@@ -88,6 +98,7 @@
         },
         "alt": {
           "type": "keyword",
+          "normalizer": "lowercase_keyword",
           "fields": {
             "text": {
               "type": "text",
@@ -97,6 +108,7 @@
         },
         "id": {
           "type": "keyword",
+          "normalizer": "lowercase_keyword",
           "fields": {
             "text": {
               "type": "text",
@@ -104,8 +116,13 @@
             }
           }
         },
+        "oid": {
+          "type": "keyword",
+          "normalizer": "lowercase_keyword"
+        },
         "email": {
           "type": "keyword",
+          "normalizer": "lowercase_keyword",
           "fields": {
             "text": {
               "type": "text",

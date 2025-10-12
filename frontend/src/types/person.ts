@@ -1,5 +1,6 @@
 export interface SearchFields {
   id: string;
+  oid: string;
   name: string;
   fname: string;
   mobile: string;
@@ -16,6 +17,7 @@ export interface Person {
   alt_address: string;
   alt: string;
   id: string;
+  oid: string;
   email: string;
   year_of_registration: number;
 }

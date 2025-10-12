@@ -13,6 +13,7 @@ export const formatPersonForClipboard = (person: Person): string => {
   return `Name: ${person.name}
 Father Name: ${person.fname}
 Master ID: ${person.id}
+OID: ${person.oid}
 Mobile: ${person.mobile}
 Alternate Phone: ${person.alt}
 Email: ${person.email}

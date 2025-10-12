@@ -17,6 +17,7 @@ export function useClientFilter(results: Person[], query: string) {
         person.alt_address?.toLowerCase().includes(lowercaseQuery) ||
         person.alt?.toLowerCase().includes(lowercaseQuery) ||
         person.id?.toLowerCase().includes(lowercaseQuery) ||
+        person.oid?.toLowerCase().includes(lowercaseQuery) ||
         person.email?.toLowerCase().includes(lowercaseQuery)
       );
     });
