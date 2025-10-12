@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { Shield, Lock, Mail } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Lock, Mail, Shield } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -23,19 +23,21 @@ export default function AdminLogin() {
 
     try {
       await login(email, password);
-      const storedUser = localStorage.getItem("notorious_user");
+      const storedUser = localStorage.getItem("knotorious_user");
       if (storedUser) {
         const user = JSON.parse(storedUser);
         if (user.role === "admin") {
           router.push("/admin");
         } else {
           setError("Access denied. Admin credentials required.");
-          localStorage.removeItem("notorious_token");
-          localStorage.removeItem("notorious_user");
+          localStorage.removeItem("knotorious_token");
+          localStorage.removeItem("knotorious_user");
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid admin credentials");
+      setError(
+        err instanceof Error ? err.message : "Invalid admin credentials"
+      );
     } finally {
       setLoading(false);
     }
@@ -137,4 +139,3 @@ export default function AdminLogin() {
     </div>
   );
 }
-

@@ -23,7 +23,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const PAGE_SIZE = 50;
-const LAST_SEARCH_KEY = "notorious_last_search";
+const LAST_SEARCH_KEY = "knotorious_last_search";
 const DEFAULT_SEARCH_FIELDS: SearchFields = {
   id: "",
   oid: "",
@@ -204,7 +204,9 @@ export default function SearchPage() {
         <div className="flex justify-between items-center mb-3 bg-[#1a0f2e] p-3 rounded-lg border border-gray-700">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-xl font-bold text-white">Notorious Search</h1>
+              <h1 className="text-xl font-bold text-white">
+                Knotorious Search
+              </h1>
               <div className="text-xs text-gray-400 mt-0.5">
                 {user?.name} • {user?.email}
               </div>

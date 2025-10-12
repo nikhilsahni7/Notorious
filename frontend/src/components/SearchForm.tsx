@@ -38,7 +38,7 @@ export function SearchForm({
         />
         <Input
           id="oid"
-          placeholder="OID"
+          placeholder="ID"
           value={safeValue(searchFields.oid)}
           onChange={(e) => onFieldChange("oid", e.target.value)}
           onKeyDown={handleKeyDown}

@@ -25,8 +25,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = "notorious_token";
-const USER_KEY = "notorious_user";
+const TOKEN_KEY = "knotorious_token";
+const USER_KEY = "knotorious_user";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

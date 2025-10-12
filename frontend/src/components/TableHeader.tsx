@@ -9,7 +9,7 @@ export function TableHeader() {
         Master ID
       </div>
       <div className="col-span-1 bg-[#4A5568] text-white p-2 rounded text-center">
-        OID
+        ID
       </div>
       <div className="col-span-2 bg-[#9AE6B4] text-gray-900 p-2 rounded">
         Address
