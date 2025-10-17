@@ -111,7 +111,7 @@ func main() {
 		userRoutes.Use(authMiddleware.AuthRequired())
 		{
 			userRoutes.GET("/search-history", userHandler.GetSearchHistory)
-		userRoutes.GET("/metadata", userHandler.GetMetadata)
+			userRoutes.GET("/metadata", userHandler.GetMetadata)
 		}
 	}
 
@@ -173,6 +173,7 @@ func main() {
 			searchRoutes.GET("", searchHandler.Search)
 			searchRoutes.POST("", searchHandler.Search)
 			searchRoutes.GET("/suggest", searchHandler.Suggest)
+			searchRoutes.GET("/export-eod", searchHandler.ExportEODReport)
 		}
 	}
 

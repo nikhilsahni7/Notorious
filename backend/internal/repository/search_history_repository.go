@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/google/uuid"
 	"notorious-backend/internal/database"
 	"notorious-backend/internal/models"
+
+	"github.com/google/uuid"
 )
 
 type SearchHistoryRepository struct {
@@ -22,13 +23,13 @@ func (r *SearchHistoryRepository) Create(ctx context.Context, history *models.Se
 	if err != nil {
 		return err
 	}
-	
+
 	query := `
 		INSERT INTO search_history (user_id, query, total_results, top_results)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, searched_at
 	`
-	
+
 	return r.db.Pool.QueryRow(ctx, query,
 		history.UserID,
 		history.Query,
@@ -46,17 +47,17 @@ func (r *SearchHistoryRepository) GetByUserID(ctx context.Context, userID uuid.U
 		ORDER BY searched_at DESC
 		LIMIT $2 OFFSET $3
 	`
-	
+
 	rows, err := r.db.Pool.Query(ctx, query, userID, limit, offset)
 	if err != nil {
 		return histories, err
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var history models.SearchHistory
 		var topResultsJSON []byte
-		
+
 		if err := rows.Scan(
 			&history.ID,
 			&history.UserID,
@@ -67,21 +68,21 @@ func (r *SearchHistoryRepository) GetByUserID(ctx context.Context, userID uuid.U
 		); err != nil {
 			return histories, err
 		}
-		
+
 		if err := json.Unmarshal(topResultsJSON, &history.TopResults); err != nil {
 			return histories, err
 		}
-		
+
 		histories = append(histories, &history)
 	}
-	
+
 	return histories, rows.Err()
 }
 
 func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, offset int) ([]*models.SearchHistoryWithUser, error) {
 	histories := make([]*models.SearchHistoryWithUser, 0)
 	query := `
-		SELECT 
+		SELECT
 			sh.id, sh.user_id, sh.query, sh.total_results, sh.top_results, sh.searched_at,
 			u.email, u.name
 		FROM search_history sh
@@ -89,17 +90,17 @@ func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, of
 		ORDER BY sh.searched_at DESC
 		LIMIT $1 OFFSET $2
 	`
-	
+
 	rows, err := r.db.Pool.Query(ctx, query, limit, offset)
 	if err != nil {
 		return histories, err
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var history models.SearchHistoryWithUser
 		var topResultsJSON []byte
-		
+
 		if err := rows.Scan(
 			&history.ID,
 			&history.UserID,
@@ -112,14 +113,14 @@ func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, of
 		); err != nil {
 			return histories, err
 		}
-		
+
 		if err := json.Unmarshal(topResultsJSON, &history.TopResults); err != nil {
 			return histories, err
 		}
-		
+
 		histories = append(histories, &history)
 	}
-	
+
 	return histories, rows.Err()
 }
 
@@ -130,3 +131,46 @@ func (r *SearchHistoryRepository) CountByUserID(ctx context.Context, userID uuid
 	return count, err
 }
 
+// GetTodaySearches retrieves all searches from midnight to now in IST
+func (r *SearchHistoryRepository) GetTodaySearches(ctx context.Context) ([]*models.SearchHistory, error) {
+	histories := make([]*models.SearchHistory, 0)
+
+	// IST is UTC+5:30
+	query := `
+		SELECT id, user_id, query, total_results, top_results, searched_at
+		FROM search_history
+		WHERE searched_at >= (CURRENT_DATE AT TIME ZONE 'Asia/Kolkata')
+		  AND searched_at < (CURRENT_DATE AT TIME ZONE 'Asia/Kolkata' + INTERVAL '1 day')
+		ORDER BY searched_at ASC
+	`
+
+	rows, err := r.db.Pool.Query(ctx, query)
+	if err != nil {
+		return histories, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var history models.SearchHistory
+		var topResultsJSON []byte
+
+		if err := rows.Scan(
+			&history.ID,
+			&history.UserID,
+			&history.Query,
+			&history.TotalResults,
+			&topResultsJSON,
+			&history.SearchedAt,
+		); err != nil {
+			return histories, err
+		}
+
+		if err := json.Unmarshal(topResultsJSON, &history.TopResults); err != nil {
+			return histories, err
+		}
+
+		histories = append(histories, &history)
+	}
+
+	return histories, rows.Err()
+}

@@ -13,6 +13,7 @@ import { Person, SearchFields, SearchOperator } from "@/types/person";
 import { copyToClipboard, formatPersonForClipboard } from "@/utils/clipboard";
 import {
   AlertCircle,
+  Download,
   History,
   LogOut,
   RotateCcw,
@@ -170,6 +171,50 @@ export default function SearchPage() {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  const handleExportEOD = async () => {
+    try {
+      // Sanitize NEXT_PUBLIC_API_URL which may include quotes in .env
+      let base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      base = base.replace(/^"|"$/g, "");
+      const exportUrl = `${base.replace(/\/$/, "")}/search/export-eod`;
+
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to export EOD report");
+      }
+
+      // Get the filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = "EOD_Report.csv";
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename=(.+)/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Download the CSV file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert(error instanceof Error ? error.message : "Export failed");
+    }
+  };
+
   const handleNextPage = () => {
     if (currentPage < totalPages) {
       executeSearch(currentPage + 1);
@@ -288,16 +333,15 @@ export default function SearchPage() {
               Password
             </Button>
 
-            {user?.role === "admin" && (
-              <Button
-                onClick={() => router.push("/admin")}
-                variant="outline"
-                size="sm"
-                className="bg-transparent border-purple-500 text-purple-400 hover:bg-purple-500/10"
-              >
-                Admin
-              </Button>
-            )}
+            <Button
+              onClick={handleExportEOD}
+              variant="outline"
+              size="sm"
+              className="bg-transparent border-green-500 text-green-400 hover:bg-green-500/10"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Export EOD
+            </Button>
 
             <Button
               onClick={logout}

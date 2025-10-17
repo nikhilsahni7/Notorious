@@ -206,7 +206,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		h.userRepo.IncrementSearchUsage(c.Request.Context(), user.ID)
 
 		topResults := make([]map[string]interface{}, 0)
-		limit := 5
+		limit := 25
 		if len(response.Hits.Hits) < limit {
 			limit = len(response.Hits.Hits)
 		}
@@ -214,11 +214,14 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		for i := 0; i < limit; i++ {
 			hit := response.Hits.Hits[i]
 			topResults = append(topResults, map[string]interface{}{
-				"mobile":               hit.Source.Mobile,
+				"oid":                  hit.Source.OID,
 				"name":                 hit.Source.Name,
 				"fname":                hit.Source.Fname,
-				"id":                   hit.Source.ID,
+				"mobile":               hit.Source.Mobile,
+				"alt":                  hit.Source.Alt,
 				"email":                hit.Source.Email,
+				"address":              hit.Source.Address,
+				"alt_address":          hit.Source.AltAddress,
 				"year_of_registration": hit.Source.YearOfRegistration,
 			})
 		}
@@ -350,4 +353,132 @@ func (h *SearchHandler) Suggest(c *gin.Context) {
 		"results": results,
 		"took_ms": response.Took,
 	})
+}
+
+// ExportEODReport generates a CSV file with all searches from today (midnight to now IST)
+func (h *SearchHandler) ExportEODReport(c *gin.Context) {
+	// Get today's searches from the database
+	histories, err := h.searchHistoryRepo.GetTodaySearches(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve search history"})
+		return
+	}
+
+	// Generate filename with current date in IST
+	now := time.Now().In(h.istLocation)
+	filename := fmt.Sprintf("EOD_Report_%s.csv", now.Format("2006-01-02"))
+
+	// Set CSV headers
+	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+
+	// Write CSV header row (without Result Number)
+	c.Writer.Write([]byte("Search ID,Timestamp,Total Results,OID,Name,Father Name,Mobile,Alt Phone,Email,Address,Alt Address,Year of Registration\n"))
+
+	// Process each search history record
+	for searchID, history := range histories {
+		// Parse top results
+		topResults, ok := history.TopResults.([]interface{})
+		if !ok {
+			continue
+		}
+
+		// Format timestamp in IST
+		timestamp := history.SearchedAt.In(h.istLocation).Format("2006-01-02 15:04:05")
+		totalResults := history.TotalResults
+
+		// Limit to top 25 results
+		maxResults := len(topResults)
+		if maxResults > 25 {
+			maxResults = 25
+		}
+
+		// Write each result as a CSV row
+		for resultNum := 0; resultNum < maxResults; resultNum++ {
+			result, ok := topResults[resultNum].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			// Helper function to safely get string values
+			getStringValue := func(key string) string {
+				if val, ok := result[key]; ok && val != nil {
+					return fmt.Sprintf("%v", val)
+				}
+				return ""
+			}
+
+			// Format address by replacing ! with comma
+			formatAddress := func(addr string) string {
+				if addr == "" {
+					return ""
+				}
+				return escapeCSV(addr)
+			}
+
+			// Build CSV row
+			row := fmt.Sprintf("%d,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
+				searchID+1,                                        // Search ID (1-indexed)
+				timestamp,                                         // Timestamp
+				totalResults,                                      // Total Results
+				escapeCSV(getStringValue("oid")),                  // OID
+				escapeCSV(getStringValue("name")),                 // Name
+				escapeCSV(getStringValue("fname")),                // Father Name
+				escapeCSV(getStringValue("mobile")),               // Mobile
+				escapeCSV(getStringValue("alt")),                  // Alt Phone
+				escapeCSV(getStringValue("email")),                // Email
+				formatAddress(getStringValue("address")),          // Address
+				formatAddress(getStringValue("alt_address")),      // Alt Address
+				escapeCSV(getStringValue("year_of_registration")), // Year of Registration
+			)
+
+			c.Writer.Write([]byte(row))
+		}
+	}
+}
+
+// escapeCSV escapes CSV values by wrapping in quotes if they contain special characters
+func escapeCSV(value string) string {
+	if value == "" {
+		return ""
+	}
+	// Replace ! with comma for addresses
+	value = replaceChar(value, '!', ',')
+
+	// If the value contains comma, quote, or newline, wrap in quotes and escape quotes
+	needsQuotes := false
+	for _, ch := range value {
+		if ch == ',' || ch == '"' || ch == '\n' || ch == '\r' {
+			needsQuotes = true
+			break
+		}
+	}
+
+	if needsQuotes {
+		// Escape existing quotes by doubling them
+		escaped := ""
+		for _, ch := range value {
+			if ch == '"' {
+				escaped += "\"\""
+			} else {
+				escaped += string(ch)
+			}
+		}
+		return "\"" + escaped + "\""
+	}
+
+	return value
+}
+
+// replaceChar replaces all occurrences of old rune with new rune in string
+func replaceChar(s string, old, new rune) string {
+	result := ""
+	for _, ch := range s {
+		if ch == old {
+			result += string(new)
+		} else {
+			result += string(ch)
+		}
+	}
+	return result
 }
