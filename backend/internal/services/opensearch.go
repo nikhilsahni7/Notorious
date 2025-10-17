@@ -962,17 +962,31 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 	})
 
 	// Add master ID searches (using ID field) - this is the most important
+	// Use prefix search to handle Master IDs with suffixes (e.g., 718834428718M, 718834428718A)
 	if len(masterIDSet) > 0 {
-		masterIDTerms := make([]string, 0, len(masterIDSet))
 		for masterID := range masterIDSet {
-			masterIDTerms = append(masterIDTerms, masterID)
+			// For each Master ID, search for exact match OR prefix match
+			comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+				"bool": map[string]interface{}{
+					"should": []map[string]interface{}{
+						{
+							"term": map[string]interface{}{
+								"id": masterID,
+							},
+						},
+						{
+							"prefix": map[string]interface{}{
+								"id": masterID, // This will match 718834428718, 718834428718M, 718834428718A, etc.
+							},
+						},
+					},
+					"minimum_should_match": 1,
+					"boost":                2.0, // High boost for master ID matches
+				},
+			})
 		}
-		comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
-			"terms": map[string]interface{}{
-				"id":    masterIDTerms,
-				"boost": 2.0, // High boost for master ID matches
-			},
-		})
+
+		log.Printf("Master ID search will include prefix matching for suffixes (e.g., M, A, B)")
 	}
 
 	// Only add name/fname/address searches if we don't have Master IDs
