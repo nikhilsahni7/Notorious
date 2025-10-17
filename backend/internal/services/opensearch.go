@@ -858,7 +858,6 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 	addressSet := make(map[string]bool)
 
 	// Track filtered IDs for logging
-	validMasterIDs := []string{}
 	invalidMasterIDs := []string{}
 
 	// Parse initial results
@@ -874,13 +873,23 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 		if doc.ID != "" {
 			if isValidMasterID(doc.ID) {
 				masterIDSet[doc.ID] = true
-				validMasterIDs = append(validMasterIDs, doc.ID)
 			} else {
-				invalidMasterIDs = append(invalidMasterIDs, doc.ID)
+				// Only add to invalid list if not already there
+				alreadyInvalid := false
+				for _, inv := range invalidMasterIDs {
+					if inv == doc.ID {
+						alreadyInvalid = true
+						break
+					}
+				}
+				if !alreadyInvalid {
+					invalidMasterIDs = append(invalidMasterIDs, doc.ID)
+				}
 			}
 		}
 
-		// Collect names, father names, and addresses
+		// Always collect names, father names, and addresses
+		// We'll decide later whether to use them based on Master ID availability
 		if doc.Name != "" {
 			nameSet[strings.ToLower(strings.TrimSpace(doc.Name))] = true
 		}
@@ -894,10 +903,15 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 
 	// Log Master ID filtering
 	if len(invalidMasterIDs) > 0 {
-		log.Printf("Filtered out %d invalid/masked Master IDs: %v", len(invalidMasterIDs), invalidMasterIDs)
+		log.Printf("Filtered out %d invalid/masked Master IDs (unique): %v", len(invalidMasterIDs), invalidMasterIDs)
 	}
-	if len(validMasterIDs) > 0 {
-		log.Printf("Using %d valid Master IDs for comprehensive search: %v", len(validMasterIDs), validMasterIDs)
+	if len(masterIDSet) > 0 {
+		// Convert map to slice for logging (deduplicated)
+		uniqueMasterIDs := make([]string, 0, len(masterIDSet))
+		for id := range masterIDSet {
+			uniqueMasterIDs = append(uniqueMasterIDs, id)
+		}
+		log.Printf("Using %d unique Master ID(s) for comprehensive search: %v", len(uniqueMasterIDs), uniqueMasterIDs)
 	}
 
 	// If no initial results, return empty response
@@ -927,7 +941,7 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 	// Step 2: Build comprehensive query with all collected data
 	var comprehensiveShould []map[string]interface{}
 
-	// Add original mobile/alt search
+	// Add original mobile/alt search with highest boost
 	comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
 		"bool": map[string]interface{}{
 			"should": []map[string]interface{}{
@@ -943,11 +957,11 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 				},
 			},
 			"minimum_should_match": 1,
-			"boost":                2.0, // Boost direct mobile matches
+			"boost":                3.0, // Highest boost for direct mobile matches
 		},
 	})
 
-	// Add master ID searches (using ID field)
+	// Add master ID searches (using ID field) - this is the most important
 	if len(masterIDSet) > 0 {
 		masterIDTerms := make([]string, 0, len(masterIDSet))
 		for masterID := range masterIDSet {
@@ -956,53 +970,57 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 		comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
 			"terms": map[string]interface{}{
 				"id":    masterIDTerms,
-				"boost": 1.5, // Boost master ID matches
+				"boost": 2.0, // High boost for master ID matches
 			},
 		})
 	}
 
-	// Add name searches
-	if len(nameSet) > 0 {
-		for name := range nameSet {
-			comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
-				"term": map[string]interface{}{
-					"name": map[string]interface{}{
-						"value":            name,
-						"case_insensitive": true,
-						"boost":            1.2,
+	// Only add name/fname/address searches if we don't have Master IDs
+	// This prevents too many unrelated results
+	if len(masterIDSet) == 0 {
+		// Add name searches
+		if len(nameSet) > 0 {
+			for name := range nameSet {
+				comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+					"term": map[string]interface{}{
+						"name": map[string]interface{}{
+							"value":            name,
+							"case_insensitive": true,
+							"boost":            1.2,
+						},
 					},
-				},
-			})
+				})
+			}
 		}
-	}
 
-	// Add father name searches
-	if len(fnameSet) > 0 {
-		for fname := range fnameSet {
-			comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
-				"term": map[string]interface{}{
-					"fname": map[string]interface{}{
-						"value":            fname,
-						"case_insensitive": true,
-						"boost":            1.2,
+		// Add father name searches
+		if len(fnameSet) > 0 {
+			for fname := range fnameSet {
+				comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+					"term": map[string]interface{}{
+						"fname": map[string]interface{}{
+							"value":            fname,
+							"case_insensitive": true,
+							"boost":            1.2,
+						},
 					},
-				},
-			})
+				})
+			}
 		}
-	}
 
-	// Add address searches
-	if len(addressSet) > 0 {
-		for address := range addressSet {
-			comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
-				"term": map[string]interface{}{
-					"address": map[string]interface{}{
-						"value":            address,
-						"case_insensitive": true,
-						"boost":            1.1,
+		// Add address searches
+		if len(addressSet) > 0 {
+			for address := range addressSet {
+				comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+					"term": map[string]interface{}{
+						"address": map[string]interface{}{
+							"value":            address,
+							"case_insensitive": true,
+							"boost":            1.1,
+						},
 					},
-				},
-			})
+				})
+			}
 		}
 	}
 
@@ -1013,9 +1031,17 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 		},
 	}
 
+	// Use a larger size for comprehensive search to ensure we get all Master ID matches
+	// OpenSearch can handle up to 10000 results
+	comprehensiveSize := 200 // Get up to 200 results for comprehensive search
+	if len(masterIDSet) > 0 {
+		// If we have Master IDs, we want to get ALL records with those IDs
+		comprehensiveSize = 500
+	}
+
 	comprehensiveSearchBody := map[string]interface{}{
 		"query":   comprehensiveQuery,
-		"size":    size * 2, // Get more results since we're doing comprehensive search
+		"size":    comprehensiveSize,
 		"_source": true,
 		"timeout": "10s",
 		"sort": []map[string]interface{}{
@@ -1028,8 +1054,20 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 	}
 
 	comprehensiveBodyJSON, _ := json.Marshal(comprehensiveSearchBody)
-	log.Printf("Comprehensive mobile search - Full query searching %d master IDs, %d names, %d fnames, %d addresses",
-		len(masterIDSet), len(nameSet), len(fnameSet), len(addressSet))
+
+	// Log what's actually in the query
+	nameCount := 0
+	fnameCount := 0
+	addressCount := 0
+	if len(masterIDSet) == 0 {
+		// Only count these if they're actually in the query
+		nameCount = len(nameSet)
+		fnameCount = len(fnameSet)
+		addressCount = len(addressSet)
+	}
+
+	log.Printf("Comprehensive mobile search - Query includes: %d Master IDs, %d names, %d fnames, %d addresses (size: %d)",
+		len(masterIDSet), nameCount, fnameCount, addressCount, comprehensiveSize)
 
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel2()
@@ -1051,7 +1089,14 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 		return s.convertToSearchResponse(initialResp)
 	}
 
-	log.Printf("Comprehensive mobile search completed - found %d total results", comprehensiveResp.Hits.Total.Value)
+	log.Printf("Comprehensive mobile search completed - returned %d out of %d total matching results",
+		len(comprehensiveResp.Hits.Hits), comprehensiveResp.Hits.Total.Value)
+
+	// If we got fewer results than expected with Master ID, log for debugging
+	if len(masterIDSet) > 0 && comprehensiveResp.Hits.Total.Value < 60 {
+		log.Printf("WARNING: Expected more results with Master ID. Got %d, size was %d",
+			comprehensiveResp.Hits.Total.Value, comprehensiveSize)
+	}
 
 	return s.convertToSearchResponse(comprehensiveResp)
 }
