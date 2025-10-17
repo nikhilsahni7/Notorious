@@ -9,17 +9,23 @@ const formatAddress = (address: string | undefined) => {
     .replace(/,$/g, "");
 };
 
+// Format single person for Excel/CSV with tab-separated values
 export const formatPersonForClipboard = (person: Person): string => {
-  return `Name: ${person.name}
-Father Name: ${person.fname}
-Master ID: ${person.id}
-OID: ${person.oid}
-Mobile: ${person.mobile}
-Alternate Phone: ${person.alt}
-Email: ${person.email}
-Address: ${formatAddress(person.address)}
-Alt Address: ${formatAddress(person.alt_address)}
-Year of Registration: ${person.year_of_registration}`;
+  return `${person.name || ""}\t${person.fname || ""}\t${person.id || ""}\t${
+    person.oid || ""
+  }\t${person.mobile || ""}\t${person.alt || ""}\t${
+    person.email || ""
+  }\t${formatAddress(person.address)}\t${formatAddress(person.alt_address)}\t${
+    person.year_of_registration || ""
+  }`;
+};
+
+// Format multiple persons for Excel/CSV with headers
+export const formatPersonsForClipboard = (persons: Person[]): string => {
+  const header =
+    "Name\tFather Name\tMaster ID\tOID\tMobile\tAlternate Phone\tEmail\tAddress\tAlt Address\tYear of Registration";
+  const rows = persons.map((person) => formatPersonForClipboard(person));
+  return [header, ...rows].join("\n");
 };
 
 export const copyToClipboard = async (text: string): Promise<void> => {

@@ -10,7 +10,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useClientFilter } from "@/hooks/useClientFilter";
 import { useSearch } from "@/hooks/useSearch";
 import { Person, SearchFields, SearchOperator } from "@/types/person";
-import { copyToClipboard, formatPersonForClipboard } from "@/utils/clipboard";
+import {
+  copyToClipboard,
+  formatPersonForClipboard,
+  formatPersonsForClipboard,
+} from "@/utils/clipboard";
 import {
   AlertCircle,
   Download,
@@ -59,6 +63,7 @@ export default function SearchPage() {
   const [searchTime, setSearchTime] = useState(0);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [isCopyingAll, setIsCopyingAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchesUsed, setSearchesUsed] = useState(0);
   const [searchLimit, setSearchLimit] = useState(0);
@@ -169,6 +174,13 @@ export default function SearchPage() {
     copyToClipboard(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleCopyAll = () => {
+    const text = formatPersonsForClipboard(filteredResults);
+    copyToClipboard(text);
+    setIsCopyingAll(true);
+    setTimeout(() => setIsCopyingAll(false), 2000);
   };
 
   const handleExportEOD = async () => {
@@ -428,6 +440,8 @@ export default function SearchPage() {
               results={filteredResults}
               copiedIndex={copiedIndex}
               onCopy={handleCopy}
+              onCopyAll={handleCopyAll}
+              isCopyingAll={isCopyingAll}
             />
 
             <div className="mt-3">
