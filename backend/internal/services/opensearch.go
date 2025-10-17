@@ -751,3 +751,331 @@ func tokenize(value string) []string {
 	}
 	return normalized
 }
+
+// isValidMasterID checks if a Master ID is valid (not masked with 'x' characters)
+// Valid: "402371432105", "6802357444f7c329baa9993"
+// Invalid: "xxxxxxxx2105", "xxxx1234", "xxx"
+func isValidMasterID(masterID string) bool {
+	if masterID == "" {
+		return false
+	}
+
+	// Count the number of 'x' characters (case-insensitive)
+	xCount := 0
+	totalChars := len(masterID)
+
+	for _, ch := range strings.ToLower(masterID) {
+		if ch == 'x' {
+			xCount++
+		}
+	}
+
+	// If more than 30% of the ID is 'x' characters, consider it masked/invalid
+	// This handles cases like "xxxxxxxx2105" (8 out of 12 chars = 66%)
+	if totalChars > 0 && float64(xCount)/float64(totalChars) > 0.3 {
+		return false
+	}
+
+	// Additional check: if ID starts with multiple 'x' characters, it's likely masked
+	if totalChars >= 4 && strings.HasPrefix(strings.ToLower(masterID), "xxxx") {
+		return false
+	}
+
+	// Must have at least some alphanumeric content
+	if totalChars < 8 {
+		return false
+	}
+
+	return true
+}
+
+// ComprehensiveMobileSearch performs an extensive search when searching by mobile number
+// It searches for:
+// 1. Direct matches in mobile and alt fields
+// 2. All records associated with the master ID (oid) of found records
+// 3. Records with matching name, fname, and address from initial results
+func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size int) (*SearchResponse, error) {
+	mobileNumber = strings.TrimSpace(mobileNumber)
+	if mobileNumber == "" {
+		return nil, fmt.Errorf("mobile number cannot be empty")
+	}
+
+	if size <= 0 || size > 100 {
+		size = 50
+	}
+
+	// Step 1: Search for the mobile number in both mobile and alt fields
+	initialQuery := map[string]interface{}{
+		"bool": map[string]interface{}{
+			"should": []map[string]interface{}{
+				{
+					"term": map[string]interface{}{
+						"mobile": strings.ToLower(mobileNumber),
+					},
+				},
+				{
+					"term": map[string]interface{}{
+						"alt": strings.ToLower(mobileNumber),
+					},
+				},
+			},
+			"minimum_should_match": 1,
+		},
+	}
+
+	initialSearchBody := map[string]interface{}{
+		"query":   initialQuery,
+		"size":    size,
+		"_source": true,
+		"timeout": "5s",
+	}
+
+	bodyJSON, _ := json.Marshal(initialSearchBody)
+	log.Printf("Comprehensive mobile search - Initial query: %s", string(bodyJSON))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Execute initial search
+	initialResp, err := s.api.Search(
+		ctx,
+		&opensearchapi.SearchReq{
+			Indices: []string{s.cfg.OpenSearchIndex},
+			Body:    bytes.NewReader(bodyJSON),
+			Params: opensearchapi.SearchParams{
+				RequestCache: opensearchapi.ToPointer(true),
+			},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initial mobile search failed: %v", err)
+	}
+
+	// Collect unique values for comprehensive search
+	masterIDSet := make(map[string]bool)
+	nameSet := make(map[string]bool)
+	fnameSet := make(map[string]bool)
+	addressSet := make(map[string]bool)
+
+	// Track filtered IDs for logging
+	validMasterIDs := []string{}
+	invalidMasterIDs := []string{}
+
+	// Parse initial results
+	var initialDocs []Document
+	for _, hit := range initialResp.Hits.Hits {
+		var doc Document
+		if err := json.Unmarshal(hit.Source, &doc); err != nil {
+			continue
+		}
+		initialDocs = append(initialDocs, doc)
+
+		// Collect master IDs (ID field) - only valid, non-masked IDs
+		if doc.ID != "" {
+			if isValidMasterID(doc.ID) {
+				masterIDSet[doc.ID] = true
+				validMasterIDs = append(validMasterIDs, doc.ID)
+			} else {
+				invalidMasterIDs = append(invalidMasterIDs, doc.ID)
+			}
+		}
+
+		// Collect names, father names, and addresses
+		if doc.Name != "" {
+			nameSet[strings.ToLower(strings.TrimSpace(doc.Name))] = true
+		}
+		if doc.Fname != "" {
+			fnameSet[strings.ToLower(strings.TrimSpace(doc.Fname))] = true
+		}
+		if doc.Address != "" {
+			addressSet[strings.ToLower(strings.TrimSpace(doc.Address))] = true
+		}
+	}
+
+	// Log Master ID filtering
+	if len(invalidMasterIDs) > 0 {
+		log.Printf("Filtered out %d invalid/masked Master IDs: %v", len(invalidMasterIDs), invalidMasterIDs)
+	}
+	if len(validMasterIDs) > 0 {
+		log.Printf("Using %d valid Master IDs for comprehensive search: %v", len(validMasterIDs), validMasterIDs)
+	}
+
+	// If no initial results, return empty response
+	if len(initialDocs) == 0 {
+		return &SearchResponse{
+			Took: initialResp.Took,
+			Hits: struct {
+				Total struct {
+					Value int `json:"value"`
+				} `json:"total"`
+				Hits []struct {
+					Source Document `json:"_source"`
+					Score  float64  `json:"_score"`
+				} `json:"hits"`
+			}{
+				Total: struct {
+					Value int `json:"value"`
+				}{Value: 0},
+				Hits: []struct {
+					Source Document `json:"_source"`
+					Score  float64  `json:"_score"`
+				}{},
+			},
+		}, nil
+	}
+
+	// Step 2: Build comprehensive query with all collected data
+	var comprehensiveShould []map[string]interface{}
+
+	// Add original mobile/alt search
+	comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+		"bool": map[string]interface{}{
+			"should": []map[string]interface{}{
+				{
+					"term": map[string]interface{}{
+						"mobile": strings.ToLower(mobileNumber),
+					},
+				},
+				{
+					"term": map[string]interface{}{
+						"alt": strings.ToLower(mobileNumber),
+					},
+				},
+			},
+			"minimum_should_match": 1,
+			"boost":                2.0, // Boost direct mobile matches
+		},
+	})
+
+	// Add master ID searches (using ID field)
+	if len(masterIDSet) > 0 {
+		masterIDTerms := make([]string, 0, len(masterIDSet))
+		for masterID := range masterIDSet {
+			masterIDTerms = append(masterIDTerms, masterID)
+		}
+		comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+			"terms": map[string]interface{}{
+				"id":    masterIDTerms,
+				"boost": 1.5, // Boost master ID matches
+			},
+		})
+	}
+
+	// Add name searches
+	if len(nameSet) > 0 {
+		for name := range nameSet {
+			comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+				"term": map[string]interface{}{
+					"name": map[string]interface{}{
+						"value":            name,
+						"case_insensitive": true,
+						"boost":            1.2,
+					},
+				},
+			})
+		}
+	}
+
+	// Add father name searches
+	if len(fnameSet) > 0 {
+		for fname := range fnameSet {
+			comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+				"term": map[string]interface{}{
+					"fname": map[string]interface{}{
+						"value":            fname,
+						"case_insensitive": true,
+						"boost":            1.2,
+					},
+				},
+			})
+		}
+	}
+
+	// Add address searches
+	if len(addressSet) > 0 {
+		for address := range addressSet {
+			comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
+				"term": map[string]interface{}{
+					"address": map[string]interface{}{
+						"value":            address,
+						"case_insensitive": true,
+						"boost":            1.1,
+					},
+				},
+			})
+		}
+	}
+
+	comprehensiveQuery := map[string]interface{}{
+		"bool": map[string]interface{}{
+			"should":               comprehensiveShould,
+			"minimum_should_match": 1,
+		},
+	}
+
+	comprehensiveSearchBody := map[string]interface{}{
+		"query":   comprehensiveQuery,
+		"size":    size * 2, // Get more results since we're doing comprehensive search
+		"_source": true,
+		"timeout": "10s",
+		"sort": []map[string]interface{}{
+			{
+				"_score": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+	}
+
+	comprehensiveBodyJSON, _ := json.Marshal(comprehensiveSearchBody)
+	log.Printf("Comprehensive mobile search - Full query searching %d master IDs, %d names, %d fnames, %d addresses",
+		len(masterIDSet), len(nameSet), len(fnameSet), len(addressSet))
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel2()
+
+	// Execute comprehensive search
+	comprehensiveResp, err := s.api.Search(
+		ctx2,
+		&opensearchapi.SearchReq{
+			Indices: []string{s.cfg.OpenSearchIndex},
+			Body:    bytes.NewReader(comprehensiveBodyJSON),
+			Params: opensearchapi.SearchParams{
+				RequestCache: opensearchapi.ToPointer(true),
+			},
+		},
+	)
+	if err != nil {
+		log.Printf("Comprehensive search failed, falling back to initial results: %v", err)
+		// Fall back to initial results
+		return s.convertToSearchResponse(initialResp)
+	}
+
+	log.Printf("Comprehensive mobile search completed - found %d total results", comprehensiveResp.Hits.Total.Value)
+
+	return s.convertToSearchResponse(comprehensiveResp)
+}
+
+// Helper function to convert opensearchapi response to our SearchResponse
+func (s *OpenSearchService) convertToSearchResponse(resp *opensearchapi.SearchResp) (*SearchResponse, error) {
+	result := &SearchResponse{
+		Took: resp.Took,
+	}
+
+	result.Hits.Total.Value = resp.Hits.Total.Value
+	for _, hit := range resp.Hits.Hits {
+		var doc Document
+		if err := json.Unmarshal(hit.Source, &doc); err != nil {
+			return nil, fmt.Errorf("error decoding search hit: %v", err)
+		}
+		result.Hits.Hits = append(result.Hits.Hits, struct {
+			Source Document `json:"_source"`
+			Score  float64  `json:"_score"`
+		}{
+			Source: doc,
+			Score:  float64(hit.Score),
+		})
+	}
+
+	return result, nil
+}

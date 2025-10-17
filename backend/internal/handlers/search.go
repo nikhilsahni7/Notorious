@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"regexp"
 	"time"
 
 	"notorious-backend/internal/models"
@@ -12,6 +14,61 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+var mobileRegex = regexp.MustCompile(`^\d{10,}$`)
+
+// isMobileNumber checks if the query string looks like a mobile number
+func isMobileNumber(query string) bool {
+	return mobileRegex.MatchString(query)
+}
+
+// extractMobileNumber extracts mobile number from various query formats
+// Handles: "9876543210", "mobile:9876543210", "alt:9876543210"
+// Returns (mobileNumber, isMobileSearch)
+func extractMobileNumber(query string) (string, bool) {
+	query = trimSpace(query)
+
+	// Case 1: Direct mobile number (e.g., "9876543210")
+	if isMobileNumber(query) {
+		return query, true
+	}
+
+	// Case 2: Field syntax with mobile or alt (e.g., "mobile:9876543210" or "alt:9876543210")
+	if colonIdx := findChar(query, ':'); colonIdx != -1 {
+		field := trimSpace(query[:colonIdx])
+		value := trimSpace(query[colonIdx+1:])
+
+		// Check if it's a mobile or alt field with a valid mobile number
+		if (toLower(field) == "mobile" || toLower(field) == "alt") && isMobileNumber(value) {
+			return value, true
+		}
+	}
+
+	return "", false
+}
+
+// Helper function to find character index
+func findChar(s string, ch rune) int {
+	for i, c := range s {
+		if c == ch {
+			return i
+		}
+	}
+	return -1
+}
+
+// Helper function to convert to lowercase
+func toLower(s string) string {
+	result := ""
+	for _, ch := range s {
+		if ch >= 'A' && ch <= 'Z' {
+			result += string(ch + 32)
+		} else {
+			result += string(ch)
+		}
+	}
+	return result
+}
 
 type SearchHandler struct {
 	openSearchService *services.OpenSearchService
@@ -115,10 +172,29 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		req.Fields = []string{"name", "fname", "address", "mobile", "alt", "id", "oid", "email"}
 	}
 
-	response, err := h.openSearchService.Search(req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	// Check if this is a mobile number search
+	// Supports both raw numbers (9876543210) and field syntax (mobile:9876543210)
+	mobileNumber, isMobileSearch := extractMobileNumber(req.Query)
+
+	var response *services.SearchResponse
+	var searchErr error
+
+	if isMobileSearch {
+		// Use comprehensive mobile search for better results
+		log.Printf("Using comprehensive mobile search for number: %s (original query: %s)", mobileNumber, req.Query)
+		response, searchErr = h.openSearchService.ComprehensiveMobileSearch(mobileNumber, req.Size)
+		if searchErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": searchErr.Error()})
+			return
+		}
+	} else {
+		// Use regular search for non-mobile queries
+		log.Printf("Using regular search for query: %s", req.Query)
+		response, searchErr = h.openSearchService.Search(req)
+		if searchErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": searchErr.Error()})
+			return
+		}
 	}
 
 	totalResults := response.Hits.Total.Value
