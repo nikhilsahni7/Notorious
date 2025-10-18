@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"notorious-backend/internal/models"
@@ -269,6 +270,133 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		"daily_search_limit":  user.DailySearchLimit,
 		"searches_remaining":  user.DailySearchLimit - user.SearchesUsedToday,
 		"is_duplicate":        isDuplicate && totalResults > 0,
+	})
+}
+
+// RefineSearch allows users to filter existing search results without consuming search credits
+func (h *SearchHandler) RefineSearch(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+	uid := userID.(uuid.UUID)
+
+	// Get user info for region filtering
+	user, err := h.userRepo.GetByID(c.Request.Context(), uid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user info"})
+		return
+	}
+
+	if !user.IsActive {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account is inactive"})
+		return
+	}
+
+	var req services.RefineRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate request
+	if req.BaseQuery == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "base_query is required"})
+		return
+	}
+
+	// Set user's region for filtering
+	req.UserRegion = user.Region
+
+	// Set defaults
+	if req.Size == 0 {
+		req.Size = 50
+	}
+	if req.BaseOperator == "" {
+		req.BaseOperator = "OR"
+	}
+	if req.RefinementOperator == "" {
+		req.RefinementOperator = "AND"
+	}
+
+	log.Printf("🔍 User %s refining search: base=%s, refinements=%d", user.Email, req.BaseQuery, len(req.Refinements))
+
+	// Execute refined search
+	response, searchErr := h.openSearchService.RefineSearch(req)
+	if searchErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": searchErr.Error()})
+		return
+	}
+
+	totalResults := response.Hits.Total.Value
+
+	// Save refinement to search history (marked as refinement, doesn't increment search count)
+	if totalResults > 0 {
+		topResults := make([]map[string]interface{}, 0)
+		limit := 25
+		if len(response.Hits.Hits) < limit {
+			limit = len(response.Hits.Hits)
+		}
+
+		for i := 0; i < limit; i++ {
+			hit := response.Hits.Hits[i]
+			topResults = append(topResults, map[string]interface{}{
+				"oid":                  hit.Source.OID,
+				"name":                 hit.Source.Name,
+				"fname":                hit.Source.Fname,
+				"mobile":               hit.Source.Mobile,
+				"alt":                  hit.Source.Alt,
+				"email":                hit.Source.Email,
+				"address":              hit.Source.Address,
+				"alt_address":          hit.Source.AltAddress,
+				"year_of_registration": hit.Source.YearOfRegistration,
+			})
+		}
+
+		// Build refinement query string for history
+		refinementQueryParts := []string{req.BaseQuery}
+		for _, r := range req.Refinements {
+			refinementQueryParts = append(refinementQueryParts, fmt.Sprintf("%s:%s", r.Field, r.Value))
+		}
+		refinementQuery := strings.Join(refinementQueryParts, " AND ")
+
+		history := &models.SearchHistory{
+			UserID:       user.ID,
+			Query:        refinementQuery,
+			TotalResults: totalResults,
+			TopResults:   topResults,
+			IsRefinement: true,
+			// Note: BaseSearchID could be set if we track the original search ID
+		}
+		h.searchHistoryRepo.Create(c.Request.Context(), history)
+	}
+
+	// Format results
+	results := make([]map[string]interface{}, 0, len(response.Hits.Hits))
+	for _, hit := range response.Hits.Hits {
+		results = append(results, map[string]interface{}{
+			"mobile":               hit.Source.Mobile,
+			"name":                 hit.Source.Name,
+			"fname":                hit.Source.Fname,
+			"address":              hit.Source.Address,
+			"alt_address":          hit.Source.AltAddress,
+			"alt":                  hit.Source.Alt,
+			"id":                   hit.Source.ID,
+			"oid":                  hit.Source.OID,
+			"email":                hit.Source.Email,
+			"year_of_registration": hit.Source.YearOfRegistration,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total":               totalResults,
+		"results":             results,
+		"took_ms":             response.Took,
+		"searches_used_today": user.SearchesUsedToday, // Unchanged - refinement doesn't count
+		"daily_search_limit":  user.DailySearchLimit,
+		"searches_remaining":  user.DailySearchLimit - user.SearchesUsedToday,
+		"is_refinement":       true,
 	})
 }
 

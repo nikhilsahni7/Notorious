@@ -173,6 +173,7 @@ func main() {
 		{
 			searchRoutes.GET("", searchHandler.Search)
 			searchRoutes.POST("", searchHandler.Search)
+			searchRoutes.POST("/refine", searchHandler.RefineSearch)
 			searchRoutes.GET("/suggest", searchHandler.Suggest)
 			searchRoutes.GET("/export-eod", searchHandler.ExportEODReport)
 		}

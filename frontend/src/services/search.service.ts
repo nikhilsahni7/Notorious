@@ -1,6 +1,11 @@
 import { API_CONFIG } from "@/config/api";
 import { apiRequest } from "@/lib/api-client";
-import { SearchOperator, Person } from "@/types/person";
+import {
+  Person,
+  RefineRequest,
+  RefineResponse,
+  SearchOperator,
+} from "@/types/person";
 
 export interface SearchRequest {
   query: string;
@@ -46,6 +51,17 @@ export const searchService = {
     token: string
   ): Promise<SearchResponse> => {
     return apiRequest(API_CONFIG.ENDPOINTS.SEARCH.BASE, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    });
+  },
+
+  refineSearch: async (
+    data: RefineRequest,
+    token: string
+  ): Promise<RefineResponse> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.SEARCH.BASE}/refine`, {
       method: "POST",
       body: JSON.stringify(data),
       token,

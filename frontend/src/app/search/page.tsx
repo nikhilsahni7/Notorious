@@ -1,15 +1,21 @@
 "use client";
 
 import { Pagination } from "@/components/Pagination";
+import { RefineSearch } from "@/components/RefineSearch";
 import { ResultsStats } from "@/components/ResultsStats";
 import { ResultsTable } from "@/components/ResultsTable";
 import { SearchForm } from "@/components/SearchForm";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useClientFilter } from "@/hooks/useClientFilter";
 import { useSearch } from "@/hooks/useSearch";
-import { Person, SearchFields, SearchOperator } from "@/types/person";
+import { searchService } from "@/services/search.service";
+import {
+  Person,
+  Refinement,
+  SearchFields,
+  SearchOperator,
+} from "@/types/person";
 import {
   copyToClipboard,
   formatPersonForClipboard,
@@ -61,7 +67,6 @@ export default function SearchPage() {
   const [results, setResults] = useState<Person[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [searchTime, setSearchTime] = useState(0);
-  const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isCopyingAll, setIsCopyingAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,7 +74,12 @@ export default function SearchPage() {
   const [searchLimit, setSearchLimit] = useState(0);
   const [isDuplicateSearch, setIsDuplicateSearch] = useState(false);
 
-  const filteredResults = useClientFilter(results, clientSearchQuery);
+  // Refinement state
+  const [activeRefinements, setActiveRefinements] = useState<Refinement[]>([]);
+  const [isRefining, setIsRefining] = useState(false);
+  const [baseQuery, setBaseQuery] = useState("");
+  const [baseOperator, setBaseOperator] = useState<SearchOperator>("AND");
+  const [isRefinedView, setIsRefinedView] = useState(false);
 
   // Load last search on mount
   useEffect(() => {
@@ -118,16 +128,19 @@ export default function SearchPage() {
     setSearchFields({ ...DEFAULT_SEARCH_FIELDS });
     setResults([]);
     setTotalResults(0);
-    setClientSearchQuery("");
     setCurrentPage(1);
     setSearchTime(0);
     setIsDuplicateSearch(false);
+    setActiveRefinements([]);
+    setIsRefinedView(false);
+    setBaseQuery("");
     localStorage.removeItem(LAST_SEARCH_KEY);
   };
 
   const executeSearch = async (page: number = 1) => {
-    setClientSearchQuery("");
     setIsDuplicateSearch(false);
+    setActiveRefinements([]);
+    setIsRefinedView(false);
 
     try {
       const data = await performSearch(searchFields, operator, page, PAGE_SIZE);
@@ -135,6 +148,16 @@ export default function SearchPage() {
       setTotalResults(data.total || 0);
       setSearchTime(data.took_ms || 0);
       setIsDuplicateSearch(data.is_duplicate || false);
+
+      // Store base query for refinement
+      const queries: string[] = [];
+      Object.entries(searchFields).forEach(([field, value]) => {
+        if (value.trim()) {
+          queries.push(`${field}:${value.trim()}`);
+        }
+      });
+      setBaseQuery(queries.join(` ${operator} `));
+      setBaseOperator(operator);
 
       // Update search limits in real-time
       if (data.searches_used_today !== undefined) {
@@ -169,6 +192,56 @@ export default function SearchPage() {
     }
   };
 
+  const handleRefine = async () => {
+    if (!token || activeRefinements.length === 0) return;
+
+    setIsRefining(true);
+    try {
+      const data = await searchService.refineSearch(
+        {
+          base_query: baseQuery,
+          base_operator: baseOperator,
+          refinements: activeRefinements,
+          refinement_operator: "AND",
+          size: PAGE_SIZE,
+          from: 0,
+        },
+        token
+      );
+
+      setResults(data.results || []);
+      setTotalResults(data.total || 0);
+      setSearchTime(data.took_ms || 0);
+      setCurrentPage(1);
+      setIsRefinedView(true);
+
+      // Refinement doesn't consume search credits
+      if (data.searches_used_today !== undefined) {
+        setSearchesUsed(data.searches_used_today);
+      }
+    } catch (error) {
+      console.error("Refine failed:", error);
+      alert(error instanceof Error ? error.message : "Refine failed");
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
+  const handleAddRefinement = (refinement: Refinement) => {
+    setActiveRefinements((prev) => [...prev, refinement]);
+  };
+
+  const handleRemoveRefinement = (index: number) => {
+    setActiveRefinements((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearRefinements = () => {
+    setActiveRefinements([]);
+    setIsRefinedView(false);
+    // Re-execute original search
+    executeSearch(1);
+  };
+
   const handleCopy = (person: Person, index: number) => {
     const text = formatPersonForClipboard(person);
     copyToClipboard(text);
@@ -177,7 +250,7 @@ export default function SearchPage() {
   };
 
   const handleCopyAll = () => {
-    const text = formatPersonsForClipboard(filteredResults);
+    const text = formatPersonsForClipboard(results);
     copyToClipboard(text);
     setIsCopyingAll(true);
     setTimeout(() => setIsCopyingAll(false), 2000);
@@ -450,19 +523,40 @@ export default function SearchPage() {
         {/* Results - Compact */}
         {totalResults > 0 && (
           <>
+            {/* Refine Search Component */}
+            <RefineSearch
+              totalResults={totalResults}
+              activeRefinements={activeRefinements}
+              onAddRefinement={handleAddRefinement}
+              onRemoveRefinement={handleRemoveRefinement}
+              onClearRefinements={handleClearRefinements}
+              onRefine={handleRefine}
+              isRefining={isRefining}
+            />
+
+            {isRefinedView && (
+              <div className="mb-3 bg-blue-500/10 border border-blue-500 text-blue-400 p-3 rounded-lg text-sm flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                <span>
+                  <strong>Refined view active!</strong> Showing filtered
+                  results. Clear filters to see all results.
+                </span>
+              </div>
+            )}
+
             <div className="mb-3">
               <ResultsStats
                 startIndex={startIndex}
                 endIndex={endIndex}
                 totalResults={totalResults}
                 searchTime={searchTime}
-                filterQuery={clientSearchQuery}
-                onFilterChange={setClientSearchQuery}
+                filterQuery=""
+                onFilterChange={() => {}}
               />
             </div>
 
             <ResultsTable
-              results={filteredResults}
+              results={results}
               copiedIndex={copiedIndex}
               onCopy={handleCopy}
               onCopyAll={handleCopyAll}

@@ -55,6 +55,23 @@ type SearchRequest struct {
 	UserRegion string   `json:"user_region"` // User's region for filtering: "pan-india" or "delhi-ncr"
 }
 
+// Refinement represents a single field-value filter to apply
+type Refinement struct {
+	Field string `json:"field"`
+	Value string `json:"value"`
+}
+
+// RefineRequest represents a request to refine existing search results
+type RefineRequest struct {
+	BaseQuery          string       `json:"base_query"`          // Original search query
+	BaseOperator       string       `json:"base_operator"`       // AND/OR for base query
+	Refinements        []Refinement `json:"refinements"`         // Additional filters
+	RefinementOperator string       `json:"refinement_operator"` // AND/OR for refinements
+	Size               int          `json:"size"`                // Results per page
+	From               int          `json:"from"`                // Pagination offset
+	UserRegion         string       `json:"user_region"`         // User's region for filtering
+}
+
 type SearchResponse struct {
 	Hits struct {
 		Total struct {
@@ -1219,4 +1236,179 @@ func (s *OpenSearchService) convertToSearchResponse(resp *opensearchapi.SearchRe
 	}
 
 	return result, nil
+}
+
+// RefineSearch performs a refined search by combining base query with additional filters
+// This allows users to progressively narrow down search results without consuming search limits
+func (s *OpenSearchService) RefineSearch(req RefineRequest) (*SearchResponse, error) {
+	// Validate base query
+	if req.BaseQuery == "" {
+		return nil, errors.New("base query cannot be empty")
+	}
+
+	// Default operators
+	if req.BaseOperator == "" {
+		req.BaseOperator = "AND"
+	}
+	if req.RefinementOperator == "" {
+		req.RefinementOperator = "AND"
+	}
+
+	// Default pagination
+	size := req.Size
+	if size <= 0 || size > 100 {
+		size = 50
+	}
+	from := req.From
+	if from < 0 {
+		from = 0
+	}
+
+	// Parse base query
+	baseFieldQueries := parseFieldQuery(req.BaseQuery, req.BaseOperator)
+
+	var baseQuery map[string]interface{}
+
+	// Build base query using the same logic as Search
+	if len(baseFieldQueries) == 0 {
+		// No field:value pairs found, use multi-field search
+		fields := []string{"name", "fname", "address", "mobile", "alt", "id", "oid", "email"}
+		var mustOrShould []map[string]interface{}
+		operator := "should"
+		if strings.ToUpper(req.BaseOperator) == "AND" {
+			operator = "must"
+		}
+
+		for _, field := range fields {
+			if q := buildFieldQuery(field, req.BaseQuery); q != nil {
+				mustOrShould = append(mustOrShould, q)
+			}
+		}
+
+		baseQuery = map[string]interface{}{
+			"bool": map[string]interface{}{
+				operator: mustOrShould,
+			},
+		}
+	} else if len(baseFieldQueries) == 1 {
+		// Single field:value query
+		for field, value := range baseFieldQueries[0] {
+			baseQuery = buildFieldQuery(field, value)
+		}
+	} else {
+		// Multiple field:value queries with AND/OR
+		var mustOrShould []map[string]interface{}
+		operator := "should"
+		if strings.ToUpper(req.BaseOperator) == "AND" {
+			operator = "must"
+		}
+
+		for _, fq := range baseFieldQueries {
+			for field, value := range fq {
+				if q := buildFieldQuery(field, value); q != nil {
+					mustOrShould = append(mustOrShould, q)
+				}
+			}
+		}
+
+		baseQuery = map[string]interface{}{
+			"bool": map[string]interface{}{
+				operator: mustOrShould,
+			},
+		}
+	}
+
+	// Build refinement queries
+	var refinementQueries []map[string]interface{}
+	for _, refinement := range req.Refinements {
+		if refinement.Field == "" || refinement.Value == "" {
+			continue
+		}
+		if q := buildFieldQuery(refinement.Field, refinement.Value); q != nil {
+			refinementQueries = append(refinementQueries, q)
+		}
+	}
+
+	// Combine base query with refinements
+	var finalQuery map[string]interface{}
+
+	if len(refinementQueries) == 0 {
+		// No refinements, just use base query
+		finalQuery = baseQuery
+	} else {
+		// Combine base query with refinements
+		mustClauses := []map[string]interface{}{baseQuery}
+
+		if len(refinementQueries) == 1 {
+			mustClauses = append(mustClauses, refinementQueries[0])
+		} else {
+			// Multiple refinements - combine with specified operator
+			refinementOperator := "must"
+			if strings.ToUpper(req.RefinementOperator) == "OR" {
+				refinementOperator = "should"
+			}
+
+			refinementBool := map[string]interface{}{
+				"bool": map[string]interface{}{
+					refinementOperator: refinementQueries,
+				},
+			}
+			mustClauses = append(mustClauses, refinementBool)
+		}
+
+		finalQuery = map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": mustClauses,
+			},
+		}
+	}
+
+	// Add region filtering
+	finalQuery = addRegionFilter(finalQuery, req.UserRegion)
+
+	// Build search body
+	searchBody := map[string]interface{}{
+		"query":   finalQuery,
+		"size":    size,
+		"from":    from,
+		"_source": true,
+		"timeout": "5s",
+		"sort": []map[string]interface{}{
+			{
+				"_score": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+	}
+
+	bodyJSON, _ := json.Marshal(searchBody)
+	log.Printf("Refine search query: %s", string(bodyJSON))
+
+	// Execute search
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	startTime := time.Now()
+	resp, err := s.api.Search(
+		ctx,
+		&opensearchapi.SearchReq{
+			Indices: s.cfg.OpenSearchIndices,
+			Body:    bytes.NewReader(bodyJSON),
+			Params: opensearchapi.SearchParams{
+				RequestCache: opensearchapi.ToPointer(true),
+			},
+		},
+	)
+	queryDuration := time.Since(startTime)
+
+	if err != nil {
+		log.Printf("Refine search failed after %v: %v", queryDuration, err)
+		return nil, fmt.Errorf("error refining search: %v", err)
+	}
+
+	log.Printf("Refine search completed in %v (OpenSearch took: %dms, total hits: %d)",
+		queryDuration, resp.Took, resp.Hits.Total.Value)
+
+	return s.convertToSearchResponse(resp)
 }

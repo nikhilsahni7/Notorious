@@ -29,3 +29,40 @@ export interface SearchResponse {
 }
 
 export type SearchOperator = "AND" | "OR";
+
+// Refinement types
+export interface Refinement {
+  field: string;
+  value: string;
+}
+
+export interface RefineRequest {
+  base_query: string;
+  base_operator: SearchOperator;
+  refinements: Refinement[];
+  refinement_operator: SearchOperator;
+  size: number;
+  from: number;
+}
+
+export interface RefineResponse {
+  total: number;
+  results: Person[];
+  took_ms: number;
+  searches_used_today: number;
+  daily_search_limit: number;
+  searches_remaining: number;
+  is_refinement: boolean;
+}
+
+// Available fields for refinement
+export const REFINEMENT_FIELDS = [
+  { value: "name", label: "Name" },
+  { value: "fname", label: "Father Name" },
+  { value: "mobile", label: "Mobile" },
+  { value: "alt", label: "Alt Phone" },
+  { value: "email", label: "Email" },
+  { value: "address", label: "Address" },
+  { value: "id", label: "Master ID" },
+  { value: "oid", label: "OID" },
+] as const;

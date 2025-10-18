@@ -59,6 +59,8 @@ type SearchHistory struct {
 	TotalResults int         `json:"total_results" db:"total_results"`
 	TopResults   interface{} `json:"top_results" db:"top_results"`
 	SearchedAt   time.Time   `json:"searched_at" db:"searched_at"`
+	IsRefinement bool        `json:"is_refinement" db:"is_refinement"`
+	BaseSearchID *uuid.UUID  `json:"base_search_id,omitempty" db:"base_search_id"`
 }
 
 type SearchHistoryWithUser struct {
