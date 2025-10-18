@@ -2,11 +2,13 @@ package repository
 
 import (
 	"context"
+	"time"
+
+	"notorious-backend/internal/database"
+	"notorious-backend/internal/models"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"notorious-backend/internal/database"
-	"notorious-backend/internal/models"
 )
 
 type UserRequestRepository struct {
@@ -26,7 +28,7 @@ func (r *UserRequestRepository) Create(ctx context.Context, req *models.UserRequ
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, status
 	`
-	
+
 	return r.db.Pool.QueryRow(ctx, query,
 		req.Email,
 		req.Name,
@@ -50,7 +52,7 @@ func (r *UserRequestRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 		FROM user_requests
 		WHERE id = $1
 	`
-	
+
 	err := r.db.Pool.QueryRow(ctx, query, id).Scan(
 		&req.ID,
 		&req.Email,
@@ -68,11 +70,11 @@ func (r *UserRequestRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 		&req.OS,
 		&req.UserAgent,
 	)
-	
+
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
-	
+
 	return &req, err
 }
 
@@ -86,13 +88,13 @@ func (r *UserRequestRepository) ListByStatus(ctx context.Context, status string,
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
-	
+
 	rows, err := r.db.Pool.Query(ctx, query, status, limit, offset)
 	if err != nil {
 		return requests, err
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var req models.UserRequest
 		if err := rows.Scan(
@@ -116,17 +118,17 @@ func (r *UserRequestRepository) ListByStatus(ctx context.Context, status string,
 		}
 		requests = append(requests, &req)
 	}
-	
+
 	return requests, rows.Err()
 }
 
-func (r *UserRequestRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, adminNotes *string) error {
+func (r *UserRequestRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, adminNote *string, reviewedBy *uuid.UUID, reviewedAt *time.Time) error {
 	query := `
 		UPDATE user_requests
-		SET status = $1, admin_notes = $2
-		WHERE id = $3
+		SET status = $1, admin_note = $2, reviewed_by = $3, reviewed_at = $4, admin_notes = $2
+		WHERE id = $5
 	`
-	_, err := r.db.Pool.Exec(ctx, query, status, adminNotes, id)
+	_, err := r.db.Pool.Exec(ctx, query, status, adminNote, reviewedBy, reviewedAt, id)
 	return err
 }
 
@@ -135,4 +137,3 @@ func (r *UserRequestRepository) Delete(ctx context.Context, id uuid.UUID) error 
 	_, err := r.db.Pool.Exec(ctx, query, id)
 	return err
 }
-

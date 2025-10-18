@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, UserRequest } from "@/services/admin.service";
 import { X } from "lucide-react";
@@ -19,11 +18,7 @@ export function ApproveRequestModal({
   onSuccess,
 }: ApproveRequestModalProps) {
   const [loading, setLoading] = useState(false);
-  const [password, setPassword] = useState("");
-  const [region, setRegion] = useState("pan-india");
-  const [dailyLimit, setDailyLimit] = useState(
-    request.requested_searches_per_day.toString()
-  );
+  const [adminNote, setAdminNote] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,10 +27,8 @@ export function ApproveRequestModal({
     try {
       await adminService.approveUserRequest(
         request.id,
-        password,
-        region,
-        parseInt(dailyLimit),
-        token
+        token,
+        adminNote || undefined
       );
       onSuccess();
     } catch (error) {
@@ -66,60 +59,34 @@ export function ApproveRequestModal({
             <p className="text-white font-medium">{request.name}</p>
             <p className="text-gray-300 text-sm">{request.email}</p>
             <p className="text-gray-300 text-sm">{request.phone}</p>
+            <p className="text-gray-300 text-sm mt-2">
+              <span className="text-gray-400">Requested searches/day:</span>{" "}
+              {request.requested_searches_per_day}
+            </p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Set Password *
-            </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create password for user"
-              className="bg-[#2D1B4E] border-gray-600 text-white"
-              minLength={6}
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Minimum 6 characters. Share this with the user.
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+            <p className="text-sm text-blue-300">
+              ℹ️ <strong>Note:</strong> Approving this request marks it as
+              approved. You can create the user account later using the
+              &quot;Create User&quot; button.
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Region *
+              Admin Note (Optional)
             </label>
-            <select
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              className="w-full px-3 py-2 bg-[#2D1B4E] border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-              required
-            >
-              <option value="pan-india">🌏 Pan-India (Access All Data)</option>
-              <option value="delhi-ncr">
-                📍 Delhi-NCR (Restricted Access)
-              </option>
-            </select>
+            <textarea
+              value={adminNote}
+              onChange={(e) => setAdminNote(e.target.value)}
+              placeholder="Why are you approving this request? (e.g., Verified company email, Known user, etc.)"
+              rows={4}
+              className="w-full px-3 py-2 bg-[#2D1B4E] border border-gray-600 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+            />
             <p className="text-xs text-gray-400 mt-1">
-              Choose access level for this user
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Daily Search Limit *
-            </label>
-            <Input
-              type="number"
-              value={dailyLimit}
-              onChange={(e) => setDailyLimit(e.target.value)}
-              className="bg-[#2D1B4E] border-gray-600 text-white"
-              min="1"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Requested: {request.requested_searches_per_day} searches/day
+              This note will help you remember why you approved this request
+              later.
             </p>
           </div>
 
@@ -144,7 +111,7 @@ export function ApproveRequestModal({
                   Approving...
                 </>
               ) : (
-                "Approve & Create User"
+                "Approve Request"
               )}
             </Button>
           </div>

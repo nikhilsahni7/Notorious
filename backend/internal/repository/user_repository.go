@@ -151,7 +151,8 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 		query = `
 			SELECT id, email, password_hash, name, phone, role, daily_search_limit,
 			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
-			       COALESCE(last_search_query, '') as last_search_query
+			       COALESCE(last_search_query, '') as last_search_query,
+			       COALESCE(region, 'pan-india') as region
 			FROM users
 			WHERE role = $1
 			ORDER BY created_at DESC
@@ -162,7 +163,8 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 		query = `
 			SELECT id, email, password_hash, name, phone, role, daily_search_limit,
 			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
-			       COALESCE(last_search_query, '') as last_search_query
+			       COALESCE(last_search_query, '') as last_search_query,
+			       COALESCE(region, 'pan-india') as region
 			FROM users
 			ORDER BY created_at DESC
 			LIMIT $1 OFFSET $2
@@ -192,6 +194,7 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 			&user.UpdatedAt,
 			&user.LastResetDate,
 			&user.LastSearchQuery,
+			&user.Region,
 		); err != nil {
 			return users, err
 		}

@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"notorious-backend/internal/auth"
 	"notorious-backend/internal/models"
@@ -214,9 +214,7 @@ func (h *AdminGinHandler) ApproveUserRequest(c *gin.Context) {
 	}
 
 	var req struct {
-		Password         string `json:"password" binding:"required,min=6"`
-		Region           string `json:"region"` // "pan-india" or "delhi-ncr"
-		DailySearchLimit int    `json:"daily_search_limit" binding:"required,min=1"`
+		AdminNote string `json:"admin_note"` // Optional note explaining approval
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -224,14 +222,9 @@ func (h *AdminGinHandler) ApproveUserRequest(c *gin.Context) {
 		return
 	}
 
-	// Validate and set default region
-	if req.Region == "" {
-		req.Region = "pan-india" // Default to pan-india
-	}
-	if req.Region != "pan-india" && req.Region != "delhi-ncr" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "region must be either 'pan-india' or 'delhi-ncr'"})
-		return
-	}
+	// Get admin user ID from context
+	adminID, _ := c.Get("user_id")
+	adminUUID := adminID.(uuid.UUID)
 
 	userRequest, err := h.userRequestRepo.GetByID(c.Request.Context(), requestID)
 	if err != nil || userRequest == nil {
@@ -239,53 +232,35 @@ func (h *AdminGinHandler) ApproveUserRequest(c *gin.Context) {
 		return
 	}
 
-	passwordHash, err := auth.HashPassword(req.Password)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+	if userRequest.Status != "pending" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "request is not pending"})
 		return
 	}
 
-	user := &models.User{
-		Email:            userRequest.Email,
-		PasswordHash:     passwordHash,
-		Name:             userRequest.Name,
-		Phone:            userRequest.Phone,
-		Role:             models.RoleUser,
-		Region:           req.Region,
-		DailySearchLimit: req.DailySearchLimit,
-		IsActive:         true,
+	// Update request with admin note and reviewer
+	adminNote := req.AdminNote
+	if adminNote == "" {
+		adminNote = "Request approved - awaiting user creation"
 	}
+	now := time.Now()
 
-	if err := h.userRepo.Create(c.Request.Context(), user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+	if err := h.userRequestRepo.UpdateStatus(c.Request.Context(), requestID, "approved", &adminNote, &adminUUID, &now); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update request status"})
 		return
 	}
 
-	// Store user metadata from the original signup request
-	if h.metadataRepo != nil && userRequest.IPAddress != nil {
-		metadata := &models.UserMetadata{
-			UserID:     user.ID,
-			IPAddress:  userRequest.IPAddress,
-			Country:    userRequest.Country,
-			City:       userRequest.City,
-			DeviceType: userRequest.DeviceType,
-			Browser:    userRequest.Browser,
-			OS:         userRequest.OS,
-			UserAgent:  userRequest.UserAgent,
-		}
-		if err := h.metadataRepo.CreateUserMetadata(c.Request.Context(), metadata); err != nil {
-			log.Printf("Failed to store user metadata: %v", err)
-		} else {
-			log.Printf("Successfully stored metadata for user %s", user.ID)
-		}
-	} else {
-		log.Printf("Metadata not stored - metadataRepo: %v, IPAddress: %v", h.metadataRepo != nil, userRequest.IPAddress)
-	}
-
-	approvedNote := "User created successfully"
-	h.userRequestRepo.UpdateStatus(c.Request.Context(), requestID, "approved", &approvedNote)
-
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Request approved successfully",
+		"request": gin.H{
+			"id":          userRequest.ID,
+			"email":       userRequest.Email,
+			"name":        userRequest.Name,
+			"status":      "approved",
+			"admin_note":  adminNote,
+			"reviewed_by": adminUUID,
+			"reviewed_at": now,
+		},
+	})
 }
 
 func (h *AdminGinHandler) RejectUserRequest(c *gin.Context) {
@@ -295,17 +270,29 @@ func (h *AdminGinHandler) RejectUserRequest(c *gin.Context) {
 		return
 	}
 
-	var body struct {
-		Reason string `json:"reason"`
-	}
-	c.ShouldBindJSON(&body)
-
-	var adminNotes *string
-	if body.Reason != "" {
-		adminNotes = &body.Reason
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
 	}
 
-	if err := h.userRequestRepo.UpdateStatus(c.Request.Context(), requestID, "rejected", adminNotes); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Rejection reason is required"})
+		return
+	}
+
+	// Get admin user ID from context
+	adminID, _ := c.Get("user_id")
+	adminUUID := adminID.(uuid.UUID)
+
+	// Update with admin note and reviewer
+	now := time.Now()
+	userRequest, _ := h.userRequestRepo.GetByID(c.Request.Context(), requestID)
+	if userRequest != nil {
+		userRequest.AdminNote = &req.Reason
+		userRequest.ReviewedBy = &adminUUID
+		userRequest.ReviewedAt = &now
+	}
+
+	if err := h.userRequestRepo.UpdateStatus(c.Request.Context(), requestID, "rejected", &req.Reason, &adminUUID, &now); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update request status"})
 		return
 	}

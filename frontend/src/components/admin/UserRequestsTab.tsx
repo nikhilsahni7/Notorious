@@ -104,6 +104,11 @@ export function UserRequestsTab({ token, onApprove }: UserRequestsTabProps) {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
                   Status
                 </th>
+                {filter !== "pending" && (
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                    Admin Note
+                  </th>
+                )}
                 {filter === "pending" && (
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
                     Actions
@@ -145,6 +150,15 @@ export function UserRequestsTab({ token, onApprove }: UserRequestsTabProps) {
                       {request.status}
                     </span>
                   </td>
+                  {filter !== "pending" && (
+                    <td className="px-4 py-3 text-sm text-gray-300">
+                      {request.admin_note || request.admin_notes || (
+                        <span className="text-gray-500 italic">
+                          No note provided
+                        </span>
+                      )}
+                    </td>
+                  )}
                   {filter === "pending" && (
                     <td className="px-4 py-3 text-sm">
                       <div className="flex items-center gap-2">

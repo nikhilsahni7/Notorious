@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { adminService, User } from "@/services/admin.service";
-import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Edit, Trash2, Check, X, History, Key } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { adminService, User } from "@/services/admin.service";
+import { Check, Edit, History, Key, Plus, Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 import { CreateUserModal } from "./CreateUserModal";
 import { EditUserModal } from "./EditUserModal";
-import { ChangePasswordModal } from "./ChangePasswordModal";
 
 interface UsersTabProps {
   token: string;
@@ -19,9 +19,14 @@ export function UsersTab({ token }: UsersTabProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [regionFilter, setRegionFilter] = useState<
+    "all" | "pan-india" | "delhi-ncr"
+  >("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [changingPasswordUser, setChangingPasswordUser] = useState<User | null>(null);
+  const [changingPasswordUser, setChangingPasswordUser] = useState<User | null>(
+    null
+  );
 
   useEffect(() => {
     loadUsers();
@@ -29,20 +34,26 @@ export function UsersTab({ token }: UsersTabProps) {
   }, []);
 
   useEffect(() => {
+    let filtered = users;
+
+    // Apply region filter
+    if (regionFilter !== "all") {
+      filtered = filtered.filter((user) => user.region === regionFilter);
+    }
+
+    // Apply search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      setFilteredUsers(
-        users.filter(
-          (user) =>
-            user.name.toLowerCase().includes(query) ||
-            user.email.toLowerCase().includes(query) ||
-            user.phone?.toLowerCase().includes(query)
-        )
+      filtered = filtered.filter(
+        (user) =>
+          user.name.toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query) ||
+          user.phone?.toLowerCase().includes(query)
       );
-    } else {
-      setFilteredUsers(users);
     }
-  }, [searchQuery, users]);
+
+    setFilteredUsers(filtered);
+  }, [searchQuery, regionFilter, users]);
 
   const loadUsers = async () => {
     try {
@@ -101,25 +112,81 @@ export function UsersTab({ token }: UsersTabProps) {
         />
       </div>
 
+      {/* Region Filter */}
+      <div className="mb-4 flex gap-2">
+        <button
+          onClick={() => setRegionFilter("all")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            regionFilter === "all"
+              ? "bg-pink-500 text-white"
+              : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
+          }`}
+        >
+          All Users ({users.length})
+        </button>
+        <button
+          onClick={() => setRegionFilter("pan-india")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            regionFilter === "pan-india"
+              ? "bg-blue-500 text-white"
+              : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
+          }`}
+        >
+          🌏 Pan-India ({users.filter((u) => u.region === "pan-india").length})
+        </button>
+        <button
+          onClick={() => setRegionFilter("delhi-ncr")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            regionFilter === "delhi-ncr"
+              ? "bg-green-500 text-white"
+              : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
+          }`}
+        >
+          📍 Delhi-NCR ({users.filter((u) => u.region === "delhi-ncr").length})
+        </button>
+      </div>
+
       <div className="bg-[#2D1B4E] rounded-lg border border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-[#1a0f2e] border-b border-gray-700">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Name</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Role</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Daily Limit</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Used Today</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Actions</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Email
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Role
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Region
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Daily Limit
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Used Today
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-[#1a0f2e] transition-colors">
+                <tr
+                  key={user.id}
+                  className="hover:bg-[#1a0f2e] transition-colors"
+                >
                   <td className="px-4 py-3 text-sm text-white">{user.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-300">{user.email}</td>
+                  <td className="px-4 py-3 text-sm text-gray-300">
+                    {user.email}
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     <span
                       className={`px-2 py-1 rounded text-xs font-medium ${
@@ -131,8 +198,25 @@ export function UsersTab({ token }: UsersTabProps) {
                       {user.role}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">{user.daily_search_limit}</td>
-                  <td className="px-4 py-3 text-sm text-white">{user.searches_used_today}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${
+                        user.region === "delhi-ncr"
+                          ? "bg-green-500/20 text-green-400"
+                          : "bg-blue-500/20 text-blue-400"
+                      }`}
+                    >
+                      {user.region === "delhi-ncr"
+                        ? "📍 Delhi-NCR"
+                        : "🌏 Pan-India"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    {user.daily_search_limit}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    {user.searches_used_today}
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     {user.is_active ? (
                       <span className="flex items-center text-green-400">
@@ -149,7 +233,9 @@ export function UsersTab({ token }: UsersTabProps) {
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => router.push(`/admin/users/${user.id}/history`)}
+                        onClick={() =>
+                          router.push(`/admin/users/${user.id}/history`)
+                        }
                         className="text-green-400 hover:text-green-300 transition-colors"
                         title="View search history"
                       >
@@ -198,7 +284,9 @@ export function UsersTab({ token }: UsersTabProps) {
 
       {filteredUsers.length === 0 && (
         <div className="text-center py-12 text-gray-400">
-          {searchQuery ? "No users found matching your search" : "No users found"}
+          {searchQuery
+            ? "No users found matching your search"
+            : "No users found"}
         </div>
       )}
 
@@ -240,4 +328,3 @@ export function UsersTab({ token }: UsersTabProps) {
     </div>
   );
 }
-

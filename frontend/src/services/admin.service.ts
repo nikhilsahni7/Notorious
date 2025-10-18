@@ -47,7 +47,10 @@ export interface UserRequest {
   requested_searches_per_day: number;
   status: string;
   created_at: string;
-  admin_notes?: string;
+  admin_notes?: string; // Deprecated - keeping for backward compatibility
+  admin_note?: string; // New field
+  reviewed_by?: string; // UUID of admin who reviewed
+  reviewed_at?: string; // Timestamp of review
   ip_address?: string;
   country?: string;
   city?: string;
@@ -196,19 +199,15 @@ export const adminService = {
 
   approveUserRequest: async (
     requestId: string,
-    password: string,
-    region: string,
-    dailySearchLimit: number,
-    token: string
-  ): Promise<User> => {
+    token: string,
+    adminNote?: string
+  ): Promise<{ message: string; request: UserRequest }> => {
     return apiRequest(
       `${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/approve`,
       {
         method: "POST",
         body: JSON.stringify({
-          password,
-          region,
-          daily_search_limit: dailySearchLimit,
+          admin_note: adminNote,
         }),
         token,
       }
