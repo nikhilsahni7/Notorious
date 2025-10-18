@@ -2,7 +2,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, User } from "@/services/admin.service";
-import { Check, Edit, History, Key, Plus, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Download,
+  Edit,
+  History,
+  Key,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChangePasswordModal } from "./ChangePasswordModal";
@@ -79,6 +88,25 @@ export function UsersTab({ token }: UsersTabProps) {
     } catch (error) {
       console.error("Failed to delete user:", error);
       alert("Failed to delete user");
+    }
+  };
+
+  const handleGenerateEOD = async (userId: string, userName: string) => {
+    try {
+      const blob = await adminService.generateUserEOD(userId, token);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${userName}_EOD_${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Failed to generate EOD report:", error);
+      alert("Failed to generate EOD report");
     }
   };
 
@@ -170,6 +198,9 @@ export function UsersTab({ token }: UsersTabProps) {
                   Used Today
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Total Searches
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
@@ -217,6 +248,11 @@ export function UsersTab({ token }: UsersTabProps) {
                   <td className="px-4 py-3 text-sm text-white">
                     {user.searches_used_today}
                   </td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    <span className="font-semibold text-blue-400">
+                      {user.total_searches || 0}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     {user.is_active ? (
                       <span className="flex items-center text-green-400">
@@ -260,6 +296,16 @@ export function UsersTab({ token }: UsersTabProps) {
                         title="Change password"
                       >
                         <Key className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleGenerateEOD(user.id, user.name);
+                        }}
+                        className="text-purple-400 hover:text-purple-300 transition-colors"
+                        title="Generate EOD Report"
+                      >
+                        <Download className="h-4 w-4" />
                       </button>
                       {user.role !== "admin" && (
                         <button

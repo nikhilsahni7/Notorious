@@ -10,6 +10,7 @@ export interface User {
   region: string; // "pan-india" or "delhi-ncr"
   daily_search_limit: number;
   searches_used_today: number;
+  total_searches: number; // Total searches done overall
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -332,5 +333,24 @@ export const adminService = {
       method: "GET",
       token,
     });
+  },
+
+  // Generate EOD Report for User
+  generateUserEOD: async (userId: string, token: string): Promise<Blob> => {
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}/api/admin/users/${userId}/eod-report`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to generate EOD report");
+    }
+
+    return response.blob();
   },
 };

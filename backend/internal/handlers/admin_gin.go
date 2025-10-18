@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"notorious-backend/internal/auth"
@@ -105,7 +107,22 @@ func (h *AdminGinHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, users)
+	// Enrich users with total search count
+	type UserWithStats struct {
+		*models.User
+		TotalSearches int `json:"total_searches"`
+	}
+
+	usersWithStats := make([]UserWithStats, len(users))
+	for i, user := range users {
+		totalSearches, _ := h.searchHistoryRepo.CountByUserID(c.Request.Context(), user.ID)
+		usersWithStats[i] = UserWithStats{
+			User:          user,
+			TotalSearches: totalSearches,
+		}
+	}
+
+	c.JSON(http.StatusOK, usersWithStats)
 }
 
 func (h *AdminGinHandler) GetUser(c *gin.Context) {
@@ -542,4 +559,129 @@ func (h *AdminGinHandler) GetRequestCounts(c *gin.Context) {
 		"pending_user_requests":     len(userRequests),
 		"pending_password_requests": len(passwordRequests),
 	})
+}
+
+// GenerateUserEOD generates End of Day report for a specific user
+func (h *AdminGinHandler) GenerateUserEOD(c *gin.Context) {
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	// Get user details
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	// Get today's search history for this user
+	todaySearches, err := h.searchHistoryRepo.GetTodaySearches(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch search history"})
+		return
+	}
+
+	// Filter searches for this user only
+	userSearches := make([]*models.SearchHistory, 0)
+	for _, search := range todaySearches {
+		if search.UserID == userID {
+			userSearches = append(userSearches, search)
+		}
+	}
+
+	// Set headers for file download
+	filename := user.Name + "_EOD_" + time.Now().Format("2006-01-02") + ".csv"
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", "attachment; filename="+filename)
+	c.Header("Content-Type", "text/csv")
+
+	// Write CSV header row
+	c.Writer.Write([]byte("Search ID,Timestamp,Total Results,OID,Name,Father Name,Mobile,Alt Phone,Email,Address,Alt Address,Year of Registration\n"))
+
+	// Helper function to escape CSV values
+	escapeCSV := func(value string) string {
+		if value == "" {
+			return ""
+		}
+		// Replace ! with comma for addresses
+		value = strings.ReplaceAll(value, "!", ",")
+
+		// If contains special chars, wrap in quotes
+		needsQuotes := false
+		for _, ch := range value {
+			if ch == ',' || ch == '"' || ch == '\n' || ch == '\r' {
+				needsQuotes = true
+				break
+			}
+		}
+
+		if needsQuotes {
+			// Escape existing quotes by doubling them
+			escaped := ""
+			for _, ch := range value {
+				if ch == '"' {
+					escaped += "\"\""
+				} else {
+					escaped += string(ch)
+				}
+			}
+			return "\"" + escaped + "\""
+		}
+		return value
+	}
+
+	// Helper to safely get string values from result map
+	getStringValue := func(result map[string]interface{}, key string) string {
+		if val, ok := result[key]; ok && val != nil {
+			return fmt.Sprintf("%v", val)
+		}
+		return ""
+	}
+
+	// Process each search history record
+	for searchID, history := range userSearches {
+		// Parse top results
+		topResults, ok := history.TopResults.([]interface{})
+		if !ok {
+			continue
+		}
+
+		// Format timestamp
+		timestamp := history.SearchedAt.Format("2006-01-02 15:04:05")
+		totalResults := history.TotalResults
+
+		// Limit to top 25 results
+		maxResults := len(topResults)
+		if maxResults > 25 {
+			maxResults = 25
+		}
+
+		// Write each result as a CSV row
+		for resultNum := 0; resultNum < maxResults; resultNum++ {
+			result, ok := topResults[resultNum].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			// Build CSV row
+			row := fmt.Sprintf("%d,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
+				searchID+1,                               // Search ID (1-indexed)
+				timestamp,                                // Timestamp
+				totalResults,                             // Total Results
+				escapeCSV(getStringValue(result, "oid")), // OID
+				escapeCSV(getStringValue(result, "name")),                 // Name
+				escapeCSV(getStringValue(result, "fname")),                // Father Name
+				escapeCSV(getStringValue(result, "mobile")),               // Mobile
+				escapeCSV(getStringValue(result, "alt")),                  // Alt Phone
+				escapeCSV(getStringValue(result, "email")),                // Email
+				escapeCSV(getStringValue(result, "address")),              // Address
+				escapeCSV(getStringValue(result, "alt_address")),          // Alt Address
+				escapeCSV(getStringValue(result, "year_of_registration")), // Year of Registration
+			)
+
+			c.Writer.Write([]byte(row))
+		}
+	}
 }

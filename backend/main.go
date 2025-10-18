@@ -136,6 +136,7 @@ func main() {
 			adminRoutes.PUT("/users/:id", adminHandler.UpdateUser)
 			adminRoutes.DELETE("/users/:id", adminHandler.DeleteUser)
 			adminRoutes.POST("/users/:id/change-password", adminHandler.ChangeUserPassword)
+			adminRoutes.GET("/users/:id/eod-report", adminHandler.GenerateUserEOD) // NEW: Generate EOD for user
 
 			// User requests
 			adminRoutes.GET("/user-requests", adminHandler.ListUserRequests)
