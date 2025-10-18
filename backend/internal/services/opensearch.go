@@ -42,15 +42,17 @@ type Document struct {
 	OID                string `json:"oid"`
 	Email              string `json:"email"`
 	YearOfRegistration int    `json:"year_of_registration"`
+	Region             string `json:"region"` // "pan-india" or "delhi-ncr" - for ultra-fast filtering
 	InternalID         string `json:"-"`
 }
 
 type SearchRequest struct {
-	Query  string   `json:"query"`
-	Fields []string `json:"fields"`
-	AndOr  string   `json:"and_or"` // "AND" or "OR"
-	Size   int      `json:"size"`
-	From   int      `json:"from"` // Pagination offset
+	Query      string   `json:"query"`
+	Fields     []string `json:"fields"`
+	AndOr      string   `json:"and_or"` // "AND" or "OR"
+	Size       int      `json:"size"`
+	From       int      `json:"from"`        // Pagination offset
+	UserRegion string   `json:"user_region"` // User's region for filtering: "pan-india" or "delhi-ncr"
 }
 
 type SearchResponse struct {
@@ -254,6 +256,7 @@ func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Doc
 
 	doc := Document{
 		YearOfRegistration: year,
+		Region:             "pan-india", // Default region
 	}
 
 	// Map fields, dropping _id and circle
@@ -294,6 +297,10 @@ func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Doc
 				doc.OID = oid
 			}
 		}
+	}
+	// Allow region to be overridden from rawDoc
+	if val, ok := rawDoc["region"].(string); ok && val != "" {
+		doc.Region = val
 	}
 
 	return doc
@@ -570,6 +577,72 @@ func parseFieldQuery(query string, operator string) []map[string]string {
 	return result
 }
 
+// addRegionFilter adds region-based filtering to the query
+// - pan-india users: can search ALL data (pan-india + delhi-ncr)
+// - delhi-ncr users: can ONLY search delhi-ncr data
+func addRegionFilter(query map[string]interface{}, userRegion string) map[string]interface{} {
+	if userRegion == "" {
+		userRegion = "pan-india" // Default to pan-india if not specified
+	}
+
+	// Get or create the bool query
+	boolQuery, exists := query["bool"].(map[string]interface{})
+	if !exists {
+		// If there's no bool query, wrap the existing query in a bool.must
+		// Create a copy of the original query to avoid modifying the source
+		originalQuery := make(map[string]interface{})
+		for k, v := range query {
+			originalQuery[k] = v
+		}
+
+		// Create new bool query structure
+		boolQuery = make(map[string]interface{})
+		if len(originalQuery) > 0 {
+			boolQuery["must"] = []map[string]interface{}{originalQuery}
+		}
+
+		// Replace query with new bool structure
+		query = map[string]interface{}{
+			"bool": boolQuery,
+		}
+	}
+
+	if userRegion == "delhi-ncr" {
+		// Delhi-NCR users: ONLY see delhi-ncr data (strict filter)
+		filters, _ := boolQuery["filter"].([]map[string]interface{})
+		filters = append(filters, map[string]interface{}{
+			"term": map[string]interface{}{
+				"region": "delhi-ncr",
+			},
+		})
+		boolQuery["filter"] = filters
+		log.Printf("🔒 Region filter applied: delhi-ncr (strict) - will ONLY show delhi-ncr documents")
+	} else {
+		// Pan-India users: can see ALL data (both pan-india + delhi-ncr + old data without region)
+		filters, _ := boolQuery["filter"].([]map[string]interface{})
+		filters = append(filters, map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should": []map[string]interface{}{
+					{"term": map[string]interface{}{"region": "pan-india"}},
+					{"term": map[string]interface{}{"region": "delhi-ncr"}},
+					{"bool": map[string]interface{}{ // Documents without region field (old data)
+						"must_not": map[string]interface{}{
+							"exists": map[string]interface{}{
+								"field": "region",
+							},
+						},
+					}},
+				},
+				"minimum_should_match": 1,
+			},
+		})
+		boolQuery["filter"] = filters
+		log.Printf("✅ Region filter applied: pan-india (access to all regions)")
+	}
+
+	return query
+}
+
 func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 	// Parse query for field:value syntax
 	fieldQueries := parseFieldQuery(req.Query, req.AndOr)
@@ -623,6 +696,9 @@ func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 		}
 	}
 
+	// Add region filtering based on user's region
+	query = addRegionFilter(query, req.UserRegion)
+
 	// Limit results to 50 per page for better performance
 	size := req.Size
 	if size <= 0 || size > 100 {
@@ -663,7 +739,7 @@ func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 	resp, err := s.api.Search(
 		ctx,
 		&opensearchapi.SearchReq{
-			Indices: []string{s.cfg.OpenSearchIndex},
+			Indices: s.cfg.OpenSearchIndices, // Search across all configured indices
 			Body:    bytes.NewReader(bodyJSON),
 			Params: opensearchapi.SearchParams{
 				RequestCache: opensearchapi.ToPointer(true), // Enable request cache
@@ -794,7 +870,7 @@ func isValidMasterID(masterID string) bool {
 // 1. Direct matches in mobile and alt fields
 // 2. All records associated with the master ID (oid) of found records
 // 3. Records with matching name, fname, and address from initial results
-func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size int) (*SearchResponse, error) {
+func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size int, userRegion string) (*SearchResponse, error) {
 	mobileNumber = strings.TrimSpace(mobileNumber)
 	if mobileNumber == "" {
 		return nil, fmt.Errorf("mobile number cannot be empty")
@@ -823,6 +899,9 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 		},
 	}
 
+	// Add region filtering to initial query
+	initialQuery = addRegionFilter(initialQuery, userRegion)
+
 	initialSearchBody := map[string]interface{}{
 		"query":   initialQuery,
 		"size":    size,
@@ -840,7 +919,7 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 	initialResp, err := s.api.Search(
 		ctx,
 		&opensearchapi.SearchReq{
-			Indices: []string{s.cfg.OpenSearchIndex},
+			Indices: s.cfg.OpenSearchIndices, // Search across all configured indices
 			Body:    bytes.NewReader(bodyJSON),
 			Params: opensearchapi.SearchParams{
 				RequestCache: opensearchapi.ToPointer(true),
@@ -1045,6 +1124,9 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 		},
 	}
 
+	// Add region filtering to comprehensive query
+	comprehensiveQuery = addRegionFilter(comprehensiveQuery, userRegion)
+
 	// Use a larger size for comprehensive search to ensure we get all Master ID matches
 	// OpenSearch can handle up to 10000 results
 	comprehensiveSize := 200 // Get up to 200 results for comprehensive search
@@ -1090,7 +1172,7 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 	comprehensiveResp, err := s.api.Search(
 		ctx2,
 		&opensearchapi.SearchReq{
-			Indices: []string{s.cfg.OpenSearchIndex},
+			Indices: s.cfg.OpenSearchIndices, // Search across all configured indices
 			Body:    bytes.NewReader(comprehensiveBodyJSON),
 			Params: opensearchapi.SearchParams{
 				RequestCache: opensearchapi.ToPointer(true),

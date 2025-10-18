@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { adminService, UserRequest } from "@/services/admin.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { adminService, UserRequest } from "@/services/admin.service";
 import { X } from "lucide-react";
+import { useState } from "react";
 
 interface ApproveRequestModalProps {
   token: string;
@@ -20,18 +20,29 @@ export function ApproveRequestModal({
 }: ApproveRequestModalProps) {
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState("");
-  const [dailyLimit, setDailyLimit] = useState(request.requested_searches_per_day.toString());
+  const [region, setRegion] = useState("pan-india");
+  const [dailyLimit, setDailyLimit] = useState(
+    request.requested_searches_per_day.toString()
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      await adminService.approveUserRequest(request.id, password, parseInt(dailyLimit), token);
+      await adminService.approveUserRequest(
+        request.id,
+        password,
+        region,
+        parseInt(dailyLimit),
+        token
+      );
       onSuccess();
     } catch (error) {
       console.error("Failed to approve request:", error);
-      alert(error instanceof Error ? error.message : "Failed to approve request");
+      alert(
+        error instanceof Error ? error.message : "Failed to approve request"
+      );
     } finally {
       setLoading(false);
     }
@@ -41,7 +52,9 @@ export function ApproveRequestModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-[#1a0f2e] rounded-lg border border-gray-700 w-full max-w-md">
         <div className="flex justify-between items-center p-4 border-b border-gray-700">
-          <h3 className="text-lg font-semibold text-white">Approve Access Request</h3>
+          <h3 className="text-lg font-semibold text-white">
+            Approve Access Request
+          </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
             <X className="h-5 w-5" />
           </button>
@@ -70,6 +83,26 @@ export function ApproveRequestModal({
             />
             <p className="text-xs text-gray-500 mt-1">
               Minimum 6 characters. Share this with the user.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Region *
+            </label>
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="w-full px-3 py-2 bg-[#2D1B4E] border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+              required
+            >
+              <option value="pan-india">🌏 Pan-India (Access All Data)</option>
+              <option value="delhi-ncr">
+                📍 Delhi-NCR (Restricted Access)
+              </option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Choose access level for this user
             </p>
           </div>
 
@@ -120,4 +153,3 @@ export function ApproveRequestModal({
     </div>
   );
 }
-

@@ -46,12 +46,22 @@ func (h *AdminGinHandler) CreateUser(c *gin.Context) {
 		Password         string `json:"password" binding:"required,min=6"`
 		Name             string `json:"name" binding:"required"`
 		Phone            string `json:"phone"`
+		Region           string `json:"region"` // "pan-india" or "delhi-ncr"
 		DailySearchLimit int    `json:"daily_search_limit" binding:"required,min=1"`
 		IsActive         bool   `json:"is_active"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate region
+	if req.Region == "" {
+		req.Region = "pan-india" // Default to pan-india
+	}
+	if req.Region != "pan-india" && req.Region != "delhi-ncr" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "region must be either 'pan-india' or 'delhi-ncr'"})
 		return
 	}
 
@@ -67,6 +77,7 @@ func (h *AdminGinHandler) CreateUser(c *gin.Context) {
 		Name:             req.Name,
 		Phone:            req.Phone,
 		Role:             models.RoleUser,
+		Region:           req.Region,
 		DailySearchLimit: req.DailySearchLimit,
 		IsActive:         req.IsActive,
 	}
@@ -123,12 +134,19 @@ func (h *AdminGinHandler) UpdateUser(c *gin.Context) {
 	var req struct {
 		Name             string `json:"name" binding:"required"`
 		Phone            string `json:"phone"`
+		Region           string `json:"region"` // "pan-india" or "delhi-ncr"
 		DailySearchLimit int    `json:"daily_search_limit" binding:"required,min=1"`
 		IsActive         bool   `json:"is_active"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate region if provided
+	if req.Region != "" && req.Region != "pan-india" && req.Region != "delhi-ncr" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "region must be either 'pan-india' or 'delhi-ncr'"})
 		return
 	}
 
@@ -140,6 +158,9 @@ func (h *AdminGinHandler) UpdateUser(c *gin.Context) {
 
 	user.Name = req.Name
 	user.Phone = req.Phone
+	if req.Region != "" {
+		user.Region = req.Region
+	}
 	user.DailySearchLimit = req.DailySearchLimit
 	user.IsActive = req.IsActive
 
@@ -194,11 +215,21 @@ func (h *AdminGinHandler) ApproveUserRequest(c *gin.Context) {
 
 	var req struct {
 		Password         string `json:"password" binding:"required,min=6"`
+		Region           string `json:"region"` // "pan-india" or "delhi-ncr"
 		DailySearchLimit int    `json:"daily_search_limit" binding:"required,min=1"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate and set default region
+	if req.Region == "" {
+		req.Region = "pan-india" // Default to pan-india
+	}
+	if req.Region != "pan-india" && req.Region != "delhi-ncr" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "region must be either 'pan-india' or 'delhi-ncr'"})
 		return
 	}
 
@@ -220,6 +251,7 @@ func (h *AdminGinHandler) ApproveUserRequest(c *gin.Context) {
 		Name:             userRequest.Name,
 		Phone:            userRequest.Phone,
 		Role:             models.RoleUser,
+		Region:           req.Region,
 		DailySearchLimit: req.DailySearchLimit,
 		IsActive:         true,
 	}

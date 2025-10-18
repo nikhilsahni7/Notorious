@@ -7,6 +7,7 @@ export interface User {
   name: string;
   phone: string;
   role: string;
+  region: string; // "pan-india" or "delhi-ncr"
   daily_search_limit: number;
   searches_used_today: number;
   is_active: boolean;
@@ -123,14 +124,20 @@ export const adminService = {
     });
   },
 
-  getUserDetails: async (userId: string, token: string): Promise<UserWithMetadata> => {
+  getUserDetails: async (
+    userId: string,
+    token: string
+  ): Promise<UserWithMetadata> => {
     return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/details`, {
       method: "GET",
       token,
     });
   },
 
-  createUser: async (userData: Partial<User> & { password: string }, token: string): Promise<User> => {
+  createUser: async (
+    userData: Partial<User> & { password: string },
+    token: string
+  ): Promise<User> => {
     return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.USERS, {
       method: "POST",
       body: JSON.stringify(userData),
@@ -138,7 +145,11 @@ export const adminService = {
     });
   },
 
-  updateUser: async (userId: string, userData: Partial<User>, token: string): Promise<User> => {
+  updateUser: async (
+    userId: string,
+    userData: Partial<User>,
+    token: string
+  ): Promise<User> => {
     return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}`, {
       method: "PUT",
       body: JSON.stringify(userData),
@@ -153,59 +164,112 @@ export const adminService = {
     });
   },
 
-  changeUserPassword: async (userId: string, newPassword: string, token: string): Promise<{ message: string }> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/change-password`, {
-      method: "POST",
-      body: JSON.stringify({ new_password: newPassword }),
-      token,
-    });
+  changeUserPassword: async (
+    userId: string,
+    newPassword: string,
+    token: string
+  ): Promise<{ message: string }> => {
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/change-password`,
+      {
+        method: "POST",
+        body: JSON.stringify({ new_password: newPassword }),
+        token,
+      }
+    );
   },
 
   // User Requests
-  listUserRequests: async (token: string, status = "pending", limit = 100): Promise<UserRequest[]> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}?status=${status}&limit=${limit}`, {
-      method: "GET",
-      token,
-    });
+  listUserRequests: async (
+    token: string,
+    status = "pending",
+    limit = 100
+  ): Promise<UserRequest[]> => {
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}?status=${status}&limit=${limit}`,
+      {
+        method: "GET",
+        token,
+      }
+    );
   },
 
-  approveUserRequest: async (requestId: string, password: string, dailySearchLimit: number, token: string): Promise<User> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/approve`, {
-      method: "POST",
-      body: JSON.stringify({ password, daily_search_limit: dailySearchLimit }),
-      token,
-    });
+  approveUserRequest: async (
+    requestId: string,
+    password: string,
+    region: string,
+    dailySearchLimit: number,
+    token: string
+  ): Promise<User> => {
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/approve`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          password,
+          region,
+          daily_search_limit: dailySearchLimit,
+        }),
+        token,
+      }
+    );
   },
 
-  rejectUserRequest: async (requestId: string, reason: string, token: string): Promise<void> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/reject`, {
-      method: "POST",
-      body: JSON.stringify({ reason }),
-      token,
-    });
+  rejectUserRequest: async (
+    requestId: string,
+    reason: string,
+    token: string
+  ): Promise<void> => {
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.USER_REQUESTS}/${requestId}/reject`,
+      {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+        token,
+      }
+    );
   },
 
   // Search History
-  getSearchHistory: async (token: string, limit = 50): Promise<SearchHistoryItem[]> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.SEARCH_HISTORY}?limit=${limit}`, {
-      method: "GET",
-      token,
-    });
+  getSearchHistory: async (
+    token: string,
+    limit = 50
+  ): Promise<SearchHistoryItem[]> => {
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.SEARCH_HISTORY}?limit=${limit}`,
+      {
+        method: "GET",
+        token,
+      }
+    );
   },
 
-  getUserSearchHistory: async (userId: string, token: string, limit = 50): Promise<SearchHistoryItem[]> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/search-history?limit=${limit}`, {
-      method: "GET",
-      token,
-    });
+  getUserSearchHistory: async (
+    userId: string,
+    token: string,
+    limit = 50
+  ): Promise<SearchHistoryItem[]> => {
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/search-history?limit=${limit}`,
+      {
+        method: "GET",
+        token,
+      }
+    );
   },
 
   // Password Change Requests
-  listPasswordChangeRequests: async (token: string, status = "pending"): Promise<PasswordChangeRequestWithUser[]> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}?status=${status}&limit=100`, {
-      method: "GET",
-      token,
-    });
+  listPasswordChangeRequests: async (
+    token: string,
+    status = "pending"
+  ): Promise<PasswordChangeRequestWithUser[]> => {
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}?status=${status}&limit=100`,
+      {
+        method: "GET",
+        token,
+      }
+    );
   },
 
   approvePasswordChangeRequest: async (
@@ -214,11 +278,17 @@ export const adminService = {
     adminNotes: string | undefined,
     token: string
   ): Promise<{ message: string }> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}/${requestId}/approve`, {
-      method: "POST",
-      body: JSON.stringify({ new_password: newPassword, admin_notes: adminNotes }),
-      token,
-    });
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}/${requestId}/approve`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          new_password: newPassword,
+          admin_notes: adminNotes,
+        }),
+        token,
+      }
+    );
   },
 
   rejectPasswordChangeRequest: async (
@@ -226,22 +296,31 @@ export const adminService = {
     adminNotes: string,
     token: string
   ): Promise<{ message: string }> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}/${requestId}/reject`, {
-      method: "POST",
-      body: JSON.stringify({ admin_notes: adminNotes }),
-      token,
-    });
+    return apiRequest(
+      `${API_CONFIG.ENDPOINTS.ADMIN.PASSWORD_CHANGE_REQUESTS}/${requestId}/reject`,
+      {
+        method: "POST",
+        body: JSON.stringify({ admin_notes: adminNotes }),
+        token,
+      }
+    );
   },
 
   // Sessions
-  getAdminSessions: async (token: string, limit = 100): Promise<AdminSession[]> => {
+  getAdminSessions: async (
+    token: string,
+    limit = 100
+  ): Promise<AdminSession[]> => {
     return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.SESSIONS}?limit=${limit}`, {
       method: "GET",
       token,
     });
   },
 
-  invalidateSession: async (sessionId: string, token: string): Promise<{ message: string }> => {
+  invalidateSession: async (
+    sessionId: string,
+    token: string
+  ): Promise<{ message: string }> => {
     return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.SESSIONS}/${sessionId}`, {
       method: "DELETE",
       token,

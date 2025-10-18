@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { adminService, User } from "@/services/admin.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { adminService, User } from "@/services/admin.service";
 import { X } from "lucide-react";
+import { useState } from "react";
 
 interface EditUserModalProps {
   token: string;
@@ -12,11 +12,17 @@ interface EditUserModalProps {
   onSuccess: () => void;
 }
 
-export function EditUserModal({ token, user, onClose, onSuccess }: EditUserModalProps) {
+export function EditUserModal({
+  token,
+  user,
+  onClose,
+  onSuccess,
+}: EditUserModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: user.name,
     phone: user.phone || "",
+    region: user.region || "pan-india",
     daily_search_limit: user.daily_search_limit.toString(),
     is_active: user.is_active,
   });
@@ -26,10 +32,14 @@ export function EditUserModal({ token, user, onClose, onSuccess }: EditUserModal
     setLoading(true);
 
     try {
-      await adminService.updateUser(user.id, {
-        ...formData,
-        daily_search_limit: parseInt(formData.daily_search_limit),
-      }, token);
+      await adminService.updateUser(
+        user.id,
+        {
+          ...formData,
+          daily_search_limit: parseInt(formData.daily_search_limit),
+        },
+        token
+      );
       onSuccess();
     } catch (error) {
       console.error("Failed to update user:", error);
@@ -51,32 +61,67 @@ export function EditUserModal({ token, user, onClose, onSuccess }: EditUserModal
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Email
+            </label>
             <Input
               value={user.email}
               className="bg-[#2D1B4E] border-gray-600 text-gray-500"
               disabled
             />
-            <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Email cannot be changed
+            </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Name *</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Name *
+            </label>
             <Input
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               className="bg-[#2D1B4E] border-gray-600 text-white"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Phone</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Phone
+            </label>
             <Input
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
               className="bg-[#2D1B4E] border-gray-600 text-white"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Region *
+            </label>
+            <select
+              value={formData.region}
+              onChange={(e) =>
+                setFormData({ ...formData, region: e.target.value })
+              }
+              className="w-full px-3 py-2 bg-[#2D1B4E] border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+              required
+            >
+              <option value="pan-india">🌏 Pan-India (Access All Data)</option>
+              <option value="delhi-ncr">
+                📍 Delhi-NCR (Restricted Access)
+              </option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Pan-India users can search all data. Delhi-NCR users only see
+              Delhi data.
+            </p>
           </div>
 
           <div>
@@ -86,7 +131,9 @@ export function EditUserModal({ token, user, onClose, onSuccess }: EditUserModal
             <Input
               type="number"
               value={formData.daily_search_limit}
-              onChange={(e) => setFormData({ ...formData, daily_search_limit: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, daily_search_limit: e.target.value })
+              }
               className="bg-[#2D1B4E] border-gray-600 text-white"
               min="1"
               required
@@ -101,7 +148,9 @@ export function EditUserModal({ token, user, onClose, onSuccess }: EditUserModal
               type="checkbox"
               id="is_active"
               checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              onChange={(e) =>
+                setFormData({ ...formData, is_active: e.target.checked })
+              }
               className="rounded"
             />
             <label htmlFor="is_active" className="text-sm text-gray-300">
@@ -139,4 +188,3 @@ export function EditUserModal({ token, user, onClose, onSuccess }: EditUserModal
     </div>
   );
 }
-

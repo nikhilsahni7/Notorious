@@ -20,6 +20,7 @@ type User struct {
 	Name              string    `json:"name" db:"name"`
 	Phone             string    `json:"phone" db:"phone"`
 	Role              Role      `json:"role" db:"role"`
+	Region            string    `json:"region" db:"region"` // "pan-india" or "delhi-ncr"
 	DailySearchLimit  int       `json:"daily_search_limit" db:"daily_search_limit"`
 	SearchesUsedToday int       `json:"searches_used_today" db:"searches_used_today"`
 	IsActive          bool      `json:"is_active" db:"is_active"`
@@ -39,13 +40,13 @@ type UserRequest struct {
 	CreatedAt               time.Time `json:"created_at" db:"created_at"`
 	AdminNotes              *string   `json:"admin_notes,omitempty" db:"admin_notes"`
 	// Metadata fields for tracking signup requests
-	IPAddress   *string `json:"ip_address,omitempty" db:"ip_address"`
-	Country     *string `json:"country,omitempty" db:"country"`
-	City        *string `json:"city,omitempty" db:"city"`
-	DeviceType  *string `json:"device_type,omitempty" db:"device_type"`
-	Browser     *string `json:"browser,omitempty" db:"browser"`
-	OS          *string `json:"os,omitempty" db:"os"`
-	UserAgent   *string `json:"user_agent,omitempty" db:"user_agent"`
+	IPAddress  *string `json:"ip_address,omitempty" db:"ip_address"`
+	Country    *string `json:"country,omitempty" db:"country"`
+	City       *string `json:"city,omitempty" db:"city"`
+	DeviceType *string `json:"device_type,omitempty" db:"device_type"`
+	Browser    *string `json:"browser,omitempty" db:"browser"`
+	OS         *string `json:"os,omitempty" db:"os"`
+	UserAgent  *string `json:"user_agent,omitempty" db:"user_agent"`
 }
 
 type SearchHistory struct {

@@ -3,13 +3,15 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
 	AWSRegion                 string
 	OpenSearchEndpoint        string
-	OpenSearchIndex           string
+	OpenSearchIndex           string   // Primary index (for ingestion/writes)
+	OpenSearchIndices         []string // Multiple indices to search (comma-separated in env)
 	OpenSearchMasterUser      string
 	OpenSearchMasterPass      string
 	S3UploadBucket            string
@@ -23,10 +25,19 @@ type Config struct {
 }
 
 func Load() *Config {
+	indices := parseCommaSeparated(getEnv("OPENSEARCH_INDICES", ""))
+	primaryIndex := getEnv("OPENSEARCH_INDEX", "people-dev-0001")
+
+	// If OPENSEARCH_INDICES not set, use primary index for both
+	if len(indices) == 0 {
+		indices = []string{primaryIndex}
+	}
+
 	return &Config{
 		AWSRegion:                 getEnv("AWS_REGION", "us-east-1"),
 		OpenSearchEndpoint:        getEnv("OPENSEARCH_ENDPOINT", ""),
-		OpenSearchIndex:           getEnv("OPENSEARCH_INDEX", "people-dev-0001"),
+		OpenSearchIndex:           primaryIndex,
+		OpenSearchIndices:         indices,
 		OpenSearchMasterUser:      getEnv("OPENSEARCH_MASTER_USER", ""),
 		OpenSearchMasterPass:      getEnv("OPENSEARCH_MASTER_PASSWORD", ""),
 		S3UploadBucket:            getEnv("S3_UPLOAD_BUCKET", ""),
@@ -73,4 +84,17 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 		}
 	}
 	return defaultValue
+}
+
+func parseCommaSeparated(value string) []string {
+	if value == "" {
+		return []string{}
+	}
+	var result []string
+	for _, item := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }

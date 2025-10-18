@@ -172,6 +172,10 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		req.Fields = []string{"name", "fname", "address", "mobile", "alt", "id", "oid", "email"}
 	}
 
+	// Set user's region for filtering
+	req.UserRegion = user.Region
+	log.Printf("🔐 User %s searching with region: %s", user.Email, user.Region)
+
 	// Check if this is a mobile number search
 	// Supports both raw numbers (9876543210) and field syntax (mobile:9876543210)
 	mobileNumber, isMobileSearch := extractMobileNumber(req.Query)
@@ -182,7 +186,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	if isMobileSearch {
 		// Use comprehensive mobile search for better results
 		log.Printf("Using comprehensive mobile search for number: %s (original query: %s)", mobileNumber, req.Query)
-		response, searchErr = h.openSearchService.ComprehensiveMobileSearch(mobileNumber, req.Size)
+		response, searchErr = h.openSearchService.ComprehensiveMobileSearch(mobileNumber, req.Size, user.Region)
 		if searchErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": searchErr.Error()})
 			return

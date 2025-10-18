@@ -5,6 +5,8 @@
       "number_of_shards": 6,
       "number_of_replicas": 0,
       "refresh_interval": "-1",
+      "index.queries.cache.enabled": true,
+      "index.requests.cache.enable": true,
       "analysis": {
         "tokenizer": {
           "address_tokenizer": {
@@ -132,6 +134,13 @@
         },
         "year_of_registration": {
           "type": "integer"
+        },
+        "region": {
+          "type": "keyword",
+          "normalizer": "lowercase_keyword",
+          "doc_values": true,
+          "eager_global_ordinals": true,
+          "index": true
         }
       }
     }
