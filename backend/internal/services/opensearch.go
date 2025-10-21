@@ -1086,52 +1086,52 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 	}
 
 	// Only add name/fname/address searches if we don't have Master IDs
-	// This prevents too many unrelated results
+	// IMPORTANT: When no Master ID, we require EXACT matches for ALL fields together
+	// This prevents too many unrelated results from partial name matches
 	if len(masterIDSet) == 0 {
-		// Add name searches
-		if len(nameSet) > 0 {
-			for name := range nameSet {
-				comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
-					"term": map[string]interface{}{
-						"name": map[string]interface{}{
-							"value":            name,
-							"case_insensitive": true,
-							"boost":            1.2,
+		log.Printf("⚠️ No valid Master IDs found. Using exact name+fname+address matching to prevent false positives.")
+
+		// For each unique combination from initial results, create a query that requires
+		// ALL fields to match (name AND fname AND address)
+		for _, doc := range initialDocs {
+			if doc.Name != "" && doc.Fname != "" && doc.Address != "" {
+				// Create a bool query that requires ALL three fields to match exactly
+				exactMatchQuery := map[string]interface{}{
+					"bool": map[string]interface{}{
+						"must": []map[string]interface{}{
+							{
+								"term": map[string]interface{}{
+									"name": map[string]interface{}{
+										"value":            strings.ToLower(strings.TrimSpace(doc.Name)),
+										"case_insensitive": true,
+									},
+								},
+							},
+							{
+								"term": map[string]interface{}{
+									"fname": map[string]interface{}{
+										"value":            strings.ToLower(strings.TrimSpace(doc.Fname)),
+										"case_insensitive": true,
+									},
+								},
+							},
+							{
+								"term": map[string]interface{}{
+									"address": map[string]interface{}{
+										"value":            strings.ToLower(strings.TrimSpace(doc.Address)),
+										"case_insensitive": true,
+									},
+								},
+							},
 						},
+						"boost": 1.5,
 					},
-				})
+				}
+				comprehensiveShould = append(comprehensiveShould, exactMatchQuery)
 			}
 		}
 
-		// Add father name searches
-		if len(fnameSet) > 0 {
-			for fname := range fnameSet {
-				comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
-					"term": map[string]interface{}{
-						"fname": map[string]interface{}{
-							"value":            fname,
-							"case_insensitive": true,
-							"boost":            1.2,
-						},
-					},
-				})
-			}
-		}
-
-		// Add address searches
-		if len(addressSet) > 0 {
-			for address := range addressSet {
-				comprehensiveShould = append(comprehensiveShould, map[string]interface{}{
-					"term": map[string]interface{}{
-						"address": map[string]interface{}{
-							"value":            address,
-							"case_insensitive": true,
-							"boost":            1.1,
-						},
-					},
-				})
-			}
-		}
+		log.Printf("Added %d exact match queries (name+fname+address combinations)", len(comprehensiveShould)-1)
 	}
 
 	comprehensiveQuery := map[string]interface{}{
@@ -1146,17 +1146,22 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 
 	// Use a larger size for comprehensive search to ensure we get all Master ID matches
 	// OpenSearch can handle up to 10000 results
-	comprehensiveSize := 200 // Get up to 200 results for comprehensive search
+	comprehensiveSize := 100 // When no Master ID, use smaller size since we're doing exact matching
 	if len(masterIDSet) > 0 {
 		// If we have Master IDs, we want to get ALL records with those IDs
 		comprehensiveSize = 500
 	}
 
+	// Cap the track_total_hits to prevent showing inflated counts
+	// This ensures we don't show "10000 results" when we only return the limited results
+	trackTotalHits := comprehensiveSize
+
 	comprehensiveSearchBody := map[string]interface{}{
-		"query":   comprehensiveQuery,
-		"size":    comprehensiveSize,
-		"_source": true,
-		"timeout": "10s",
+		"query":            comprehensiveQuery,
+		"size":             comprehensiveSize,
+		"track_total_hits": trackTotalHits, // Cap total count to prevent showing inflated numbers
+		"_source":          true,
+		"timeout":          "10s",
 		"sort": []map[string]interface{}{
 			{
 				"_score": map[string]string{
@@ -1179,8 +1184,8 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 		addressCount = len(addressSet)
 	}
 
-	log.Printf("Comprehensive mobile search - Query includes: %d Master IDs, %d names, %d fnames, %d addresses (size: %d)",
-		len(masterIDSet), nameCount, fnameCount, addressCount, comprehensiveSize)
+	log.Printf("Comprehensive mobile search - Query includes: %d Master IDs, %d names, %d fnames, %d addresses (size: %d, track_total_hits: %d)",
+		len(masterIDSet), nameCount, fnameCount, addressCount, comprehensiveSize, trackTotalHits)
 
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel2()
@@ -1202,13 +1207,18 @@ func (s *OpenSearchService) ComprehensiveMobileSearch(mobileNumber string, size 
 		return s.convertToSearchResponse(initialResp)
 	}
 
-	log.Printf("Comprehensive mobile search completed - returned %d out of %d total matching results",
-		len(comprehensiveResp.Hits.Hits), comprehensiveResp.Hits.Total.Value)
+	log.Printf("Comprehensive mobile search completed - returned %d out of %d total matching results (track_total_hits capped at %d)",
+		len(comprehensiveResp.Hits.Hits), comprehensiveResp.Hits.Total.Value, trackTotalHits)
 
 	// If we got fewer results than expected with Master ID, log for debugging
 	if len(masterIDSet) > 0 && comprehensiveResp.Hits.Total.Value < 60 {
 		log.Printf("WARNING: Expected more results with Master ID. Got %d, size was %d",
 			comprehensiveResp.Hits.Total.Value, comprehensiveSize)
+	}
+
+	// Additional logging if we hit the track_total_hits limit
+	if comprehensiveResp.Hits.Total.Value >= trackTotalHits {
+		log.Printf("⚠️ NOTICE: Total hits reached the track_total_hits limit (%d). Actual total may be higher.", trackTotalHits)
 	}
 
 	return s.convertToSearchResponse(comprehensiveResp)
