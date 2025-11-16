@@ -46,8 +46,8 @@ func Load() *Config {
 		AWSSecretAccessKey:        getEnv("AWS_SECRET_ACCESS_KEY", ""),
 		OpenSearchBulkMaxAttempts: getEnvInt("OPENSEARCH_BULK_MAX_ATTEMPTS", 5),
 		OpenSearchBulkRetryBase:   getEnvDuration("OPENSEARCH_BULK_RETRY_BASE", 2*time.Second),
-		IngestBatchSize:           clampInt(getEnvInt("INGEST_BATCH_SIZE", 7500), 1000, 20000),
-		IngestWorkerMultiplier:    clampInt(getEnvInt("INGEST_WORKER_MULTIPLIER", 2), 1, 8),
+		IngestBatchSize:           clampInt(getEnvInt("INGEST_BATCH_SIZE", 7500), 1000, 50000),
+		IngestWorkerMultiplier:    clampInt(getEnvInt("INGEST_WORKER_MULTIPLIER", 2), 1, 16),
 	}
 }
 
