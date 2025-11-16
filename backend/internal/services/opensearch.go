@@ -142,8 +142,8 @@ func (s *OpenSearchService) ApplyIndexTemplate() error {
 func (s *OpenSearchService) CreateIndex() error {
 	indexSettings := `{
 		"settings": {
-			"number_of_shards": 6,
-			"number_of_replicas": 0,
+			"number_of_shards": 12,
+			"number_of_replicas": 2,
 			"refresh_interval": "-1"
 		}
 	}`
@@ -793,10 +793,10 @@ func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 }
 
 func (s *OpenSearchService) FinalizeIndex() error {
-	// Re-enable replicas and refresh
+	// Re-enable replicas and refresh (keeping replicas=2 for zone awareness)
 	settings := `{
 		"settings": {
-			"number_of_replicas": 1,
+			"number_of_replicas": 2,
 			"refresh_interval": "1s"
 		}
 	}`

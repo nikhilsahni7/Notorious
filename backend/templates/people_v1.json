@@ -2,8 +2,8 @@
   "index_patterns": ["people-*"],
   "template": {
     "settings": {
-      "number_of_shards": 6,
-      "number_of_replicas": 0,
+      "number_of_shards": 12,
+      "number_of_replicas": 2,
       "refresh_interval": "-1",
       "index.queries.cache.enabled": true,
       "index.requests.cache.enable": true,
