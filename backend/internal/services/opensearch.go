@@ -296,13 +296,9 @@ func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Doc
 	if val, ok := rawDoc["id"].(string); ok {
 		doc.ID = val
 	}
-	if val, ok := rawDoc["oid"].(string); ok {
+	// Explicitly handle oid - if present in rawDoc, use it, otherwise leave empty
+	if val, ok := rawDoc["oid"].(string); ok && val != "" {
 		doc.OID = val
-	}
-	if doc.OID == "" {
-		if val, ok := rawDoc["_id"].(string); ok {
-			doc.OID = val
-		}
 	}
 	if val, ok := rawDoc["email"].(string); ok {
 		doc.Email = val

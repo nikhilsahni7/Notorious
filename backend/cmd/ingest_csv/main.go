@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"notorious-backend/internal/config"
 	"notorious-backend/internal/services"
 	"os"
@@ -217,15 +216,7 @@ func processCSV(file *os.File, region string, offset int, cfg *config.Config, op
 			continue
 		}
 
-		// Generate random year if not present
-		if doc["year_of_registration"] == nil {
-			doc["year_of_registration"] = 2022 + rand.Intn(3) // 2022, 2023, or 2024
-		}
-
-		// Copy address to alt_address if alt_address is missing
-		if doc["alt_address"] == nil && doc["address"] != nil {
-			doc["alt_address"] = doc["address"]
-		}
+		// Note: oid, year_of_registration, and alt_address are set in TransformDocument()
 
 		select {
 		case docChan <- doc:
