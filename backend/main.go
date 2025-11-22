@@ -89,7 +89,7 @@ func main() {
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001",
-			"https://www.knotorious.co.in", "https://notorious.nikhilsahni.xyz"},
+			"https://www.knotorious.us", "https://notorious.nikhilsahni.xyz,"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
