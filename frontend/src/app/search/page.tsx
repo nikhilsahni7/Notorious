@@ -331,26 +331,28 @@ export default function SearchPage() {
     <div className="min-h-screen bg-[#2D1B4E] p-3">
       <div className="max-w-[1800px] mx-auto">
         {/* Compact Header */}
-        <div className="flex justify-between items-center mb-3 bg-[#1a0f2e] p-3 rounded-lg border border-gray-700">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-3 bg-[#1a0f2e] p-3 rounded-lg border border-gray-700">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-xl font-bold text-white">
                 Knotorious Search
               </h1>
-              <div className="text-xs text-gray-400 mt-0.5">
+              <div className="text-xs text-gray-400 mt-0.5 hidden md:block">
                 {user?.name} • {user?.email}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
             {/* Search Limit - Compact */}
-            <div className="text-right">
-              <div className="text-xs text-gray-400">Daily Limit</div>
-              <div className="text-sm font-bold text-white">
+            <div className="text-right mr-2">
+              <div className="text-[10px] md:text-xs text-gray-400">
+                Daily Limit
+              </div>
+              <div className="text-xs md:text-sm font-bold text-white">
                 {searchesUsed} / {searchLimit}
                 <span
-                  className={`ml-1 text-xs ${
+                  className={`ml-1 text-[10px] md:text-xs ${
                     percentageUsed > 90
                       ? "text-red-400"
                       : percentageUsed > 70
@@ -358,10 +360,10 @@ export default function SearchPage() {
                       : "text-green-400"
                   }`}
                 >
-                  ({searchesRemaining} left)
+                  ({searchesRemaining})
                 </span>
               </div>
-              <div className="w-32 h-1.5 bg-gray-700 rounded-full mt-1 overflow-hidden">
+              <div className="w-24 md:w-32 h-1.5 bg-gray-700 rounded-full mt-1 overflow-hidden ml-auto">
                 <div
                   className={`h-full transition-all ${
                     percentageUsed > 90
@@ -379,31 +381,31 @@ export default function SearchPage() {
               onClick={() => router.push("/profile")}
               variant="outline"
               size="sm"
-              className="bg-transparent border-purple-500 text-purple-400 hover:bg-purple-500/10"
+              className="h-8 px-2 bg-transparent border-purple-500 text-purple-400 hover:bg-purple-500/10"
             >
-              <User className="h-4 w-4 mr-1" />
-              Profile
+              <User className="h-4 w-4" />
+              <span className="hidden md:inline ml-1">Profile</span>
             </Button>
 
             <Button
               onClick={() => router.push("/history")}
               variant="outline"
               size="sm"
-              className="bg-transparent border-blue-500 text-blue-400 hover:bg-blue-500/10"
+              className="h-8 px-2 bg-transparent border-blue-500 text-blue-400 hover:bg-blue-500/10"
             >
-              <History className="h-4 w-4 mr-1" />
-              History
+              <History className="h-4 w-4" />
+              <span className="hidden md:inline ml-1">History</span>
             </Button>
 
             <Button
               onClick={() => router.push("/password-change")}
               variant="outline"
               size="sm"
-              className="bg-transparent border-orange-500 text-orange-400 hover:bg-orange-500/10"
+              className="h-8 px-2 bg-transparent border-orange-500 text-orange-400 hover:bg-orange-500/10"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 mr-1"
+                className="h-4 w-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -415,17 +417,17 @@ export default function SearchPage() {
                   d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
                 />
               </svg>
-              Password
+              <span className="hidden md:inline ml-1">Password</span>
             </Button>
 
             <Button
               onClick={handleExportEOD}
               variant="outline"
               size="sm"
-              className="bg-transparent border-green-500 text-green-400 hover:bg-green-500/10"
+              className="h-8 px-2 bg-transparent border-green-500 text-green-400 hover:bg-green-500/10"
             >
-              <Download className="h-4 w-4 mr-1" />
-              Export EOD
+              <Download className="h-4 w-4" />
+              <span className="hidden md:inline ml-1">Export</span>
             </Button>
 
             {user?.role === "admin" && (
@@ -433,11 +435,11 @@ export default function SearchPage() {
                 onClick={() => router.push("/admin")}
                 variant="outline"
                 size="sm"
-                className="bg-transparent border-pink-500 text-pink-400 hover:bg-pink-500/10"
+                className="h-8 px-2 bg-transparent border-pink-500 text-pink-400 hover:bg-pink-500/10"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 mr-1"
+                  className="h-4 w-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -449,7 +451,7 @@ export default function SearchPage() {
                     d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                   />
                 </svg>
-                Admin
+                <span className="hidden md:inline ml-1">Admin</span>
               </Button>
             )}
 
@@ -457,7 +459,7 @@ export default function SearchPage() {
               onClick={logout}
               variant="outline"
               size="sm"
-              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
+              className="h-8 px-2 bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
             >
               <LogOut className="h-4 w-4" />
             </Button>

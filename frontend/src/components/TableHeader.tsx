@@ -1,6 +1,6 @@
 export function TableHeader() {
   return (
-    <div className="grid grid-cols-[repeat(16,minmax(0,1fr))] gap-2 mb-2 text-sm font-semibold">
+    <div className="hidden md:grid grid-cols-[repeat(16,minmax(0,1fr))] gap-2 mb-2 text-sm font-semibold">
       <div className="col-span-1 bg-[#4A5568] text-white p-2 rounded text-center text-xs">
         Master ID
       </div>
