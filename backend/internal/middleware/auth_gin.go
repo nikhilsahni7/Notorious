@@ -5,16 +5,21 @@ import (
 	"strings"
 
 	"notorious-backend/internal/auth"
+	"notorious-backend/internal/repository"
 
 	"github.com/gin-gonic/gin"
 )
 
 type GinAuthMiddleware struct {
-	jwtManager *auth.JWTManager
+	jwtManager  *auth.JWTManager
+	sessionRepo *repository.SessionRepository
 }
 
-func NewGinAuthMiddleware(jwtManager *auth.JWTManager) *GinAuthMiddleware {
-	return &GinAuthMiddleware{jwtManager: jwtManager}
+func NewGinAuthMiddleware(jwtManager *auth.JWTManager, sessionRepo *repository.SessionRepository) *GinAuthMiddleware {
+	return &GinAuthMiddleware{
+		jwtManager:  jwtManager,
+		sessionRepo: sessionRepo,
+	}
 }
 
 func (m *GinAuthMiddleware) AuthRequired() gin.HandlerFunc {
@@ -33,11 +38,38 @@ func (m *GinAuthMiddleware) AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := m.jwtManager.Verify(parts[1])
+		tokenString := parts[1]
+		claims, err := m.jwtManager.Verify(tokenString)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			c.Abort()
 			return
+		}
+
+		// Check if session exists in DB (enforce revocation)
+		// Only for regular users, admin sessions are handled differently (or we can add admin session check too, but let's stick to user sessions for now)
+		// Actually, admin sessions are in a different table. If role is admin, we might skip this or check admin_sessions.
+		// The user request was about "device limiting" which applies to users.
+		// Admin exemption logic in Login suggests admins are special.
+		// However, if an admin logs out, their token should also be invalidated?
+		// Admin sessions are in `admin_sessions` table.
+		// Let's check user role.
+
+		if claims.Role == "user" && m.sessionRepo != nil {
+			tokenHash := auth.HashToken(tokenString)
+			exists, err := m.sessionRepo.ExistsByTokenHash(c.Request.Context(), tokenHash)
+			if err != nil {
+				// If DB error, fail safe? Or allow?
+				// Fail safe: deny access.
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify session"})
+				c.Abort()
+				return
+			}
+			if !exists {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "session revoked or invalid"})
+				c.Abort()
+				return
+			}
 		}
 
 		c.Set("user_id", claims.UserID)
@@ -74,4 +106,3 @@ func (m *GinAuthMiddleware) RequireRole(roles ...string) gin.HandlerFunc {
 		c.Next()
 	}
 }
-

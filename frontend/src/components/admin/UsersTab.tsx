@@ -9,6 +9,7 @@ import {
   History,
   Key,
   Plus,
+  Smartphone,
   Trash2,
   X,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { useEffect, useState } from "react";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { CreateUserModal } from "./CreateUserModal";
 import { EditUserModal } from "./EditUserModal";
+import { UserSessionsModal } from "./UserSessionsModal";
 
 interface UsersTabProps {
   token: string;
@@ -34,6 +36,9 @@ export function UsersTab({ token }: UsersTabProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [changingPasswordUser, setChangingPasswordUser] = useState<User | null>(
+    null
+  );
+  const [viewingSessionsUser, setViewingSessionsUser] = useState<User | null>(
     null
   );
 
@@ -195,6 +200,9 @@ export function UsersTab({ token }: UsersTabProps) {
                   Daily Limit
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                  Device Limit
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
                   Used Today
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
@@ -246,6 +254,9 @@ export function UsersTab({ token }: UsersTabProps) {
                     {user.daily_search_limit}
                   </td>
                   <td className="px-4 py-3 text-sm text-white">
+                    {user.device_limit}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-white">
                     {user.searches_used_today}
                   </td>
                   <td className="px-4 py-3 text-sm text-white">
@@ -268,6 +279,16 @@ export function UsersTab({ token }: UsersTabProps) {
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingSessionsUser(user);
+                        }}
+                        className="text-cyan-400 hover:text-cyan-300 transition-colors"
+                        title="View Active Sessions"
+                      >
+                        <Smartphone className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={() =>
                           router.push(`/admin/users/${user.id}/history`)
@@ -369,6 +390,14 @@ export function UsersTab({ token }: UsersTabProps) {
             setChangingPasswordUser(null);
             loadUsers();
           }}
+        />
+      )}
+
+      {viewingSessionsUser && (
+        <UserSessionsModal
+          token={token}
+          user={viewingSessionsUser}
+          onClose={() => setViewingSessionsUser(null)}
         />
       )}
     </div>

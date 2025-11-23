@@ -42,4 +42,22 @@ export const authService = {
       body: JSON.stringify(data),
     });
   },
+
+  revokeSession: async (data: {
+    email: string;
+    password: string;
+    session_id: string;
+  }): Promise<{ message: string }> => {
+    return apiRequest("/auth/revoke-session", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  logout: async (token: string): Promise<{ message: string }> => {
+    return apiRequest("/auth/logout", {
+      method: "POST",
+      token,
+    });
+  },
 };

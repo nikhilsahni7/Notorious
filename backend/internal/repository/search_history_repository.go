@@ -124,11 +124,44 @@ func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, of
 	return histories, rows.Err()
 }
 
+// CountByUserID counts searches for a single user
 func (r *SearchHistoryRepository) CountByUserID(ctx context.Context, userID uuid.UUID) (int, error) {
 	var count int
 	query := `SELECT COUNT(*) FROM search_history WHERE user_id = $1`
 	err := r.db.Pool.QueryRow(ctx, query, userID).Scan(&count)
 	return count, err
+}
+
+// CountByUserIDs counts searches for multiple users in a single query
+func (r *SearchHistoryRepository) CountByUserIDs(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]int, error) {
+	counts := make(map[uuid.UUID]int)
+	if len(userIDs) == 0 {
+		return counts, nil
+	}
+
+	query := `
+		SELECT user_id, COUNT(*)
+		FROM search_history
+		WHERE user_id = ANY($1)
+		GROUP BY user_id
+	`
+
+	rows, err := r.db.Pool.Query(ctx, query, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userID uuid.UUID
+		var count int
+		if err := rows.Scan(&userID, &count); err != nil {
+			return nil, err
+		}
+		counts[userID] = count
+	}
+
+	return counts, rows.Err()
 }
 
 // GetTodaySearches retrieves all searches from midnight to now in IST

@@ -22,8 +22,8 @@ func NewUserRepository(db *database.DB) *UserRepository {
 
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	query := `
-		INSERT INTO users (email, password_hash, name, phone, role, region, daily_search_limit, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO users (email, password_hash, name, phone, role, region, daily_search_limit, is_active, device_limit)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at, searches_used_today, last_reset_date
 	`
 
@@ -36,6 +36,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 		user.Region,
 		user.DailySearchLimit,
 		user.IsActive,
+		user.DeviceLimit,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.SearchesUsedToday, &user.LastResetDate)
 }
 
@@ -45,7 +46,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 		SELECT id, email, password_hash, name, phone, role, daily_search_limit,
 		       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 		       COALESCE(last_search_query, '') as last_search_query,
-		       COALESCE(region, 'pan-india') as region
+		       COALESCE(region, 'pan-india') as region, device_limit
 		FROM users
 		WHERE email = $1
 	`
@@ -65,6 +66,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 		&user.LastResetDate,
 		&user.LastSearchQuery,
 		&user.Region,
+		&user.DeviceLimit,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -80,7 +82,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 		SELECT id, email, password_hash, name, phone, role, daily_search_limit,
 		       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 		       COALESCE(last_search_query, '') as last_search_query,
-		       COALESCE(region, 'pan-india') as region
+		       COALESCE(region, 'pan-india') as region, device_limit
 		FROM users
 		WHERE id = $1
 	`
@@ -100,6 +102,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 		&user.LastResetDate,
 		&user.LastSearchQuery,
 		&user.Region,
+		&user.DeviceLimit,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -112,8 +115,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	query := `
 		UPDATE users
-		SET name = $1, phone = $2, region = $3, daily_search_limit = $4, is_active = $5, updated_at = $6
-		WHERE id = $7
+		SET name = $1, phone = $2, region = $3, daily_search_limit = $4, is_active = $5, updated_at = $6, device_limit = $7
+		WHERE id = $8
 	`
 
 	user.UpdatedAt = time.Now()
@@ -124,6 +127,7 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 		user.DailySearchLimit,
 		user.IsActive,
 		user.UpdatedAt,
+		user.DeviceLimit,
 		user.ID,
 	)
 
@@ -152,7 +156,8 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 			SELECT id, email, password_hash, name, phone, role, daily_search_limit,
 			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 			       COALESCE(last_search_query, '') as last_search_query,
-			       COALESCE(region, 'pan-india') as region
+			       COALESCE(region, 'pan-india') as region,
+			       device_limit
 			FROM users
 			WHERE role = $1
 			ORDER BY created_at DESC
@@ -164,7 +169,8 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 			SELECT id, email, password_hash, name, phone, role, daily_search_limit,
 			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 			       COALESCE(last_search_query, '') as last_search_query,
-			       COALESCE(region, 'pan-india') as region
+			       COALESCE(region, 'pan-india') as region,
+			       device_limit
 			FROM users
 			ORDER BY created_at DESC
 			LIMIT $1 OFFSET $2
@@ -195,6 +201,7 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 			&user.LastResetDate,
 			&user.LastSearchQuery,
 			&user.Region,
+			&user.DeviceLimit,
 		); err != nil {
 			return users, err
 		}

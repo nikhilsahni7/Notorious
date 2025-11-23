@@ -21,6 +21,7 @@ type User struct {
 	Phone             string    `json:"phone" db:"phone"`
 	Role              Role      `json:"role" db:"role"`
 	Region            string    `json:"region" db:"region"` // "pan-india" or "delhi-ncr"
+	DeviceLimit       int       `json:"device_limit" db:"device_limit"`
 	DailySearchLimit  int       `json:"daily_search_limit" db:"daily_search_limit"`
 	SearchesUsedToday int       `json:"searches_used_today" db:"searches_used_today"`
 	IsActive          bool      `json:"is_active" db:"is_active"`

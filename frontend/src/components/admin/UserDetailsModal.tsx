@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { adminService, UserWithMetadata } from "@/services/admin.service";
-import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { X, User, Globe, MapPin, Monitor, Calendar } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { adminService, UserWithMetadata } from "@/services/admin.service";
 import { format } from "date-fns";
+import { Calendar, Globe, MapPin, Monitor, User, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface UserDetailsModalProps {
   userId: string;
@@ -212,6 +212,61 @@ export function UserDetailsModal({ userId, token, onClose }: UserDetailsModalPro
               Failed to load user details
             </div>
           )}
+
+          {/* Active Sessions */}
+          {data?.sessions && data.sessions.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-md font-semibold text-white mb-3 flex items-center gap-2">
+                <Monitor className="h-4 w-4" />
+                Active Sessions ({data.sessions.length})
+              </h3>
+              <div className="bg-[#2D1B4E] rounded-lg overflow-hidden border border-gray-700">
+                <table className="w-full text-sm">
+                  <thead className="bg-[#1a0f2e] border-b border-gray-700">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-gray-400 font-medium">Device</th>
+                      <th className="px-4 py-2 text-left text-gray-400 font-medium">OS</th>
+                      <th className="px-4 py-2 text-left text-gray-400 font-medium">Location</th>
+                      <th className="px-4 py-2 text-left text-gray-400 font-medium">Last Active</th>
+                      <th className="px-4 py-2 text-right text-gray-400 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {data.sessions.map((session) => (
+                      <tr key={session.id} className="hover:bg-[#1a0f2e]/50">
+                        <td className="px-4 py-3 text-white">{session.device_name}</td>
+                        <td className="px-4 py-3 text-gray-300">{session.device_os}</td>
+                        <td className="px-4 py-3 text-gray-300">{session.location || "Unknown"}</td>
+                        <td className="px-4 py-3 text-gray-300">
+                          {format(new Date(session.last_active), "PP p")}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button
+                            onClick={async () => {
+                              if (confirm("Are you sure you want to revoke this session?")) {
+                                try {
+                                  await adminService.revokeUserSession(session.id, token);
+                                  loadUserDetails(); // Reload to refresh list
+                                } catch (error) {
+                                  console.error("Failed to revoke session:", error);
+                                  alert("Failed to revoke session");
+                                }
+                              }
+                            }}
+                            variant="destructive"
+                            size="sm"
+                            className="h-7 text-xs bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/50"
+                          >
+                            Revoke
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -228,4 +283,3 @@ export function UserDetailsModal({ userId, token, onClose }: UserDetailsModalPro
     </div>
   );
 }
-

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"notorious-backend/internal/auth"
@@ -10,14 +11,16 @@ import (
 	"notorious-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type AuthGinHandler struct {
-	userRepo           *repository.UserRepository
-	userRequestRepo    *repository.UserRequestRepository
-	metadataRepo       *repository.MetadataRepository
-	adminSessionRepo   *repository.AdminSessionRepository
-	jwtManager         *auth.JWTManager
+	userRepo         *repository.UserRepository
+	userRequestRepo  *repository.UserRequestRepository
+	metadataRepo     *repository.MetadataRepository
+	adminSessionRepo *repository.AdminSessionRepository
+	sessionRepo      *repository.SessionRepository
+	jwtManager       *auth.JWTManager
 }
 
 func NewAuthGinHandler(
@@ -25,6 +28,7 @@ func NewAuthGinHandler(
 	userRequestRepo *repository.UserRequestRepository,
 	metadataRepo *repository.MetadataRepository,
 	adminSessionRepo *repository.AdminSessionRepository,
+	sessionRepo *repository.SessionRepository,
 	jwtManager *auth.JWTManager,
 ) *AuthGinHandler {
 	return &AuthGinHandler{
@@ -32,6 +36,7 @@ func NewAuthGinHandler(
 		userRequestRepo:  userRequestRepo,
 		metadataRepo:     metadataRepo,
 		adminSessionRepo: adminSessionRepo,
+		sessionRepo:      sessionRepo,
 		jwtManager:       jwtManager,
 	}
 }
@@ -63,6 +68,28 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Device Limit Check (Skip for Admins)
+	if user.Role != models.RoleAdmin && h.sessionRepo != nil {
+		activeSessions, err := h.sessionRepo.CountActiveSessions(c.Request.Context(), user.ID)
+		if err != nil {
+			// Log error but maybe allow login or fail safe? Let's fail safe for now.
+			// c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check device limit"})
+			// return
+			// Actually, if DB fails, we probably shouldn't let them in or we risk over-limit.
+		} else {
+			if activeSessions >= user.DeviceLimit {
+				sessions, _ := h.sessionRepo.GetActiveSessions(c.Request.Context(), user.ID)
+				c.JSON(http.StatusConflict, gin.H{
+					"error":          "device_limit_exceeded",
+					"message":        "You have reached your device limit.",
+					"limit":          user.DeviceLimit,
+					"active_devices": sessions,
+				})
+				return
+			}
+		}
+	}
+
 	token, err := h.jwtManager.Generate(user.ID, user.Email, string(user.Role))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
@@ -72,14 +99,39 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 	istLocation, _ := time.LoadLocation("Asia/Kolkata")
 	user, _ = h.userRepo.CheckAndResetDailyLimit(c.Request.Context(), user.ID, istLocation)
 
-	// Track admin session if user is admin
+	// Create User Session
+	if h.sessionRepo != nil {
+		userAgent := c.Request.UserAgent()
+		ip := utils.GetClientIP(c.Request)
+		deviceInfo := utils.ParseUserAgent(userAgent)
+		location, _ := utils.GetIPLocation(ip)
+
+		session := &models.UserSession{
+			UserID:     user.ID,
+			TokenHash:  auth.HashToken(token), // Hash the token for security
+			DeviceName: deviceInfo.DeviceName, // Use the friendly name we constructed
+			DeviceOS:   deviceInfo.OS,
+			DeviceType: deviceInfo.DeviceType,
+			IPAddress:  ip,
+			LastActive: time.Now(),
+			CreatedAt:  time.Now(),
+		}
+
+		if location != nil {
+			session.Location = location.GetLocationString()
+		}
+
+		_ = h.sessionRepo.Create(c.Request.Context(), session)
+	}
+
+	// Track admin session if user is admin (keep existing logic)
 	if user.Role == models.RoleAdmin && h.adminSessionRepo != nil {
 		ip := utils.GetClientIP(c.Request)
 		userAgent := c.Request.UserAgent()
 		deviceInfo := utils.ParseUserAgent(userAgent)
-		
+
 		location, _ := utils.GetIPLocation(ip)
-		
+
 		session := &models.AdminSession{
 			AdminID:        user.ID,
 			IPAddress:      &ip,
@@ -91,7 +143,7 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 			UserAgent:      &userAgent,
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 		}
-		
+
 		if location != nil {
 			session.Country = &location.Country
 			session.CountryCode = &location.CountryCode
@@ -104,7 +156,7 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 				session.Timezone = &location.Timezone
 			}
 		}
-		
+
 		_ = h.adminSessionRepo.CreateSession(c.Request.Context(), session, token)
 	}
 
@@ -139,13 +191,13 @@ func (h *AuthGinHandler) RequestAccess(c *gin.Context) {
 		ip := utils.GetClientIP(c.Request)
 		userAgent := c.Request.UserAgent()
 		deviceInfo := utils.ParseUserAgent(userAgent)
-		
+
 		userRequest.IPAddress = &ip
 		userRequest.DeviceType = &deviceInfo.DeviceType
 		userRequest.Browser = &deviceInfo.Browser
 		userRequest.OS = &deviceInfo.OS
 		userRequest.UserAgent = &userAgent
-		
+
 		// Get location info
 		if location, err := utils.GetIPLocation(ip); err == nil && location != nil {
 			userRequest.Country = &location.Country
@@ -161,3 +213,81 @@ func (h *AuthGinHandler) RequestAccess(c *gin.Context) {
 	c.JSON(http.StatusCreated, userRequest)
 }
 
+func (h *AuthGinHandler) RemoteLogout(c *gin.Context) {
+	sessionIDStr := c.Param("id")
+	sessionID, err := uuid.Parse(sessionIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
+		return
+	}
+
+	userID := c.MustGet("userID").(uuid.UUID)
+
+	if err := h.sessionRepo.Delete(c.Request.Context(), sessionID, userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to logout device"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func (h *AuthGinHandler) RevokeSession(c *gin.Context) {
+	var req struct {
+		Email     string `json:"email" binding:"required,email"`
+		Password  string `json:"password" binding:"required"`
+		SessionID string `json:"session_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email, password, and session_id are required"})
+		return
+	}
+
+	user, err := h.userRepo.GetByEmail(c.Request.Context(), req.Email)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		return
+	}
+
+	if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		return
+	}
+
+	sessionID, err := uuid.Parse(req.SessionID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
+		return
+	}
+
+	if err := h.sessionRepo.Delete(c.Request.Context(), sessionID, user.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to revoke session"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "session revoked successfully"})
+}
+
+func (h *AuthGinHandler) Logout(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header required"})
+		return
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+		return
+	}
+
+	tokenString := parts[1]
+	tokenHash := auth.HashToken(tokenString)
+
+	if err := h.sessionRepo.InvalidateSessionByTokenHash(c.Request.Context(), tokenHash); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to logout"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
+}

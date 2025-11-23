@@ -9,6 +9,7 @@ export interface User {
   role: string;
   region: string; // "pan-india" or "delhi-ncr"
   daily_search_limit: number;
+  device_limit: number;
   searches_used_today: number;
   total_searches: number; // Total searches done overall
   is_active: boolean;
@@ -35,9 +36,22 @@ export interface UserMetadata {
   created_at: string;
 }
 
+export interface UserSession {
+  id: string;
+  user_id: string;
+  device_name: string;
+  device_os: string;
+  device_type: string;
+  ip_address: string;
+  location: string;
+  last_active: string;
+  created_at: string;
+}
+
 export interface UserWithMetadata {
   user: User;
   metadata: UserMetadata | null;
+  sessions: UserSession[] | null;
 }
 
 export interface UserRequest {
@@ -352,5 +366,16 @@ export const adminService = {
     }
 
     return response.blob();
+  },
+
+  // Revoke User Session
+  revokeUserSession: async (
+    sessionId: string,
+    token: string
+  ): Promise<{ message: string }> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.SESSIONS}/${sessionId}`, {
+      method: "DELETE",
+      token,
+    });
   },
 };

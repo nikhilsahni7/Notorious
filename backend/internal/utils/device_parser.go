@@ -7,6 +7,7 @@ import (
 )
 
 type DeviceInfo struct {
+	DeviceName     string
 	DeviceType     string
 	Browser        string
 	BrowserVersion string
@@ -60,6 +61,32 @@ func ParseUserAgent(userAgentString string) DeviceInfo {
 	} else if ua.IsLinux() {
 		info.OS = "Linux"
 	}
+
+	// Refine OS detection for Linux Desktop vs Android
+	if info.OS == "Linux" && !ua.Mobile && !ua.Tablet {
+		info.OS = "Linux Desktop"
+	} else if info.OS == "Android" {
+		info.OS = "Android Mobile"
+	}
+
+	// Construct Device Name
+	deviceName := ua.Device
+	if deviceName == "" {
+		if info.OS == "Windows" {
+			deviceName = "Windows PC"
+		} else if info.OS == "macOS" || info.OS == "Mac OS X" {
+			deviceName = "Mac"
+		} else {
+			deviceName = info.OS + " Device"
+		}
+	}
+
+	// Construct a readable full device name
+	fullDeviceName := fmt.Sprintf("%s on %s", info.Browser, info.OS)
+	if deviceName != "" && deviceName != info.OS+" Device" {
+		fullDeviceName = fmt.Sprintf("%s on %s (%s)", info.Browser, info.OS, deviceName)
+	}
+	info.DeviceName = fullDeviceName
 
 	return info
 }

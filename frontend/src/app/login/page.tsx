@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -17,10 +18,15 @@ export default function LoginPage() {
   const [captchaValid, setCaptchaValid] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const [deviceLimitData, setDeviceLimitData] = useState<{
+    limit: number;
+    active_devices: any[];
+  } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setDeviceLimitData(null);
 
     if (!captchaValid) {
       setError("Please complete the verification code");
@@ -32,9 +38,39 @@ export default function LoginPage() {
     try {
       await login(email, password);
       router.push("/search");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+    } catch (err: any) {
+      // Check if it's a device limit error
+      // ApiError has status and data properties
+      if (err.status === 409 && err.data?.error === "device_limit_exceeded") {
+        setDeviceLimitData(err.data);
+      } else {
+        setError(err instanceof Error ? err.message : "Login failed");
+      }
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRevoke = async (sessionId: string) => {
+    // No confirmation needed for smoother UX, or maybe just a quick one?
+    // User said "they can logout from other device and then it logins automatically"
+    // Let's keep confirmation to avoid accidental clicks, but make it auto-login after.
+    if (!confirm("Are you sure you want to logout this device?")) return;
+
+    try {
+      setLoading(true);
+      const { authService } = await import("@/services/auth.service");
+      await authService.revokeSession({
+        email,
+        password,
+        session_id: sessionId,
+      });
+
+      // Auto-login after revocation
+      await login(email, password);
+      router.push("/search");
+    } catch (err: any) {
+      alert(err.message || "Failed to revoke session");
       setLoading(false);
     }
   };
@@ -49,73 +85,130 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="bg-[#1a0f2e] rounded-lg border border-gray-700 p-8 shadow-xl">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm">
-                {error}
+        <div className="bg-[#1a0f2e] rounded-lg border border-gray-700 p-8 shadow-xl relative">
+          {deviceLimitData ? (
+            <div className="space-y-4">
+              <div className="bg-red-500/10 border border-red-500 text-red-400 p-4 rounded-lg">
+                <h3 className="font-bold text-lg mb-1">Device Limit Reached</h3>
+                <p className="text-sm">
+                  You have reached your device limit of {deviceLimitData.limit}.
+                  Please logout from one of your active devices to continue.
+                </p>
               </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email
-              </label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-[#2D1B4E] border-gray-600 text-white"
-                placeholder="your@email.com"
-                required
-                disabled={loading}
-              />
-            </div>
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-gray-300">
+                  Active Devices:
+                </h4>
+                {deviceLimitData.active_devices.map((device: any) => (
+                  <div
+                    key={device.id}
+                    className="bg-[#2D1B4E] p-3 rounded border border-gray-600 flex justify-between items-center"
+                  >
+                    <div>
+                      <div className="text-white text-sm font-medium">
+                        {device.device_name}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {device.device_os} •{" "}
+                        {device.location || "Unknown Location"}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Last active:{" "}
+                        {new Date(device.last_active).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => handleRevoke(device.id)}
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 text-xs"
+                      disabled={loading}
+                    >
+                      Logout
+                    </Button>
+                  </div>
+                ))}
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-[#2D1B4E] border-gray-600 text-white"
-                placeholder="••••••••"
-                required
-                disabled={loading}
-              />
-            </div>
-
-            <Captcha onVerify={setCaptchaValid} />
-
-            <Button
-              type="submit"
-              className="w-full bg-pink-500 hover:bg-pink-600 text-white h-11"
-              disabled={loading || !captchaValid}
-            >
-              {loading ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 pt-6 border-t border-gray-700 space-y-3">
-            <p className="text-center text-sm text-gray-400">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/request-access"
-                className="text-pink-400 hover:text-pink-300 font-medium"
+              <Button
+                onClick={() => setDeviceLimitData(null)}
+                variant="outline"
+                className="w-full mt-4 bg-transparent border-gray-600 text-white hover:bg-gray-700"
               >
-                Request Access
-              </Link>
-            </p>
-          </div>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Email
+                </label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-[#2D1B4E] border-gray-600 text-white"
+                  placeholder="your@email.com"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Password
+                </label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-[#2D1B4E] border-gray-600 text-white"
+                  placeholder="••••••••"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <Captcha onVerify={setCaptchaValid} />
+
+              <Button
+                type="submit"
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white h-11"
+                disabled={loading || !captchaValid}
+              >
+                {loading ? (
+                  <>
+                    <Spinner size="sm" className="mr-2" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+            </form>
+          )}
+
+          {!deviceLimitData && (
+            <div className="mt-6 pt-6 border-t border-gray-700 space-y-3">
+              <p className="text-center text-sm text-gray-400">
+                Don&apos;t have an account?{" "}
+                <Link
+                  href="/request-access"
+                  className="text-pink-400 hover:text-pink-300 font-medium"
+                >
+                  Request Access
+                </Link>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

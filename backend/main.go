@@ -59,6 +59,7 @@ func main() {
 			passwordChangeRepo := repository.NewPasswordChangeRepository(db)
 			metadataRepo := repository.NewMetadataRepository(db)
 			adminSessionRepo := repository.NewAdminSessionRepository(db)
+			sessionRepo := repository.NewSessionRepository(db)
 
 			// Initialize GeoIP (optional - falls back to API if not available)
 			geoipPath := os.Getenv("GEOIP_DB_PATH")
@@ -68,10 +69,10 @@ func main() {
 			utils.InitGeoIP(geoipPath)
 
 			jwtManager := auth.NewJWTManager(jwtSecret, 24*time.Hour)
-			authMiddleware = middleware.NewGinAuthMiddleware(jwtManager)
+			authMiddleware = middleware.NewGinAuthMiddleware(jwtManager, sessionRepo)
 
-			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, jwtManager)
-			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo)
+			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, sessionRepo, jwtManager)
+			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo, sessionRepo)
 			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo)
 			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo)
 			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
@@ -104,6 +105,10 @@ func main() {
 	if authHandler != nil {
 		r.POST("/auth/login", authHandler.Login)
 		r.POST("/auth/request-access", authHandler.RequestAccess)
+		r.POST("/auth/revoke-session", authHandler.RevokeSession)
+		if authMiddleware != nil {
+			r.POST("/auth/logout", authMiddleware.AuthRequired(), authHandler.Logout)
+		}
 	}
 
 	if authMiddleware != nil && userHandler != nil {

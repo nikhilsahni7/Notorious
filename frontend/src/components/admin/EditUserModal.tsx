@@ -24,6 +24,7 @@ export function EditUserModal({
     phone: user.phone || "",
     region: user.region || "pan-india",
     daily_search_limit: user.daily_search_limit.toString(),
+    device_limit: (user.device_limit || 1).toString(),
     is_active: user.is_active,
   });
 
@@ -37,6 +38,7 @@ export function EditUserModal({
         {
           ...formData,
           daily_search_limit: parseInt(formData.daily_search_limit),
+          device_limit: parseInt(formData.device_limit),
         },
         token
       );
@@ -140,6 +142,25 @@ export function EditUserModal({
             />
             <p className="text-xs text-gray-500 mt-1">
               Current usage: {user.searches_used_today} searches
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Device Limit *
+            </label>
+            <Input
+              type="number"
+              value={formData.device_limit}
+              onChange={(e) =>
+                setFormData({ ...formData, device_limit: e.target.value })
+              }
+              className="bg-[#2D1B4E] border-gray-600 text-white"
+              min="1"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Maximum number of concurrent devices allowed
             </p>
           </div>
 

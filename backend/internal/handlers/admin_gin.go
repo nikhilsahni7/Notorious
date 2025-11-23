@@ -22,6 +22,7 @@ type AdminGinHandler struct {
 	passwordChangeRepo *repository.PasswordChangeRepository
 	metadataRepo       *repository.MetadataRepository
 	adminSessionRepo   *repository.AdminSessionRepository
+	sessionRepo        *repository.SessionRepository
 }
 
 func NewAdminGinHandler(
@@ -31,6 +32,7 @@ func NewAdminGinHandler(
 	passwordChangeRepo *repository.PasswordChangeRepository,
 	metadataRepo *repository.MetadataRepository,
 	adminSessionRepo *repository.AdminSessionRepository,
+	sessionRepo *repository.SessionRepository,
 ) *AdminGinHandler {
 	return &AdminGinHandler{
 		userRepo:           userRepo,
@@ -39,6 +41,7 @@ func NewAdminGinHandler(
 		passwordChangeRepo: passwordChangeRepo,
 		metadataRepo:       metadataRepo,
 		adminSessionRepo:   adminSessionRepo,
+		sessionRepo:        sessionRepo,
 	}
 }
 
@@ -50,6 +53,7 @@ func (h *AdminGinHandler) CreateUser(c *gin.Context) {
 		Phone            string `json:"phone"`
 		Region           string `json:"region"` // "pan-india" or "delhi-ncr"
 		DailySearchLimit int    `json:"daily_search_limit" binding:"required,min=1"`
+		DeviceLimit      int    `json:"device_limit"`
 		IsActive         bool   `json:"is_active"`
 	}
 
@@ -81,7 +85,12 @@ func (h *AdminGinHandler) CreateUser(c *gin.Context) {
 		Role:             models.RoleUser,
 		Region:           req.Region,
 		DailySearchLimit: req.DailySearchLimit,
+		DeviceLimit:      req.DeviceLimit,
 		IsActive:         req.IsActive,
+	}
+
+	if user.DeviceLimit == 0 {
+		user.DeviceLimit = 1
 	}
 
 	if err := h.userRepo.Create(c.Request.Context(), user); err != nil {
@@ -113,12 +122,33 @@ func (h *AdminGinHandler) ListUsers(c *gin.Context) {
 		TotalSearches int `json:"total_searches"`
 	}
 
+	if len(users) == 0 {
+		c.JSON(http.StatusOK, []UserWithStats{})
+		return
+	}
+
+	userIDs := make([]uuid.UUID, len(users))
+	for i, user := range users {
+		userIDs[i] = user.ID
+	}
+
+	searchCounts, err := h.searchHistoryRepo.CountByUserIDs(c.Request.Context(), userIDs)
+	if err != nil {
+		// Log error but continue with 0 counts? Or fail?
+		// Let's log and continue to not break the UI completely
+		// But for now, let's just return 0s if it fails or handle error.
+		// Given the user's report, performance is key.
+		// Let's assume 0 if error for now to be safe, or return error.
+		// Returning error is safer for correctness.
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch search counts"})
+		return
+	}
+
 	usersWithStats := make([]UserWithStats, len(users))
 	for i, user := range users {
-		totalSearches, _ := h.searchHistoryRepo.CountByUserID(c.Request.Context(), user.ID)
 		usersWithStats[i] = UserWithStats{
 			User:          user,
-			TotalSearches: totalSearches,
+			TotalSearches: searchCounts[user.ID],
 		}
 	}
 
@@ -153,6 +183,7 @@ func (h *AdminGinHandler) UpdateUser(c *gin.Context) {
 		Phone            string `json:"phone"`
 		Region           string `json:"region"` // "pan-india" or "delhi-ncr"
 		DailySearchLimit int    `json:"daily_search_limit" binding:"required,min=1"`
+		DeviceLimit      int    `json:"device_limit"`
 		IsActive         bool   `json:"is_active"`
 	}
 
@@ -179,6 +210,9 @@ func (h *AdminGinHandler) UpdateUser(c *gin.Context) {
 		user.Region = req.Region
 	}
 	user.DailySearchLimit = req.DailySearchLimit
+	if req.DeviceLimit > 0 {
+		user.DeviceLimit = req.DeviceLimit
+	}
 	user.IsActive = req.IsActive
 
 	if err := h.userRepo.Update(c.Request.Context(), user); err != nil {
@@ -505,9 +539,15 @@ func (h *AdminGinHandler) GetUserDetails(c *gin.Context) {
 		metadata, _ = h.metadataRepo.GetUserMetadata(c.Request.Context(), userID)
 	}
 
+	var sessions []models.UserSession
+	if h.sessionRepo != nil {
+		sessions, _ = h.sessionRepo.GetActiveSessions(c.Request.Context(), userID)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"user":     user,
 		"metadata": metadata,
+		"sessions": sessions,
 	})
 }
 
