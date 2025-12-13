@@ -152,20 +152,21 @@ func processCSV(file *os.File, region string, offset int, cfg *config.Config, op
 
 	log.Printf("📄 CSV Headers: %v", header)
 
-	// Validate required columns
-	requiredCols := []string{"mobile", "name", "fname", "address", "id"}
+	// Map column names to indices (no strict validation - ingest whatever columns exist)
+	expectedCols := []string{"mobile", "name", "fname", "address", "id", "alt", "email", "oid"}
 	colIndices := make(map[string]int)
 	for i, col := range header {
 		colIndices[col] = i
 	}
 
-	for _, reqCol := range requiredCols {
-		if _, exists := colIndices[reqCol]; !exists {
-			return fmt.Errorf("missing required column: %s", reqCol)
+	// Log which expected columns are present/missing (but don't fail)
+	for _, col := range expectedCols {
+		if _, exists := colIndices[col]; !exists {
+			log.Printf("⚠️  Column '%s' not found in CSV (will be empty for all rows)", col)
 		}
 	}
 
-	log.Println("✅ CSV validation passed")
+	log.Printf("✅ Found %d columns in CSV, proceeding with ingestion...", len(header))
 
 	// Skip offset rows if resuming
 	rowNum := 0
@@ -210,13 +211,8 @@ func processCSV(file *os.File, region string, offset int, cfg *config.Config, op
 			}
 		}
 
-		// Skip rows with missing required fields
-		if doc["mobile"] == nil || doc["name"] == nil || doc["id"] == nil {
-			atomic.AddInt64(&skippedRows, 1)
-			continue
-		}
-
 		// Note: oid, year_of_registration, and alt_address are set in TransformDocument()
+		// All rows are ingested regardless of null/empty fields
 
 		select {
 		case docChan <- doc:
