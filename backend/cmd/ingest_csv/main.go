@@ -106,12 +106,25 @@ func processCSV(file *os.File, region string, offset int, cfg *config.Config, op
 	docChan := make(chan map[string]interface{}, batchSize*numWorkers)
 	doneChan := make(chan struct{}, numWorkers)
 
+	// Track last checkpoint for resume capability
+	var lastCheckpoint int64
+
 	// Start workers
 	for i := 0; i < numWorkers; i++ {
 		go func(workerID int) {
-			defer func() { doneChan <- struct{}{} }()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("❌ PANIC in worker %d: %v", workerID, r)
+					log.Printf("💾 CHECKPOINT: Last successful count = %d (use -resume=%d to continue)",
+						atomic.LoadInt64(&totalProcessed), atomic.LoadInt64(&totalProcessed))
+				}
+				doneChan <- struct{}{}
+			}()
 
 			batch := make([]services.Document, 0, batchSize)
+			consecutiveErrors := 0
+			maxConsecutiveErrors := 10
+
 			for doc := range docChan {
 				transformed := openSearchService.TransformDocument(doc)
 				transformed.Region = region // Set region for all documents
@@ -119,14 +132,33 @@ func processCSV(file *os.File, region string, offset int, cfg *config.Config, op
 
 				if len(batch) >= batchSize {
 					if err := openSearchService.BulkIndex(batch); err != nil {
-						log.Printf("⚠️  Worker %d bulk index error: %v", workerID, err)
+						consecutiveErrors++
+						log.Printf("⚠️  Worker %d bulk index error (%d/%d): %v", workerID, consecutiveErrors, maxConsecutiveErrors, err)
+						if consecutiveErrors >= maxConsecutiveErrors {
+							log.Printf("❌ Worker %d: Too many consecutive errors, stopping", workerID)
+							log.Printf("💾 CHECKPOINT: Processed ~%d documents (use -resume=%d to continue)",
+								atomic.LoadInt64(&totalProcessed), atomic.LoadInt64(&totalProcessed))
+							return
+						}
+						// Wait before retry
+						time.Sleep(5 * time.Second)
 					} else {
-						atomic.AddInt64(&totalProcessed, int64(len(batch)))
-						if totalProcessed%10000 == 0 {
+						consecutiveErrors = 0 // Reset on success
+						processed := atomic.AddInt64(&totalProcessed, int64(len(batch)))
+
+						// Log progress every 50k
+						if processed%50000 == 0 {
 							elapsed := time.Since(startTime)
-							rate := float64(totalProcessed) / elapsed.Seconds()
+							rate := float64(processed) / elapsed.Seconds()
 							log.Printf("📊 Progress: %d documents | %.0f docs/sec | %s elapsed",
-								totalProcessed, rate, elapsed.Round(time.Second))
+								processed, rate, elapsed.Round(time.Second))
+						}
+
+						// Checkpoint every 1 million
+						if processed/1000000 > lastCheckpoint/1000000 {
+							atomic.StoreInt64(&lastCheckpoint, processed)
+							log.Printf("💾 CHECKPOINT: %d million documents processed (use -resume=%d to continue)",
+								processed/1000000, processed)
 						}
 					}
 					batch = batch[:0]
