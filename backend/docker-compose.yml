@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/notorious-backend:latest
+    container_name: notorious-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    # Volumes for persistent data if needed (e.g. SQLite or SQLite-based GeoIP)
+    # volumes:
+    #   - ./data:/root/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
