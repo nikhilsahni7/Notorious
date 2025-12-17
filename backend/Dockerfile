@@ -20,8 +20,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 # Final stage
 FROM alpine:latest
 
-# Install CA certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install CA certificates for HTTPS requests and tzdata for timezones
+RUN apk --no-cache add ca-certificates tzdata
+
 
 WORKDIR /root/
 

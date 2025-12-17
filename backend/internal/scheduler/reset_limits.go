@@ -14,7 +14,11 @@ type SearchLimitResetter struct {
 }
 
 func NewSearchLimitResetter(userRepo *repository.UserRepository) *SearchLimitResetter {
-	ist, _ := time.LoadLocation("Asia/Kolkata")
+	ist, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		log.Printf("Warning: Could not load Asia/Kolkata timezone: %v. Falling back to Local.", err)
+		ist = time.Local
+	}
 	return &SearchLimitResetter{
 		userRepo:    userRepo,
 		istLocation: ist,
@@ -44,7 +48,7 @@ func (s *SearchLimitResetter) Start(ctx context.Context) {
 
 func (s *SearchLimitResetter) checkAndReset() {
 	now := time.Now().In(s.istLocation)
-	
+
 	if now.Hour() == 0 && now.Minute() < 5 {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -57,4 +61,3 @@ func (s *SearchLimitResetter) checkAndReset() {
 		log.Printf("Successfully reset daily search limits at %s IST", now.Format("2006-01-02 15:04:05"))
 	}
 }
-
