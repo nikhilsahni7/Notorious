@@ -44,8 +44,9 @@ func main() {
 		var err error
 		db, err = database.NewPostgresDB(databaseURL)
 		if err != nil {
-			log.Printf("Warning: Failed to connect to database: %v", err)
+			log.Fatalf("CRITICAL: Failed to connect to database: %v. The server cannot start without a database.", err)
 		} else {
+
 			log.Println("Successfully connected to PostgreSQL database")
 
 			// Run migrations

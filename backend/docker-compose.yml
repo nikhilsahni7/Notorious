@@ -6,8 +6,8 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/notorious-backend:latest
     container_name: notorious-backend
     restart: always
-    ports:
-      - "8080:8080"
+    network_mode: host
+
     env_file:
       - .env
     # Volumes for persistent data if needed (e.g. SQLite or SQLite-based GeoIP)
