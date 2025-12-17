@@ -77,8 +77,8 @@ jobs:
                 image: ghcr.io/${{ github.repository_owner }}/notorious-backend:latest
                 container_name: notorious-backend
                 restart: always
-                ports:
-                  - "8080:8080"
+                network_mode: host
+
                 env_file:
                   - .env
                 logging:
