@@ -92,10 +92,11 @@ jobs:
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Pull the latest image
-            docker compose pull backend
+            docker-compose pull backend
 
             # Restart the service
-            docker compose up -d
+            docker-compose up -d
+
 
             # Cleanup old images
             docker image prune -f
