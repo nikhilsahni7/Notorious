@@ -47,8 +47,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             # Create app directory if not exists
-            mkdir -p ~/notorious/backend
-            cd ~/notorious/backend
+            mkdir -p ~/knotorious/backend
+            cd ~/knotorious/backend
 
             # Create .env file from secrets
             cat <<EOF > .env
@@ -68,6 +68,24 @@ jobs:
             INGEST_WORKER_MULTIPLIER=${{ secrets.INGEST_WORKER_MULTIPLIER }}
             GIN_MODE=release
             PORT=8080
+            EOF
+
+            # Create/Update docker-compose.yml on the server
+            cat <<EOF > docker-compose.yml
+            services:
+              backend:
+                image: ghcr.io/${{ github.repository_owner }}/notorious-backend:latest
+                container_name: notorious-backend
+                restart: always
+                ports:
+                  - "8080:8080"
+                env_file:
+                  - .env
+                logging:
+                  driver: "json-file"
+                  options:
+                    max-size: "10m"
+                    max-file: "3"
             EOF
 
             # Login to GHCR
