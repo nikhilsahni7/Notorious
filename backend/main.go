@@ -104,6 +104,10 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	r.GET("/deploy", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "deploy successful"})
+	})
+
 	if authHandler != nil {
 		r.POST("/auth/login", authHandler.Login)
 		r.POST("/auth/request-access", authHandler.RequestAccess)
