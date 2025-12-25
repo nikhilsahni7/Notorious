@@ -47,7 +47,7 @@ func main() {
 			log.Fatalf("CRITICAL: Failed to connect to database: %v. The server cannot start without a database.", err)
 		} else {
 
-			log.Println("Successfully connected to PostgreSQL database for KNotorious")
+			log.Println("Successfully connected to PostgreSQL database")
 
 			// Run migrations
 			if err := db.RunMigrations("./migrations"); err != nil {
