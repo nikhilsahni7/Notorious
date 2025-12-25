@@ -46,6 +46,9 @@ func NewAdminGinHandler(
 }
 
 func (h *AdminGinHandler) CreateUser(c *gin.Context) {
+	// Maximum allowed daily search limit (security measure)
+	const maxDailySearchLimit = 10000
+
 	var req struct {
 		Email            string `json:"email" binding:"required,email"`
 		Password         string `json:"password" binding:"required,min=6"`
@@ -59,6 +62,15 @@ func (h *AdminGinHandler) CreateUser(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// SECURITY: Validate daily search limit has a maximum
+	if req.DailySearchLimit > maxDailySearchLimit {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":     fmt.Sprintf("daily_search_limit cannot exceed %d", maxDailySearchLimit),
+			"max_limit": maxDailySearchLimit,
+		})
 		return
 	}
 
@@ -172,6 +184,9 @@ func (h *AdminGinHandler) GetUser(c *gin.Context) {
 }
 
 func (h *AdminGinHandler) UpdateUser(c *gin.Context) {
+	// Maximum allowed daily search limit (security measure)
+	const maxDailySearchLimit = 10000
+
 	userID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
@@ -189,6 +204,15 @@ func (h *AdminGinHandler) UpdateUser(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// SECURITY: Validate daily search limit has a maximum
+	if req.DailySearchLimit > maxDailySearchLimit {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":     fmt.Sprintf("daily_search_limit cannot exceed %d", maxDailySearchLimit),
+			"max_limit": maxDailySearchLimit,
+		})
 		return
 	}
 

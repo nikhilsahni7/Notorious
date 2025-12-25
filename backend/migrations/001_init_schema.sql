@@ -39,22 +39,14 @@ CREATE TABLE IF NOT EXISTS search_history (
     searched_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- Create default admin user (password: admin123)
--- In production, change this immediately!
-INSERT INTO users (email, password_hash, name, phone, role, daily_search_limit, is_active)
-VALUES (
-    'admin@notorious.com',
-    '$2a$12$vT4Q7iVUMJ.NLg8tySU29OKBzoLUb0qd6lsTFUIOH2MJznb7uFAsa',
-    'Administrator',
-    '',
-    'admin',
-    999999,
-    true
-) ON CONFLICT (email) DO NOTHING;
-
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_user_requests_status ON user_requests(status);
 CREATE INDEX IF NOT EXISTS idx_search_history_user_id ON search_history(user_id, searched_at);
 CREATE INDEX IF NOT EXISTS idx_search_history_searched_at ON search_history(searched_at);
+
+-- NOTE: Default admin removed for security
+-- Create admin manually after deployment:
+-- INSERT INTO users (email, password_hash, name, role, daily_search_limit, is_active)
+-- VALUES ('your-admin@email.com', '$bcrypt-hash-of-strong-password', 'Admin Name', 'admin', 999999, true);

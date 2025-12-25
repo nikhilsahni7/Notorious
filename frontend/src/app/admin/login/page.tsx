@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Captcha } from "@/components/ui/captcha";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,12 +14,19 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [captchaValid, setCaptchaValid] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!captchaValid) {
+      setError("Please complete the verification code");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -100,10 +108,12 @@ export default function AdminLogin() {
               </div>
             </div>
 
+            <Captcha onVerify={setCaptchaValid} />
+
             <Button
               type="submit"
               className="w-full bg-purple-500 hover:bg-purple-600 text-white h-11 text-base"
-              disabled={loading}
+              disabled={loading || !captchaValid}
             >
               {loading ? (
                 <>

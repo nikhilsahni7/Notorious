@@ -109,9 +109,11 @@ func main() {
 	})
 
 	if authHandler != nil {
-		r.POST("/auth/login", authHandler.Login)
-		r.POST("/auth/request-access", authHandler.RequestAccess)
-		r.POST("/auth/revoke-session", authHandler.RevokeSession)
+		// Rate limit login attempts (10 per minute per IP)
+		r.POST("/auth/login", middleware.AuthRateLimiter(), authHandler.Login)
+		// Rate limit access requests heavily (5 per hour per IP) - prevents spam
+		r.POST("/auth/request-access", middleware.AccessRequestRateLimiter(), authHandler.RequestAccess)
+		r.POST("/auth/revoke-session", middleware.AuthRateLimiter(), authHandler.RevokeSession)
 		if authMiddleware != nil {
 			r.POST("/auth/logout", authMiddleware.AuthRequired(), authHandler.Logout)
 		}
@@ -137,7 +139,8 @@ func main() {
 
 	if authMiddleware != nil && adminHandler != nil {
 		adminRoutes := r.Group("/api/admin")
-		adminRoutes.Use(authMiddleware.AuthRequired(), authMiddleware.RequireRole("admin"))
+		// Rate limit admin routes (30 per minute per IP)
+		adminRoutes.Use(authMiddleware.AuthRequired(), authMiddleware.RequireRole("admin"), middleware.AdminRateLimiter())
 		{
 			// User management
 			adminRoutes.GET("/users", adminHandler.ListUsers)
@@ -180,7 +183,8 @@ func main() {
 
 	if authMiddleware != nil && searchHandler != nil {
 		searchRoutes := r.Group("/search")
-		searchRoutes.Use(authMiddleware.AuthRequired())
+		// Rate limit search (100 per minute per IP)
+		searchRoutes.Use(authMiddleware.AuthRequired(), middleware.SearchRateLimiter())
 		{
 			searchRoutes.GET("", searchHandler.Search)
 			searchRoutes.POST("", searchHandler.Search)
