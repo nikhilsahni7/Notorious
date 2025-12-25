@@ -99,7 +99,7 @@ export default function AdminDashboard() {
           <div>
             <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
             <p className="text-gray-400 text-sm">
-              Manage users, requests, and view analytics
+              Manage users, requests, and view analytics for KNotorious
             </p>
           </div>
           <div className="flex items-center gap-4">
