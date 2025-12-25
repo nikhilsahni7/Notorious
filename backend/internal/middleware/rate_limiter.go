@@ -66,6 +66,12 @@ func (rl *RateLimiter) getVisitor(ip string) *visitor {
 // Limit returns a Gin middleware that rate limits requests
 func (rl *RateLimiter) Limit() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip rate limiting for OPTIONS preflight requests (CORS)
+		if c.Request.Method == "OPTIONS" {
+			c.Next()
+			return
+		}
+
 		ip := c.ClientIP()
 		v := rl.getVisitor(ip)
 
