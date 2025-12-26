@@ -82,21 +82,24 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 	if user.Role != models.RoleAdmin && h.sessionRepo != nil {
 		activeSessions, err := h.sessionRepo.CountActiveSessions(c.Request.Context(), user.ID)
 		if err != nil {
-			// Log error but maybe allow login or fail safe? Let's fail safe for now.
-			// c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check device limit"})
-			// return
-			// Actually, if DB fails, we probably shouldn't let them in or we risk over-limit.
-		} else {
-			if activeSessions >= user.DeviceLimit {
-				sessions, _ := h.sessionRepo.GetActiveSessions(c.Request.Context(), user.ID)
-				c.JSON(http.StatusConflict, gin.H{
-					"error":          "device_limit_exceeded",
-					"message":        "You have reached your device limit.",
-					"limit":          user.DeviceLimit,
-					"active_devices": sessions,
-				})
-				return
-			}
+			// SECURITY: Fail closed - if we can't check, deny access
+			log.Printf("ERROR: Failed to check device limit for %s: %v", req.Email, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify device limit"})
+			return
+		}
+
+		log.Printf("DEBUG: User %s has %d active sessions, limit is %d", req.Email, activeSessions, user.DeviceLimit)
+
+		if activeSessions >= user.DeviceLimit {
+			sessions, _ := h.sessionRepo.GetActiveSessions(c.Request.Context(), user.ID)
+			log.Printf("SECURITY: Device limit exceeded for %s (%d >= %d)", req.Email, activeSessions, user.DeviceLimit)
+			c.JSON(http.StatusConflict, gin.H{
+				"error":          "device_limit_exceeded",
+				"message":        "You have reached your device limit.",
+				"limit":          user.DeviceLimit,
+				"active_devices": sessions,
+			})
+			return
 		}
 	}
 

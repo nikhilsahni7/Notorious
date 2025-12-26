@@ -444,6 +444,30 @@ func trimSpace(s string) string {
 }
 
 func (h *SearchHandler) Suggest(c *gin.Context) {
+	// SECURITY: Require authentication and check limits (same as Search)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+	uid := userID.(uuid.UUID)
+
+	user, err := h.userRepo.CheckAndResetDailyLimit(c.Request.Context(), uid, h.istLocation)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check user limits"})
+		return
+	}
+
+	if !user.IsActive {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account is inactive"})
+		return
+	}
+
+	if user.SearchesUsedToday >= user.DailySearchLimit {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "daily search limit exceeded"})
+		return
+	}
+
 	query := c.Query("q")
 	if query == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "query parameter 'q' is required"})
@@ -451,10 +475,11 @@ func (h *SearchHandler) Suggest(c *gin.Context) {
 	}
 
 	req := services.SearchRequest{
-		Query:  query,
-		Fields: []string{"name", "fname", "address", "mobile", "alt", "id"},
-		AndOr:  "OR",
-		Size:   5,
+		Query:      query,
+		Fields:     []string{"name", "fname", "address", "mobile", "alt", "id"},
+		AndOr:      "OR",
+		Size:       5,
+		UserRegion: user.Region, // SECURITY: Respect user's region
 	}
 
 	response, err := h.openSearchService.Search(req)

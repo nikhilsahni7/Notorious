@@ -100,6 +100,9 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Block automated tools (python-requests, curl, postman, etc.)
+	r.Use(middleware.BotBlocker())
+
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
