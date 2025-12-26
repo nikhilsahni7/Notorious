@@ -53,30 +53,21 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 		return
 	}
 
-	log.Printf("DEBUG: Login attempt for email: %s", req.Email)
-
 	user, err := h.userRepo.GetByEmail(c.Request.Context(), req.Email)
 	if err != nil {
-		log.Printf("DEBUG: User not found for email: %s, error: %v", req.Email, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
-	log.Printf("DEBUG: User found - Email: %s, Role: %s, IsActive: %v", user.Email, user.Role, user.IsActive)
-
 	if !user.IsActive {
-		log.Printf("DEBUG: User is inactive: %s", req.Email)
 		c.JSON(http.StatusForbidden, gin.H{"error": "account is inactive"})
 		return
 	}
 
 	if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
-		log.Printf("DEBUG: Password mismatch for %s, hash: %s, error: %v", req.Email, user.PasswordHash[:20]+"...", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
-
-	log.Printf("DEBUG: Password verified successfully for: %s", req.Email)
 
 	// Device Limit Check (Skip for Admins)
 	if user.Role != models.RoleAdmin && h.sessionRepo != nil {
@@ -87,8 +78,6 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify device limit"})
 			return
 		}
-
-		log.Printf("DEBUG: User %s has %d active sessions, limit is %d", req.Email, activeSessions, user.DeviceLimit)
 
 		if activeSessions >= user.DeviceLimit {
 			sessions, _ := h.sessionRepo.GetActiveSessions(c.Request.Context(), user.ID)

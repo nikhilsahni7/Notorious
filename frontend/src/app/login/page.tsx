@@ -8,9 +8,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-export default function LoginPage() {
+// Wrap the main content in a separate component that uses useSearchParams
+function LoginContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -231,5 +232,18 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Default export with Suspense boundary for useSearchParams
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-[#1a0f2e] via-[#2D1B4E] to-[#1a0f2e] flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
