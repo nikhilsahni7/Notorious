@@ -373,7 +373,7 @@ export const adminService = {
     sessionId: string,
     token: string
   ): Promise<{ message: string }> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.SESSIONS}/${sessionId}`, {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USER_SESSIONS}/${sessionId}`, {
       method: "DELETE",
       token,
     });
