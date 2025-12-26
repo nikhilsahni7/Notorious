@@ -69,7 +69,7 @@ func main() {
 			}
 			utils.InitGeoIP(geoipPath)
 
-			jwtManager := auth.NewJWTManager(jwtSecret, 24*time.Hour)
+			jwtManager := auth.NewJWTManager(jwtSecret, 6*time.Hour)
 			authMiddleware = middleware.NewGinAuthMiddleware(jwtManager, sessionRepo)
 
 			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, sessionRepo, jwtManager)
@@ -170,8 +170,9 @@ func main() {
 			adminRoutes.GET("/users/:id/search-history", adminHandler.GetUserSearchHistory)
 
 			// Session management
-			adminRoutes.GET("/sessions", adminHandler.GetAdminSessions)         // NEW: Get all admin sessions
-			adminRoutes.DELETE("/sessions/:id", adminHandler.InvalidateSession) // NEW: Invalidate session
+			adminRoutes.GET("/sessions", adminHandler.GetAdminSessions)                     // Get all admin sessions
+			adminRoutes.DELETE("/sessions/:id", adminHandler.InvalidateSession)             // Invalidate admin session
+			adminRoutes.DELETE("/user-sessions/:sessionId", adminHandler.DeleteUserSession) // Delete user session
 
 			// Dashboard stats
 			adminRoutes.GET("/request-counts", adminHandler.GetRequestCounts) // NEW: Get pending request counts

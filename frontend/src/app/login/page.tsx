@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -16,12 +16,21 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [captchaValid, setCaptchaValid] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [deviceLimitData, setDeviceLimitData] = useState<{
     limit: number;
     active_devices: any[];
   } | null>(null);
+
+  // Check if redirected due to session expiry
+  useEffect(() => {
+    if (searchParams.get("session") === "expired") {
+      setSessionExpired(true);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +95,16 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-[#1a0f2e] rounded-lg border border-gray-700 p-8 shadow-xl relative">
+          {/* Session Expired Warning */}
+          {sessionExpired && !deviceLimitData && (
+            <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-400 p-4 rounded-lg mb-6">
+              <h3 className="font-bold text-lg mb-1">Session Expired</h3>
+              <p className="text-sm">
+                Your session has expired. Please sign in again to continue.
+              </p>
+            </div>
+          )}
+
           {deviceLimitData ? (
             <div className="space-y-4">
               <div className="bg-red-500/10 border border-red-500 text-red-400 p-4 rounded-lg">

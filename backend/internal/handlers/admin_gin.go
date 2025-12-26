@@ -609,6 +609,25 @@ func (h *AdminGinHandler) InvalidateSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "session invalidated successfully"})
 }
 
+// DeleteUserSession deletes a user session (for admin use)
+func (h *AdminGinHandler) DeleteUserSession(c *gin.Context) {
+	sessionID, err := uuid.Parse(c.Param("sessionId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session ID"})
+		return
+	}
+
+	// Admin can delete any user session
+	if h.sessionRepo != nil {
+		if err := h.sessionRepo.DeleteByID(c.Request.Context(), sessionID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user session"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "user session deleted successfully"})
+}
+
 // GetRequestCounts returns counts of pending requests for admin dashboard
 func (h *AdminGinHandler) GetRequestCounts(c *gin.Context) {
 	ctx := c.Request.Context()

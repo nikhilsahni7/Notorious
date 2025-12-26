@@ -173,6 +173,20 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 		_ = h.adminSessionRepo.CreateSession(c.Request.Context(), session, token)
 	}
 
+	// SECURITY: Set httpOnly cookie with secure settings
+	// Cookie settings: HttpOnly, Secure (HTTPS), SameSite=Strict
+	isProduction := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie(
+		"auth_token", // name
+		token,        // value
+		6*60*60,      // maxAge (6 hours in seconds)
+		"/",          // path
+		"",           // domain (empty = current domain)
+		isProduction, // secure (true in production with HTTPS)
+		true,         // httpOnly (cannot be accessed by JavaScript)
+	)
+
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"user":  user,
@@ -282,25 +296,45 @@ func (h *AuthGinHandler) RevokeSession(c *gin.Context) {
 }
 
 func (h *AuthGinHandler) Logout(c *gin.Context) {
-	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header required"})
-		return
+	var tokenString string
+
+	// SECURITY: First try to get token from httpOnly cookie
+	if cookie, err := c.Cookie("auth_token"); err == nil && cookie != "" {
+		tokenString = cookie
+	} else {
+		// Fallback to Authorization header
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+			return
+		}
+		tokenString = parts[1]
 	}
 
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
-		return
-	}
-
-	tokenString := parts[1]
 	tokenHash := auth.HashToken(tokenString)
 
 	if err := h.sessionRepo.InvalidateSessionByTokenHash(c.Request.Context(), tokenHash); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to logout"})
 		return
 	}
+
+	// SECURITY: Clear the httpOnly cookie
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie(
+		"auth_token", // name
+		"",           // value (empty)
+		-1,           // maxAge (-1 = delete immediately)
+		"/",          // path
+		"",           // domain
+		true,         // secure
+		true,         // httpOnly
+	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }

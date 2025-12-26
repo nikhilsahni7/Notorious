@@ -24,24 +24,33 @@ func NewGinAuthMiddleware(jwtManager *auth.JWTManager, sessionRepo *repository.S
 
 func (m *GinAuthMiddleware) AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header required"})
-			c.Abort()
-			return
+		var tokenString string
+
+		// SECURITY: First try to get token from httpOnly cookie
+		if cookie, err := c.Cookie("auth_token"); err == nil && cookie != "" {
+			tokenString = cookie
+		} else {
+			// Fallback: Check Authorization header for backward compatibility
+			authHeader := c.GetHeader("Authorization")
+			if authHeader == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required", "code": "TOKEN_MISSING"})
+				c.Abort()
+				return
+			}
+
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+				c.Abort()
+				return
+			}
+			tokenString = parts[1]
 		}
 
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
-			c.Abort()
-			return
-		}
-
-		tokenString := parts[1]
 		claims, err := m.jwtManager.Verify(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			// Return specific error for expired vs invalid
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "token expired or invalid", "code": "TOKEN_EXPIRED"})
 			c.Abort()
 			return
 		}

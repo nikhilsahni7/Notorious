@@ -5,7 +5,7 @@ interface ApiOptions extends RequestInit {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number, public data?: unknown) {
+  constructor(message: string, public status: number, public data?: { code?: string; error?: string }) {
     super(message);
     this.name = "ApiError";
   }
@@ -22,6 +22,7 @@ export async function apiRequest<T = unknown>(
     ...fetchOptions.headers,
   };
 
+  // Keep Authorization header as fallback for compatibility
   if (token) {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
@@ -29,10 +30,27 @@ export async function apiRequest<T = unknown>(
   const response = await fetch(getApiUrl(endpoint), {
     ...fetchOptions,
     headers,
+    // SECURITY: Include credentials for httpOnly cookies
+    credentials: "include",
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+
+    // SECURITY: Handle token expired - redirect to login
+    if (response.status === 401) {
+      const code = errorData.code;
+      if (code === "TOKEN_EXPIRED" || code === "TOKEN_MISSING") {
+        // Clear any stored data and redirect
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("knotorious_token");
+          localStorage.removeItem("knotorious_user");
+          // Redirect to login with message
+          window.location.href = "/login?session=expired";
+        }
+      }
+    }
+
     throw new ApiError(
       errorData.error || `Request failed: ${response.statusText}`,
       response.status,

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, User, UserWithMetadata } from "@/services/admin.service";
-import { Laptop, Monitor, Smartphone, X } from "lucide-react";
+import { Laptop, Monitor, Smartphone, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface UserSessionsModalProps {
@@ -17,6 +17,8 @@ export function UserSessionsModal({
 }: UserSessionsModalProps) {
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<UserWithMetadata | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
 
   useEffect(() => {
     loadDetails();
@@ -31,6 +33,42 @@ export function UserSessionsModal({
       console.error("Failed to load user details:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm("Are you sure you want to revoke this session? The user will be logged out from this device.")) {
+      return;
+    }
+    setDeletingId(sessionId);
+    try {
+      await adminService.revokeUserSession(sessionId, token);
+      await loadDetails();
+    } catch (error) {
+      console.error("Failed to revoke session:", error);
+      alert("Failed to revoke session");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleClearAllSessions = async () => {
+    if (!confirm(`Are you sure you want to clear ALL sessions for ${user.name}? This will log them out from all devices.`)) {
+      return;
+    }
+    setClearingAll(true);
+    try {
+      // Delete each session one by one
+      const sessions = details?.sessions || [];
+      for (const session of sessions) {
+        await adminService.revokeUserSession(session.id, token);
+      }
+      await loadDetails();
+    } catch (error) {
+      console.error("Failed to clear all sessions:", error);
+      alert("Failed to clear all sessions");
+    } finally {
+      setClearingAll(false);
     }
   };
 
@@ -79,6 +117,31 @@ export function UserSessionsModal({
           </button>
         </div>
 
+        {/* Clear All Sessions Button */}
+        {details?.sessions && details.sessions.length > 0 && (
+          <div className="px-6 py-3 border-b border-gray-700 bg-[#1a0f2e]/50">
+            <Button
+              onClick={handleClearAllSessions}
+              disabled={clearingAll}
+              variant="outline"
+              size="sm"
+              className="bg-red-500/10 border-red-500/50 text-red-400 hover:bg-red-500/20"
+            >
+              {clearingAll ? (
+                <>
+                  <Spinner size="sm" />
+                  <span className="ml-2">Clearing...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear All Sessions ({details.sessions.length})
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         <div className="p-6">
           {loading ? (
             <div className="flex justify-center py-12">
@@ -96,9 +159,18 @@ export function UserSessionsModal({
                   key={session.id}
                   className="bg-[#2D1B4E] rounded-lg border border-gray-600 p-4 relative group hover:border-pink-500/50 transition-colors"
                 >
-                  <div className="absolute top-3 right-3 text-xs font-mono text-gray-500 bg-[#1a0f2e] px-1.5 py-0.5 rounded border border-gray-700">
-                    #{index + 1}
-                  </div>
+                  <button
+                    onClick={() => handleDeleteSession(session.id)}
+                    disabled={deletingId === session.id}
+                    className="absolute top-3 right-3 p-1.5 rounded bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                    title="Revoke this session"
+                  >
+                    {deletingId === session.id ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
 
                   <div className="flex items-start gap-3 mb-4">
                     <div className="bg-pink-500/10 p-2 rounded-lg text-pink-400 border border-pink-500/20">

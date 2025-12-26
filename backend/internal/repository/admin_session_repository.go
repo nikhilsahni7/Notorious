@@ -5,9 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
-	"github.com/google/uuid"
 	"notorious-backend/internal/database"
 	"notorious-backend/internal/models"
+
+	"github.com/google/uuid"
 )
 
 type AdminSessionRepository struct {
@@ -48,7 +49,7 @@ func (r *AdminSessionRepository) CreateSession(ctx context.Context, session *mod
 func (r *AdminSessionRepository) GetActiveSessions(ctx context.Context, limit, offset int) ([]*models.AdminSessionWithUser, error) {
 	sessions := make([]*models.AdminSessionWithUser, 0)
 	query := `
-		SELECT 
+		SELECT
 			s.id, s.admin_id, s.ip_address, s.country, s.country_code, s.city,
 			s.latitude, s.longitude, s.timezone, s.device_type, s.browser,
 			s.browser_version, s.os, s.os_version, s.user_agent,
@@ -83,25 +84,17 @@ func (r *AdminSessionRepository) GetActiveSessions(ctx context.Context, limit, o
 	return sessions, rows.Err()
 }
 
-// InvalidateSession marks a session as inactive
+// InvalidateSession marks a session as inactive (keeps for audit trail)
 func (r *AdminSessionRepository) InvalidateSession(ctx context.Context, sessionID uuid.UUID) error {
-	query := `
-		UPDATE admin_sessions
-		SET is_active = false
-		WHERE id = $1
-	`
+	query := `UPDATE admin_sessions SET is_active = false WHERE id = $1`
 	_, err := r.db.Pool.Exec(ctx, query, sessionID)
 	return err
 }
 
-// InvalidateSessionByToken marks a session as inactive by token
+// InvalidateSessionByToken marks a session as inactive by token (keeps for audit)
 func (r *AdminSessionRepository) InvalidateSessionByToken(ctx context.Context, token string) error {
 	tokenHash := hashToken(token)
-	query := `
-		UPDATE admin_sessions
-		SET is_active = false
-		WHERE token_hash = $1
-	`
+	query := `UPDATE admin_sessions SET is_active = false WHERE token_hash = $1`
 	_, err := r.db.Pool.Exec(ctx, query, tokenHash)
 	return err
 }
@@ -140,4 +133,3 @@ func (r *AdminSessionRepository) CleanupExpiredSessions(ctx context.Context) err
 	_, err := r.db.Pool.Exec(ctx, query)
 	return err
 }
-

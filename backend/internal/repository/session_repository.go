@@ -85,6 +85,16 @@ func (r *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID, use
 	return nil
 }
 
+// DeleteByID deletes a session by ID only (for admin use)
+func (r *SessionRepository) DeleteByID(ctx context.Context, sessionID uuid.UUID) error {
+	query := `DELETE FROM user_sessions WHERE id = $1`
+	_, err := r.db.Pool.Exec(ctx, query, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to delete session: %w", err)
+	}
+	return nil
+}
+
 func (r *SessionRepository) DeleteAllForUser(ctx context.Context, userID uuid.UUID) error {
 	query := `DELETE FROM user_sessions WHERE user_id = $1`
 	_, err := r.db.Pool.Exec(ctx, query, userID)
