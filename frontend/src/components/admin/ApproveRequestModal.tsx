@@ -1,3 +1,4 @@
+import { triggerQuickBlast } from "@/components/NewYearCelebration";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, UserRequest } from "@/services/admin.service";
@@ -30,6 +31,7 @@ export function ApproveRequestModal({
         token,
         adminNote || undefined
       );
+      triggerQuickBlast();
       onSuccess();
     } catch (error) {
       console.error("Failed to approve request:", error);

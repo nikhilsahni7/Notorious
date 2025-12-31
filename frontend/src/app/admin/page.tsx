@@ -6,6 +6,7 @@ import { SessionsTab } from "@/components/admin/SessionsTab";
 import { StatsTab } from "@/components/admin/StatsTab";
 import { UserRequestsTab } from "@/components/admin/UserRequestsTab";
 import { UsersTab } from "@/components/admin/UsersTab";
+import { NewYearHeader } from "@/components/NewYearCelebration";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -102,6 +103,9 @@ export default function AdminDashboard() {
               Manage users, requests, and view analytics for KNotorious
             </p>
           </div>
+
+          <NewYearHeader />
+
           <div className="flex items-center gap-4">
             <Button
               onClick={() => router.push("/search")}

@@ -1,3 +1,4 @@
+import { NewYearCelebration } from "@/components/NewYearCelebration";
 import { AuthProvider } from "@/providers/AuthProvider";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -18,7 +19,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <NewYearCelebration />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { NewYearHeader, triggerQuickBlast } from "@/components/NewYearCelebration";
 import { Pagination } from "@/components/Pagination";
 import { RefineSearch } from "@/components/RefineSearch";
 import { ResultsStats } from "@/components/ResultsStats";
@@ -148,6 +149,11 @@ export default function SearchPage() {
       setTotalResults(data.total || 0);
       setSearchTime(data.took_ms || 0);
       setIsDuplicateSearch(data.is_duplicate || false);
+
+      // Trigger New Year blast for successful searches
+      if (data.results && data.results.length > 0) {
+        triggerQuickBlast();
+      }
 
       // Store base query for refinement
       const queries: string[] = [];
@@ -342,6 +348,8 @@ export default function SearchPage() {
               </div>
             </div>
           </div>
+
+          <NewYearHeader />
 
           <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
             {/* Search Limit - Compact */}
