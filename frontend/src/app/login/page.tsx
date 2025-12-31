@@ -6,6 +6,8 @@ import { Captcha } from "@/components/ui/captcha";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
+import { motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -88,9 +90,34 @@ function LoginContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1a0f2e] via-[#2D1B4E] to-[#1a0f2e] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Welcome Back</h1>
-          <p className="text-gray-400">
+        <div className="text-center mb-8 relative">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="inline-flex flex-col items-center mb-4 px-6 py-2 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 shadow-[0_0_30px_rgba(253,224,71,0.1)] group overflow-hidden"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+              <span className="text-xs font-black text-white/60 tracking-[0.3em] uppercase">
+                Happy New Year
+              </span>
+              <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+            </div>
+            <motion.h2
+              animate={{
+                color: ["#FDE047", "#F0ABFC", "#67E8F9", "#FDE047"],
+                scale: [1, 1.05, 1]
+              }}
+              transition={{ duration: 3, repeat: Infinity }}
+              className="text-2xl font-black italic tracking-tighter drop-shadow-[0_0_10px_rgba(253,224,71,0.4)]"
+            >
+              2026
+            </motion.h2>
+            <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          </motion.div>
+
+          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Welcome Back</h1>
+          <p className="text-gray-400 font-medium">
             Sign in to access your search dashboard
           </p>
         </div>
