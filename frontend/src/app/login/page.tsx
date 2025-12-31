@@ -88,8 +88,19 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a0f2e] via-[#2D1B4E] to-[#1a0f2e] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div
+      className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden"
+      style={{
+        backgroundImage: 'url("/IMG_2503.JPG")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {/* Dark overlay for readability - removed blur for clarity */}
+      <div className="absolute inset-0 bg-[#0a0515]/60" />
+
+      <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8 relative">
           <motion.div
             initial={{ opacity: 0, scale: 0.5 }}
@@ -266,8 +277,16 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-[#1a0f2e] via-[#2D1B4E] to-[#1a0f2e] flex items-center justify-center">
-        <Spinner size="lg" />
+      <div
+        className="min-h-screen relative flex items-center justify-center bg-[#1a0f2e]"
+        style={{
+          backgroundImage: 'url("/IMG_2503.JPG")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        <div className="absolute inset-0 bg-[#0a0515]/60" />
+        <Spinner size="lg" className="relative z-10" />
       </div>
     }>
       <LoginContent />
