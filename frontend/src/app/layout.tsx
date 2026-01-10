@@ -1,4 +1,4 @@
-import { NewYearCelebration } from "@/components/NewYearCelebration";
+import { FestiveCelebration } from "@/components/NewYearCelebration";
 import { AuthProvider } from "@/providers/AuthProvider";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -20,7 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <NewYearCelebration />
+          <FestiveCelebration />
           {children}
         </AuthProvider>
       </body>

@@ -2,10 +2,10 @@
 
 import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
-import { PartyPopper, Sparkles } from "lucide-react";
+import { Flag, Flame, Wind } from "lucide-react";
 import React, { useEffect } from "react";
 
-export const triggerNewYearBlast = () => {
+export const triggerFestiveBlast = () => {
   const duration = 5 * 1000;
   const animationEnd = Date.now() + duration;
   const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
@@ -21,28 +21,28 @@ export const triggerNewYearBlast = () => {
     }
 
     const particleCount = 50 * (timeLeft / duration);
-    // since particles fall down, start a bit higher than random
+    // Use Tricolor + Bonfire Gold/Orange
     confetti({
       ...defaults,
       particleCount,
       origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-      colors: ["#FFD700", "#FF69B4", "#00CED1", "#FFFFFF"],
+      colors: ["#F97316", "#FFFFFF", "#22C55E", "#FDE047"],
     });
     confetti({
       ...defaults,
       particleCount,
       origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-      colors: ["#FFD700", "#FF69B4", "#00CED1", "#FFFFFF"],
+      colors: ["#F97316", "#FFFFFF", "#22C55E", "#FDE047"],
     });
   }, 250);
 };
 
-export const triggerQuickBlast = () => {
+export const triggerFestiveQuickBlast = () => {
   confetti({
     particleCount: 150,
     spread: 70,
     origin: { y: 0.6 },
-    colors: ["#FFD700", "#FF69B4", "#00CED1", "#FFFFFF", "#FF4500"],
+    colors: ["#F97316", "#FFFFFF", "#22C55E", "#FFD700", "#FF4500"],
     ticks: 200,
     gravity: 1.2,
     scalar: 1.2,
@@ -69,25 +69,25 @@ const FloatingElement = ({ children, delay = 0, duration = 4 }: { children: Reac
   </motion.div>
 );
 
-export const NewYearHeader = () => {
+export const FestiveHeader = () => {
   return (
-    <div className="hidden lg:flex items-center px-8 py-2.5 bg-gradient-to-r from-indigo-600/20 via-fuchsia-600/30 to-amber-500/20 rounded-2xl border border-white/10 mx-6 flex-1 justify-center max-w-lg shadow-[0_0_25px_rgba(168,85,247,0.15)] relative overflow-hidden group">
+    <div className="hidden lg:flex items-center px-8 py-2.5 bg-gradient-to-r from-orange-600/20 via-white/10 to-green-600/20 rounded-2xl border border-white/10 mx-6 flex-1 justify-center max-w-lg shadow-[0_0_25px_rgba(255,165,0,0.15)] relative overflow-hidden group">
       {/* Animated background glow */}
       <motion.div
         animate={{
-          opacity: [0.1, 0.3, 0.1],
-          scale: [1, 1.2, 1],
+          opacity: [0.1, 0.2, 0.1],
+          scale: [1, 1.1, 1],
         }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none"
+        className="absolute inset-0 bg-gradient-to-r from-orange-500/5 via-transparent to-green-500/5 pointer-events-none"
       />
 
       <div className="flex items-center gap-4 relative z-10">
         <motion.div
-          animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+          transition={{ duration: 3, repeat: Infinity }}
         >
-          <Sparkles size={22} className="text-yellow-300 drop-shadow-[0_0_8px_rgba(253,224,71,0.6)]" />
+          <Flame size={20} className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
         </motion.div>
 
         <div className="flex flex-col items-center">
@@ -96,37 +96,40 @@ export const NewYearHeader = () => {
             animate={{ y: 0, opacity: 1 }}
             className="flex items-center gap-3"
           >
-            <span className="text-sm font-black text-white tracking-[0.3em] uppercase drop-shadow-md">
-              Happy New Year
+            <span className="text-sm font-black text-white tracking-[0.2em] uppercase drop-shadow-md">
+              Happy Lohri + Makar Sankranti
             </span>
-            <motion.span
+            <motion.div
               animate={{
-                color: ["#FDE047", "#F0ABFC", "#67E8F9", "#FDE047"],
-                scale: [1, 1.1, 1]
+                scale: [1, 1.1, 1],
+                filter: ["brightness(1)", "brightness(1.2)", "brightness(1)"]
               }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="text-xl font-black italic tracking-tighter drop-shadow-[0_0_10px_rgba(253,224,71,0.4)]"
+              transition={{ duration: 2, repeat: Infinity }}
+              className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-md border border-white/10"
             >
-              2026
-            </motion.span>
+              <Flag size={12} className="text-white" />
+              <span className="text-sm font-black text-white italic tracking-tighter">
+                26 JAN
+              </span>
+            </motion.div>
           </motion.div>
 
-          <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-white/20 to-transparent my-1" />
+          <div className="h-[1px] w-full bg-gradient-to-r from-orange-500/40 via-white/40 to-green-500/40 my-1" />
 
           <motion.span
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
+            animate={{ opacity: [0.5, 0.9, 0.5] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="text-[10px] text-white/60 font-black uppercase tracking-[0.4em] italic leading-none"
+            className="text-[9px] text-white/70 font-black uppercase tracking-[0.3em]"
           >
-            A Year of New Victories
+            Celebrating India • Harmony • Prosperity
           </motion.span>
         </div>
 
         <motion.div
-          animate={{ y: [0, -5, 0], rotate: [0, -10, 10, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+          animate={{ y: [0, -5, 0], rotate: [0, -15, 15, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
         >
-          <PartyPopper size={22} className="text-pink-400 drop-shadow-[0_0_8px_rgba(244,114,182,0.6)]" />
+          <Wind size={20} className="text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.6)]" />
         </motion.div>
       </div>
 
@@ -136,11 +139,11 @@ export const NewYearHeader = () => {
   );
 };
 
-export const NewYearCelebration = () => {
+export const FestiveCelebration = () => {
   useEffect(() => {
     // Auto blast on mount for festive feel
     const blastTimer = setTimeout(() => {
-        triggerQuickBlast();
+        triggerFestiveQuickBlast();
     }, 1500);
 
     return () => clearTimeout(blastTimer);

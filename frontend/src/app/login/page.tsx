@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Flag, Flame, Wind } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -89,51 +89,47 @@ function LoginContent() {
 
   return (
     <div
-      className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden"
+      className="min-h-screen relative flex items-center justify-end md:pr-[5%] p-4 overflow-hidden bg-black"
       style={{
-        backgroundImage: 'url("/IMG_2503.JPG")',
-        backgroundSize: 'cover',
+        backgroundImage: 'url("/festive_bg.png")',
+        backgroundSize: '100% 100%',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
       }}
     >
-      {/* Dark overlay for readability - removed blur for clarity */}
-      <div className="absolute inset-0 bg-[#0a0515]/60" />
+      {/* Subtle darkening only on the right to maintain text contrast */}
+      <div className="absolute inset-0 bg-gradient-to-l from-black/40 via-transparent to-transparent pointer-events-none" />
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-8 relative">
+      <div className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-right-10 duration-1000">
+        <div className="text-center mb-6 relative">
           <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex flex-col items-center mb-4 px-6 py-2 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 shadow-[0_0_30px_rgba(253,224,71,0.1)] group overflow-hidden"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex flex-col items-center mb-4 px-6 py-2 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(255,165,0,0.2)]"
           >
             <div className="flex items-center gap-2 mb-1">
-              <Sparkles size={16} className="text-yellow-400 animate-pulse" />
-              <span className="text-xs font-black text-white/60 tracking-[0.3em] uppercase">
-                Happy New Year
+              <Flame size={14} className="text-orange-500" />
+              <span className="text-[10px] font-black text-white/80 tracking-[0.4em] uppercase">
+                Unity in Diversity
               </span>
-              <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+              <Wind size={14} className="text-blue-400" />
             </div>
             <motion.h2
-              animate={{
-                color: ["#FDE047", "#F0ABFC", "#67E8F9", "#FDE047"],
-                scale: [1, 1.05, 1]
-              }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="text-2xl font-black italic tracking-tighter drop-shadow-[0_0_10px_rgba(253,224,71,0.4)]"
+              animate={{ color: ["#F97316", "#FFFFFF", "#22C55E", "#F97316"] }}
+              transition={{ duration: 4, repeat: Infinity }}
+              className="text-lg font-black italic tracking-tighter flex items-center gap-2"
             >
-              2026
+              Jai Hind <Flag size={16} />
             </motion.h2>
-            <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           </motion.div>
 
-          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Welcome Back</h1>
-          <p className="text-gray-400 font-medium">
-            Sign in to access your search dashboard
-          </p>
+          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]">Welcome</h1>
         </div>
 
-        <div className="bg-[#1a0f2e] rounded-lg border border-gray-700 p-8 shadow-xl relative">
+        <div className="bg-black/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 p-10 shadow-2xl relative overflow-hidden">
+          {/* Internal festive glows */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-orange-600/20 blur-[60px] pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-green-600/20 blur-[60px] pointer-events-none" />
           {/* Session Expired Warning */}
           {sessionExpired && !deviceLimitData && (
             <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-400 p-4 rounded-lg mb-6">
@@ -280,7 +276,7 @@ export default function LoginPage() {
       <div
         className="min-h-screen relative flex items-center justify-center bg-[#1a0f2e]"
         style={{
-          backgroundImage: 'url("/IMG_2503.JPG")',
+          backgroundImage: 'url("/festive_bg.png")',
           backgroundSize: 'cover',
           backgroundPosition: 'center'
         }}
