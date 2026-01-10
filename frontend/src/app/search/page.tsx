@@ -1,6 +1,6 @@
 "use client";
 
-import { FestiveHeader, triggerFestiveQuickBlast } from "@/components/NewYearCelebration";
+import { FestiveHeader, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
 import { Pagination } from "@/components/Pagination";
 import { RefineSearch } from "@/components/RefineSearch";
 import { ResultsStats } from "@/components/ResultsStats";

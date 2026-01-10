@@ -1,4 +1,4 @@
-import { triggerQuickBlast } from "@/components/NewYearCelebration";
+import { triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, UserRequest } from "@/services/admin.service";
@@ -31,7 +31,7 @@ export function ApproveRequestModal({
         token,
         adminNote || undefined
       );
-      triggerQuickBlast();
+      triggerFestiveQuickBlast();
       onSuccess();
     } catch (error) {
       console.error("Failed to approve request:", error);

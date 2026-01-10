@@ -1,4 +1,4 @@
-import { FestiveCelebration } from "@/components/NewYearCelebration";
+import { FestiveCelebration } from "@/components/FestiveCelebration";
 import { AuthProvider } from "@/providers/AuthProvider";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";

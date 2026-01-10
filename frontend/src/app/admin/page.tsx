@@ -6,19 +6,19 @@ import { SessionsTab } from "@/components/admin/SessionsTab";
 import { StatsTab } from "@/components/admin/StatsTab";
 import { UserRequestsTab } from "@/components/admin/UserRequestsTab";
 import { UsersTab } from "@/components/admin/UsersTab";
-import { FestiveHeader } from "@/components/NewYearCelebration";
+import { FestiveHeader } from "@/components/FestiveCelebration";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { adminService, RequestCounts } from "@/services/admin.service";
 import {
-    BarChart3,
-    History,
-    Key,
-    LogOut,
-    Shield,
-    UserPlus,
-    Users,
+  BarChart3,
+  History,
+  Key,
+  LogOut,
+  Shield,
+  UserPlus,
+  Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
