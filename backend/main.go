@@ -92,7 +92,7 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001",
 			"https://knotoriousworld.site", "https://notorious-sigma.vercel.app",
-			"https://www.knotoriousworld.site", "https://jobhuntworldknotorious.online"},
+			"https://www.knotoriousworld.site", "https://jobhuntworldknotorious.online", "https://www.jobhuntworldknotorious.online"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
