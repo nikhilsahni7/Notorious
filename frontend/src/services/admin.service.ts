@@ -197,6 +197,32 @@ export const adminService = {
     );
   },
 
+  // Bulk update users status (activate/deactivate multiple users at once)
+  bulkUpdateUsers: async (
+    userIds: string[],
+    isActive: boolean,
+    token: string
+  ): Promise<{ message: string; updated: number }> => {
+    return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.BULK_UPDATE_USERS, {
+      method: "POST",
+      body: JSON.stringify({ user_ids: userIds, is_active: isActive }),
+      token,
+    });
+  },
+
+  // Toggle single user status (convenience method)
+  toggleUserStatus: async (
+    userId: string,
+    isActive: boolean,
+    token: string
+  ): Promise<{ message: string; updated: number }> => {
+    return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.BULK_UPDATE_USERS, {
+      method: "POST",
+      body: JSON.stringify({ user_ids: [userId], is_active: isActive }),
+      token,
+    });
+  },
+
   // User Requests
   listUserRequests: async (
     token: string,

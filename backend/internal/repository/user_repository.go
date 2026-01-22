@@ -269,3 +269,17 @@ func (r *UserRepository) ResetAllDailyLimits(ctx context.Context) error {
 	_, err := r.db.Pool.Exec(ctx, query)
 	return err
 }
+
+// BulkUpdateStatus updates the is_active status for multiple users at once
+func (r *UserRepository) BulkUpdateStatus(ctx context.Context, userIDs []uuid.UUID, isActive bool) (int64, error) {
+	query := `
+		UPDATE users
+		SET is_active = $1, updated_at = $2
+		WHERE id = ANY($3)
+	`
+	result, err := r.db.Pool.Exec(ctx, query, isActive, time.Now(), userIDs)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

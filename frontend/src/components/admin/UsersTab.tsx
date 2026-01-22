@@ -3,15 +3,19 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, User } from "@/services/admin.service";
 import {
-  Check,
-  Download,
-  Edit,
-  History,
-  Key,
-  Plus,
-  Smartphone,
-  Trash2,
-  X,
+    CheckSquare,
+    Download,
+    Edit,
+    History,
+    Key,
+    Plus,
+    Power,
+    Smartphone,
+    Square,
+    Trash2,
+    UserCheck,
+    UserX,
+    X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -41,6 +45,8 @@ export function UsersTab({ token }: UsersTabProps) {
   const [viewingSessionsUser, setViewingSessionsUser] = useState<User | null>(
     null
   );
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -115,6 +121,70 @@ export function UsersTab({ token }: UsersTabProps) {
     }
   };
 
+  // Selection handlers
+  const toggleSelectAll = () => {
+    if (selectedUserIds.size === filteredUsers.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(filteredUsers.map((u) => u.id)));
+    }
+  };
+
+  const toggleSelectUser = (userId: string) => {
+    const newSelected = new Set(selectedUserIds);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUserIds(newSelected);
+  };
+
+  const clearSelection = () => {
+    setSelectedUserIds(new Set());
+  };
+
+  // Bulk update handler
+  const handleBulkUpdate = async (isActive: boolean) => {
+    if (selectedUserIds.size === 0) return;
+
+    const action = isActive ? "activate" : "deactivate";
+    if (
+      !confirm(
+        `Are you sure you want to ${action} ${selectedUserIds.size} selected user(s)?`
+      )
+    ) {
+      return;
+    }
+
+    setBulkUpdating(true);
+    try {
+      await adminService.bulkUpdateUsers(
+        Array.from(selectedUserIds),
+        isActive,
+        token
+      );
+      clearSelection();
+      await loadUsers();
+    } catch (error) {
+      console.error(`Failed to ${action} users:`, error);
+      alert(`Failed to ${action} users`);
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  // Quick toggle for single user
+  const handleToggleStatus = async (user: User) => {
+    try {
+      await adminService.toggleUserStatus(user.id, !user.is_active, token);
+      await loadUsers();
+    } catch (error) {
+      console.error("Failed to toggle user status:", error);
+      alert("Failed to toggle user status");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -179,11 +249,65 @@ export function UsersTab({ token }: UsersTabProps) {
         </button>
       </div>
 
+      {/* Bulk Actions Toolbar */}
+      {selectedUserIds.size > 0 && (
+        <div className="mb-4 bg-[#2D1B4E] border border-purple-500/30 rounded-lg p-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-white font-medium">
+              <CheckSquare className="h-4 w-4 inline mr-2 text-purple-400" />
+              {selectedUserIds.size} user(s) selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => handleBulkUpdate(true)}
+              disabled={bulkUpdating}
+              className="bg-green-600 hover:bg-green-700 text-white text-sm"
+              size="sm"
+            >
+              <UserCheck className="h-4 w-4 mr-1" />
+              Activate
+            </Button>
+            <Button
+              onClick={() => handleBulkUpdate(false)}
+              disabled={bulkUpdating}
+              className="bg-red-600 hover:bg-red-700 text-white text-sm"
+              size="sm"
+            >
+              <UserX className="h-4 w-4 mr-1" />
+              Deactivate
+            </Button>
+            <Button
+              onClick={clearSelection}
+              variant="outline"
+              className="border-gray-600 text-gray-300 hover:bg-gray-700 text-sm"
+              size="sm"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-[#2D1B4E] rounded-lg border border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-[#1a0f2e] border-b border-gray-700">
               <tr>
+                <th className="px-3 py-3 text-left">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="text-gray-300 hover:text-white transition-colors"
+                    title={selectedUserIds.size === filteredUsers.length ? "Deselect all" : "Select all"}
+                  >
+                    {selectedUserIds.size === filteredUsers.length && filteredUsers.length > 0 ? (
+                      <CheckSquare className="h-5 w-5 text-purple-400" />
+                    ) : (
+                      <Square className="h-5 w-5" />
+                    )}
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
                   Name
                 </th>
@@ -220,8 +344,20 @@ export function UsersTab({ token }: UsersTabProps) {
               {filteredUsers.map((user) => (
                 <tr
                   key={user.id}
-                  className="hover:bg-[#1a0f2e] transition-colors"
+                  className={`hover:bg-[#1a0f2e] transition-colors ${selectedUserIds.has(user.id) ? "bg-purple-500/10" : ""}`}
                 >
+                  <td className="px-3 py-3">
+                    <button
+                      onClick={() => toggleSelectUser(user.id)}
+                      className="text-gray-300 hover:text-white transition-colors"
+                    >
+                      {selectedUserIds.has(user.id) ? (
+                        <CheckSquare className="h-5 w-5 text-purple-400" />
+                      ) : (
+                        <Square className="h-5 w-5" />
+                      )}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-sm text-white">{user.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-300">
                     {user.email}
@@ -265,17 +401,18 @@ export function UsersTab({ token }: UsersTabProps) {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {user.is_active ? (
-                      <span className="flex items-center text-green-400">
-                        <Check className="h-4 w-4 mr-1" />
-                        Active
-                      </span>
-                    ) : (
-                      <span className="flex items-center text-red-400">
-                        <X className="h-4 w-4 mr-1" />
-                        Inactive
-                      </span>
-                    )}
+                    <button
+                      onClick={() => handleToggleStatus(user)}
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all hover:scale-105 ${
+                        user.is_active
+                          ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                          : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      }`}
+                      title={user.is_active ? "Click to deactivate" : "Click to activate"}
+                    >
+                      <Power className="h-3 w-3" />
+                      {user.is_active ? "Active" : "Inactive"}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-2">

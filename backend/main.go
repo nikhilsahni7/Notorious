@@ -154,6 +154,7 @@ func main() {
 			adminRoutes.DELETE("/users/:id", adminHandler.DeleteUser)
 			adminRoutes.POST("/users/:id/change-password", adminHandler.ChangeUserPassword)
 			adminRoutes.GET("/users/:id/eod-report", adminHandler.GenerateUserEOD) // NEW: Generate EOD for user
+			adminRoutes.POST("/users/bulk-update", adminHandler.BulkUpdateUsers)   // Bulk update user status
 
 			// User requests
 			adminRoutes.GET("/user-requests", adminHandler.ListUserRequests)

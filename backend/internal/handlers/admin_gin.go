@@ -262,6 +262,47 @@ func (h *AdminGinHandler) DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusNoContent, nil)
 }
 
+// BulkUpdateUsers updates multiple users' active status at once
+func (h *AdminGinHandler) BulkUpdateUsers(c *gin.Context) {
+	var req struct {
+		UserIDs  []string `json:"user_ids" binding:"required,min=1"`
+		IsActive bool     `json:"is_active"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Convert string IDs to UUIDs
+	userIDs := make([]uuid.UUID, 0, len(req.UserIDs))
+	for _, idStr := range req.UserIDs {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid user ID: %s", idStr)})
+			return
+		}
+		userIDs = append(userIDs, id)
+	}
+
+	// Perform bulk update
+	updated, err := h.userRepo.BulkUpdateStatus(c.Request.Context(), userIDs, req.IsActive)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update users"})
+		return
+	}
+
+	action := "deactivated"
+	if req.IsActive {
+		action = "activated"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("Successfully %s %d users", action, updated),
+		"updated": updated,
+	})
+}
+
 func (h *AdminGinHandler) ListUserRequests(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))

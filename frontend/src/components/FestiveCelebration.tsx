@@ -2,7 +2,7 @@
 
 import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
-import { Flag, Flame, Wind } from "lucide-react";
+import { Flag } from "lucide-react";
 import React, { useEffect } from "react";
 
 export const triggerFestiveBlast = () => {
@@ -71,23 +71,23 @@ const FloatingElement = ({ children, delay = 0, duration = 4 }: { children: Reac
 
 export const FestiveHeader = () => {
   return (
-    <div className="hidden lg:flex items-center px-8 py-2.5 bg-gradient-to-r from-orange-600/20 via-white/10 to-green-600/20 rounded-2xl border border-white/10 mx-6 flex-1 justify-center max-w-lg shadow-[0_0_25px_rgba(255,165,0,0.15)] relative overflow-hidden group">
-      {/* Animated background glow */}
+    <div className="hidden lg:flex items-center px-8 py-2.5 bg-gradient-to-r from-orange-600/20 via-white/10 to-green-600/20 rounded-2xl border border-white/10 mx-6 flex-1 justify-center max-w-lg shadow-[0_0_30px_rgba(255,165,0,0.2)] relative overflow-hidden group">
+      {/* Animated background glow - Tri-color themed */}
       <motion.div
         animate={{
           opacity: [0.1, 0.2, 0.1],
           scale: [1, 1.1, 1],
         }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-0 bg-gradient-to-r from-orange-500/5 via-transparent to-green-500/5 pointer-events-none"
+        className="absolute inset-0 bg-gradient-to-r from-orange-500/10 via-white/5 to-green-500/10 pointer-events-none"
       />
 
-      <div className="flex items-center gap-4 relative z-10">
+      <div className="flex items-center gap-6 relative z-10">
         <motion.div
-          animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
-          transition={{ duration: 3, repeat: Infinity }}
+          animate={{ rotate: [-10, 10, -10], scale: [1, 1.1, 1] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Flame size={20} className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+          <Flag size={24} className="text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]" />
         </motion.div>
 
         <div className="flex flex-col items-center">
@@ -96,45 +96,32 @@ export const FestiveHeader = () => {
             animate={{ y: 0, opacity: 1 }}
             className="flex items-center gap-3"
           >
-            <span className="text-sm font-black text-white tracking-[0.2em] uppercase drop-shadow-md">
-              Happy Lohri + Makar Sankranti
+            <span className="text-base font-black text-white tracking-[0.3em] uppercase drop-shadow-md">
+              Happy Republic Day
             </span>
-            <motion.div
-              animate={{
-                scale: [1, 1.1, 1],
-                filter: ["brightness(1)", "brightness(1.2)", "brightness(1)"]
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-md border border-white/10"
-            >
-              <Flag size={12} className="text-white" />
-              <span className="text-sm font-black text-white italic tracking-tighter">
-                26 JAN
-              </span>
-            </motion.div>
           </motion.div>
 
-          <div className="h-[1px] w-full bg-gradient-to-r from-orange-500/40 via-white/40 to-green-500/40 my-1" />
+          <div className="h-[1.5px] w-full bg-gradient-to-r from-orange-500 via-white to-green-500 my-1.5 opacity-60" />
 
           <motion.span
-            animate={{ opacity: [0.5, 0.9, 0.5] }}
+            animate={{ opacity: [0.6, 1, 0.6] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="text-[9px] text-white/70 font-black uppercase tracking-[0.3em]"
+            className="text-[10px] text-white/80 font-black uppercase tracking-[0.4em]"
           >
-            Celebrating India • Harmony • Prosperity
+            Celebrating the Soul of India
           </motion.span>
         </div>
 
         <motion.div
-          animate={{ y: [0, -5, 0], rotate: [0, -15, 15, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          animate={{ rotate: [10, -10, 10], scale: [1, 1.1, 1] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Wind size={20} className="text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.6)]" />
+          <Flag size={24} className="text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]" />
         </motion.div>
       </div>
 
       {/* Shimmer effect on hover */}
-      <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
     </div>
   );
 };

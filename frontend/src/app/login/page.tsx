@@ -6,8 +6,6 @@ import { Captcha } from "@/components/ui/captcha";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { motion } from "framer-motion";
-import { Flag, Flame, Wind } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -91,7 +89,7 @@ function LoginContent() {
     <div
       className="min-h-screen relative flex items-center justify-end md:pr-[5%] p-4 overflow-hidden bg-black"
       style={{
-        backgroundImage: 'url("/festive_bg.png")',
+        backgroundImage: 'url("/republic_day_bg.png")',
         backgroundSize: '100% 100%',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
@@ -101,29 +99,11 @@ function LoginContent() {
       <div className="absolute inset-0 bg-gradient-to-l from-black/40 via-transparent to-transparent pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-right-10 duration-1000">
-        <div className="text-center mb-6 relative">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="inline-flex flex-col items-center mb-4 px-6 py-2 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(255,165,0,0.2)]"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Flame size={14} className="text-orange-500" />
-              <span className="text-[10px] font-black text-white/80 tracking-[0.4em] uppercase">
-                Unity in Diversity
-              </span>
-              <Wind size={14} className="text-blue-400" />
-            </div>
-            <motion.h2
-              animate={{ color: ["#F97316", "#FFFFFF", "#22C55E", "#F97316"] }}
-              transition={{ duration: 4, repeat: Infinity }}
-              className="text-lg font-black italic tracking-tighter flex items-center gap-2"
-            >
-              Jai Hind <Flag size={16} />
-            </motion.h2>
-          </motion.div>
-
-          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]">Welcome</h1>
+        <div className="text-center mb-10 relative">
+          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">Welcome</h1>
+          <p className="text-white/60 font-medium text-sm tracking-wide">
+            Sign in to access your search dashboard
+          </p>
         </div>
 
         <div className="bg-black/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 p-10 shadow-2xl relative overflow-hidden">
@@ -276,8 +256,8 @@ export default function LoginPage() {
       <div
         className="min-h-screen relative flex items-center justify-center bg-[#1a0f2e]"
         style={{
-          backgroundImage: 'url("/festive_bg.png")',
-          backgroundSize: 'cover',
+          backgroundImage: 'url("/republic_day_bg.png")',
+          backgroundSize: '100% 100%',
           backgroundPosition: 'center'
         }}
       >

@@ -16,6 +16,7 @@ export const API_CONFIG = {
     },
     ADMIN: {
       USERS: "/api/admin/users",
+      BULK_UPDATE_USERS: "/api/admin/users/bulk-update",
       USER_REQUESTS: "/api/admin/user-requests",
       SEARCH_HISTORY: "/api/admin/search-history",
       PASSWORD_CHANGE_REQUESTS: "/api/admin/password-change-requests",
