@@ -13,10 +13,12 @@ export const API_CONFIG = {
       PROFILE: "/api/user/profile",
       SEARCH_HISTORY: "/api/user/search-history",
       METADATA: "/api/user/metadata",
+      HEARTBEAT: "/api/user/heartbeat",
     },
     ADMIN: {
       USERS: "/api/admin/users",
       BULK_UPDATE_USERS: "/api/admin/users/bulk-update",
+      ONLINE_USERS: "/api/admin/users/online",
       USER_REQUESTS: "/api/admin/user-requests",
       SEARCH_HISTORY: "/api/admin/search-history",
       PASSWORD_CHANGE_REQUESTS: "/api/admin/password-change-requests",

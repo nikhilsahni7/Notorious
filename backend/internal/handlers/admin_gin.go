@@ -685,6 +685,31 @@ func (h *AdminGinHandler) GetRequestCounts(c *gin.Context) {
 	})
 }
 
+// GetOnlineUsers returns list of user IDs currently online (active in last 60 seconds)
+func (h *AdminGinHandler) GetOnlineUsers(c *gin.Context) {
+	// Users are considered "online" if their last_active is within the last 60 seconds
+	const onlineThresholdSeconds = 60
+
+	if h.sessionRepo == nil {
+		c.JSON(http.StatusOK, gin.H{"online_user_ids": []string{}})
+		return
+	}
+
+	userIDs, err := h.sessionRepo.GetOnlineUserIDs(c.Request.Context(), onlineThresholdSeconds)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch online users"})
+		return
+	}
+
+	// Convert UUIDs to strings
+	stringIDs := make([]string, len(userIDs))
+	for i, id := range userIDs {
+		stringIDs[i] = id.String()
+	}
+
+	c.JSON(http.StatusOK, gin.H{"online_user_ids": stringIDs})
+}
+
 // GenerateUserEOD generates End of Day report for a specific user
 func (h *AdminGinHandler) GenerateUserEOD(c *gin.Context) {
 	userID, err := uuid.Parse(c.Param("id"))

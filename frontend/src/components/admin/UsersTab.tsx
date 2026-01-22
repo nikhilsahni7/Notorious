@@ -3,19 +3,19 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, User } from "@/services/admin.service";
 import {
-    CheckSquare,
-    Download,
-    Edit,
-    History,
-    Key,
-    Plus,
-    Power,
-    Smartphone,
-    Square,
-    Trash2,
-    UserCheck,
-    UserX,
-    X
+  CheckSquare,
+  Download,
+  Edit,
+  History,
+  Key,
+  Plus,
+  Power,
+  Smartphone,
+  Square,
+  Trash2,
+  UserCheck,
+  UserX,
+  X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -47,9 +47,25 @@ export function UsersTab({ token }: UsersTabProps) {
   );
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+
+  // Load online users
+  const loadOnlineUsers = async () => {
+    try {
+      const data = await adminService.getOnlineUsers(token);
+      setOnlineUserIds(new Set(data.online_user_ids || []));
+    } catch (error) {
+      console.error("Failed to load online users:", error);
+    }
+  };
 
   useEffect(() => {
     loadUsers();
+    loadOnlineUsers();
+
+    // Poll for online users every 30 seconds
+    const interval = setInterval(loadOnlineUsers, 30000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -358,7 +374,19 @@ export function UsersTab({ token }: UsersTabProps) {
                       )}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">{user.name}</td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          onlineUserIds.has(user.id)
+                            ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]"
+                            : "bg-gray-500"
+                        }`}
+                        title={onlineUserIds.has(user.id) ? "Online now" : "Offline"}
+                      />
+                      {user.name}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-300">
                     {user.email}
                   </td>

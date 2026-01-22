@@ -223,6 +223,16 @@ export const adminService = {
     });
   },
 
+  // Get online users (for presence indicators)
+  getOnlineUsers: async (
+    token: string
+  ): Promise<{ online_user_ids: string[] }> => {
+    return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.ONLINE_USERS, {
+      method: "GET",
+      token,
+    });
+  },
+
   // User Requests
   listUserRequests: async (
     token: string,

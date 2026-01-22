@@ -118,3 +118,34 @@ func (r *SessionRepository) ExistsByTokenHash(ctx context.Context, tokenHash str
 	err := r.db.Pool.QueryRow(ctx, query, tokenHash).Scan(&exists)
 	return exists, err
 }
+
+// UpdateLastActive updates the last_active timestamp for a session by token hash
+func (r *SessionRepository) UpdateLastActive(ctx context.Context, tokenHash string) error {
+	query := `UPDATE user_sessions SET last_active = NOW() WHERE token_hash = $1`
+	_, err := r.db.Pool.Exec(ctx, query, tokenHash)
+	return err
+}
+
+// GetOnlineUserIDs returns user IDs that have been active within the threshold seconds
+func (r *SessionRepository) GetOnlineUserIDs(ctx context.Context, thresholdSeconds int) ([]uuid.UUID, error) {
+	query := `
+		SELECT DISTINCT user_id
+		FROM user_sessions
+		WHERE last_active > NOW() - INTERVAL '1 second' * $1
+	`
+	rows, err := r.db.Pool.Query(ctx, query, thresholdSeconds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query online users: %w", err)
+	}
+	defer rows.Close()
+
+	var userIDs []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan user ID: %w", err)
+		}
+		userIDs = append(userIDs, id)
+	}
+	return userIDs, nil
+}

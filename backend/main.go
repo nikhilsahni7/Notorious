@@ -74,7 +74,7 @@ func main() {
 
 			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, sessionRepo, jwtManager)
 			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo, sessionRepo)
-			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo)
+			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo, sessionRepo)
 			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo)
 			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
 
@@ -128,6 +128,7 @@ func main() {
 		{
 			userRoutes.GET("/search-history", userHandler.GetSearchHistory)
 			userRoutes.GET("/metadata", userHandler.GetMetadata)
+			userRoutes.POST("/heartbeat", userHandler.Heartbeat) // Presence tracking
 		}
 	}
 
@@ -177,6 +178,7 @@ func main() {
 
 			// Dashboard stats
 			adminRoutes.GET("/request-counts", adminHandler.GetRequestCounts) // NEW: Get pending request counts
+			adminRoutes.GET("/users/online", adminHandler.GetOnlineUsers)     // Get currently online users
 		}
 	}
 

@@ -79,6 +79,8 @@ func (m *GinAuthMiddleware) AuthRequired() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
+			// Store token hash for heartbeat functionality
+			c.Set("token_hash", tokenHash)
 		}
 
 		c.Set("user_id", claims.UserID)
