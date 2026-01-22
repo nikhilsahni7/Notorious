@@ -120,8 +120,14 @@ func (r *SessionRepository) ExistsByTokenHash(ctx context.Context, tokenHash str
 }
 
 // UpdateLastActive updates the last_active timestamp for a session by token hash
+// Throttled: only updates if last_active is older than 30 seconds to reduce DB load
 func (r *SessionRepository) UpdateLastActive(ctx context.Context, tokenHash string) error {
-	query := `UPDATE user_sessions SET last_active = NOW() WHERE token_hash = $1`
+	query := `
+		UPDATE user_sessions
+		SET last_active = NOW()
+		WHERE token_hash = $1
+		AND last_active < NOW() - INTERVAL '30 seconds'
+	`
 	_, err := r.db.Pool.Exec(ctx, query, tokenHash)
 	return err
 }

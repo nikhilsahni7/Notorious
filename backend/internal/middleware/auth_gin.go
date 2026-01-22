@@ -81,6 +81,10 @@ func (m *GinAuthMiddleware) AuthRequired() gin.HandlerFunc {
 			}
 			// Store token hash for heartbeat functionality
 			c.Set("token_hash", tokenHash)
+
+			// Update last_active on every authenticated request for reliable presence tracking
+			// This runs async to not slow down the request
+			go m.sessionRepo.UpdateLastActive(c.Request.Context(), tokenHash)
 		}
 
 		c.Set("user_id", claims.UserID)
