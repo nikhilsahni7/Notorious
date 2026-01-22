@@ -94,16 +94,17 @@ func (rl *RateLimiter) Limit() gin.HandlerFunc {
 	}
 }
 
-// AdminRateLimiter - limits for admin endpoints (60 requests per minute)
+// AdminRateLimiter - limits for admin endpoints (120 requests per minute)
+// Increased from 60 to accommodate online users polling every 30 seconds
 func AdminRateLimiter() gin.HandlerFunc {
-	limiter := NewRateLimiter(60, time.Minute)
+	limiter := NewRateLimiter(120, time.Minute)
 	return limiter.Limit()
 }
 
-// AuthRateLimiter - strict limits for login attempts (10 per minute per IP)
-// Prevents brute force attacks
+// AuthRateLimiter - strict limits for login attempts (15 per minute per IP)
+// Prevents brute force attacks while allowing a few password typos
 func AuthRateLimiter() gin.HandlerFunc {
-	limiter := NewRateLimiter(10, time.Minute)
+	limiter := NewRateLimiter(15, time.Minute)
 	return limiter.Limit()
 }
 
@@ -114,9 +115,9 @@ func AccessRequestRateLimiter() gin.HandlerFunc {
 	return limiter.Limit()
 }
 
-// SearchRateLimiter - allows up to 60 searches per minute per IP
-// Users can do 10-15 searches/min comfortably with room to spare
+// SearchRateLimiter - allows up to 100 searches per minute per IP
+// Increased to accommodate heartbeat polling + active user searching
 func SearchRateLimiter() gin.HandlerFunc {
-	limiter := NewRateLimiter(60, time.Minute)
+	limiter := NewRateLimiter(100, time.Minute)
 	return limiter.Limit()
 }
