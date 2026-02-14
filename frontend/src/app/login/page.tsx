@@ -89,7 +89,7 @@ function LoginContent() {
     <div
       className="min-h-screen relative flex items-center justify-end md:pr-[5%] p-4 overflow-hidden bg-black"
       style={{
-        backgroundImage: 'url("/republic_day_bg.png")',
+        backgroundImage: 'url("/valentines_day_bg.png")',
         backgroundSize: '100% 100%',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
@@ -106,10 +106,10 @@ function LoginContent() {
           </p>
         </div>
 
-        <div className="bg-black/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 p-10 shadow-2xl relative overflow-hidden">
+        <div className="bg-white/5 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 p-10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] relative overflow-hidden">
           {/* Internal festive glows */}
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-orange-600/20 blur-[60px] pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-green-600/20 blur-[60px] pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500/30 blur-[60px] pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-rose-500/30 blur-[60px] pointer-events-none" />
           {/* Session Expired Warning */}
           {sessionExpired && !deviceLimitData && (
             <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-400 p-4 rounded-lg mb-6">
@@ -256,7 +256,7 @@ export default function LoginPage() {
       <div
         className="min-h-screen relative flex items-center justify-center bg-[#1a0f2e]"
         style={{
-          backgroundImage: 'url("/republic_day_bg.png")',
+          backgroundImage: 'url("/valentines_day_bg.png")',
           backgroundSize: '100% 100%',
           backgroundPosition: 'center'
         }}
