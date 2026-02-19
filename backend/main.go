@@ -16,6 +16,7 @@ import (
 	"notorious-backend/internal/repository"
 	"notorious-backend/internal/scheduler"
 	"notorious-backend/internal/utils"
+	chatws "notorious-backend/internal/websocket"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -39,6 +40,8 @@ func main() {
 	var userHandler *handlers.UserGinHandler
 	var userPasswordHandler *handlers.UserPasswordGinHandler
 	var searchHandler *handlers.SearchHandler
+	var chatHandler *handlers.ChatHandler
+	var wsHub *chatws.Hub
 
 	if databaseURL != "" && jwtSecret != "" {
 		var err error
@@ -77,6 +80,13 @@ func main() {
 			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo, sessionRepo)
 			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo)
 			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
+
+			// Initialize chat system
+			chatRepo := repository.NewChatRepository(db)
+			wsHub = chatws.NewHub(chatRepo, jwtManager)
+			go wsHub.Run()
+			chatHandler = handlers.NewChatHandler(chatRepo, wsHub)
+			log.Println("Chat system initialized with WebSocket hub")
 
 			resetter := scheduler.NewSearchLimitResetter(userRepo)
 			ctx := context.Background()
@@ -182,7 +192,26 @@ func main() {
 		}
 	}
 
-	///vps changes 
+	// Chat routes (authenticated, any role)
+	if authMiddleware != nil && chatHandler != nil {
+		// WebSocket endpoint (auth via query param)
+		r.GET("/ws", wsHub.HandleUpgrade)
+
+		chatRoutes := r.Group("/api/chat")
+		chatRoutes.Use(authMiddleware.AuthRequired())
+		{
+			chatRoutes.GET("/conversations", chatHandler.GetConversations)
+			chatRoutes.GET("/messages/:userId", chatHandler.GetMessages)
+			chatRoutes.GET("/unread", chatHandler.GetUnreadCount)
+			chatRoutes.POST("/read/:userId", chatHandler.MarkAsRead)
+			chatRoutes.GET("/broadcasts", chatHandler.GetBroadcasts)
+			chatRoutes.POST("/broadcasts/:broadcastId/read", chatHandler.MarkBroadcastRead)
+			chatRoutes.GET("/online", chatHandler.GetOnlineUsers)
+			chatRoutes.GET("/unread-per-user", chatHandler.GetUnreadPerUser)
+		}
+	}
+
+	///vps changes
 
 	uploadGroup := r.Group("/upload")
 	uploadGroup.POST("/init", uploadHandler.InitUpload)
