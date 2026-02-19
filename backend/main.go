@@ -182,6 +182,8 @@ func main() {
 		}
 	}
 
+	///vps changes 
+
 	uploadGroup := r.Group("/upload")
 	uploadGroup.POST("/init", uploadHandler.InitUpload)
 	uploadGroup.POST("/presign", uploadHandler.PresignPart)
