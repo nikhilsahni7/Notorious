@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function RequestAccessPage() {
   const [formData, setFormData] = useState({
@@ -25,7 +25,7 @@ export default function RequestAccessPage() {
 
     try {
       const { authService } = await import("@/services/auth.service");
-      
+
       await authService.requestAccess({
         ...formData,
         requested_searches_per_day: parseInt(formData.requested_searches_per_day),
@@ -42,8 +42,12 @@ export default function RequestAccessPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#2D1B4E] flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
+      <div className="min-h-screen bg-[#0a0515] flex items-center justify-center p-6 relative overflow-hidden">
+        {/* Holi Background Elements */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
+
+        <div className="w-full max-w-md relative z-10">
           <div className="bg-green-500/10 border border-green-500 p-8 rounded-lg text-center">
             <h2 className="text-2xl font-bold text-green-400 mb-4">Request Submitted!</h2>
             <p className="text-gray-300 mb-4">
@@ -59,13 +63,27 @@ export default function RequestAccessPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#2D1B4E] flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <div className="bg-[#1a0f2e] p-8 rounded-lg border border-gray-700">
-          <h1 className="text-3xl font-bold text-white mb-2 text-center">
+    <div className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden"
+      style={{
+        backgroundImage: 'url("/holi-auth.png")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {/* Holi Background Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/5 blur-[120px] rounded-full" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full" />
+
+      <div className="w-full max-w-md relative z-10">
+        <div className="bg-white/5 backdrop-blur-2xl p-8 rounded-[2.5rem] border border-white/20 shadow-2xl relative overflow-hidden">
+          {/* Internal Festive Glow */}
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-500/20 blur-[50px] pointer-events-none" />
+
+          <h1 className="text-3xl font-black text-white mb-2 text-center tracking-tight">
             Request Access
           </h1>
-          <p className="text-gray-400 text-center mb-6">
+          <p className="text-white/60 text-center mb-8 font-medium">
             Fill out the form to request database access
           </p>
 
@@ -138,7 +156,7 @@ export default function RequestAccessPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-pink-500 hover:bg-pink-600 text-white"
+              className="w-full bg-gradient-to-r from-pink-500 to-blue-500 hover:from-pink-600 hover:to-blue-600 text-white h-11 border-none shadow-[0_0_15px_rgba(236,72,153,0.3)] transition-all duration-300 font-bold"
             >
               {loading ? (
                 <>
@@ -151,10 +169,10 @@ export default function RequestAccessPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-400 text-sm">
+          <div className="mt-8 text-center pt-6 border-t border-white/10">
+            <p className="text-white/60 text-sm font-medium">
               Already have an account?{" "}
-              <a href="/login" className="text-pink-500 hover:text-pink-400">
+              <a href="/login" className="text-yellow-400 hover:text-yellow-300 font-bold transition-colors">
                 Sign in
               </a>
             </p>
@@ -164,4 +182,3 @@ export default function RequestAccessPage() {
     </div>
   );
 }
-

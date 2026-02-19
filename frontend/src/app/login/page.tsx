@@ -89,12 +89,16 @@ function LoginContent() {
     <div
       className="min-h-screen relative flex items-center justify-end md:pr-[5%] p-4 overflow-hidden bg-black"
       style={{
-        backgroundImage: 'url("/valentines_day_bg.png")',
-        backgroundSize: '100% 100%',
+        backgroundImage: 'url("/holi-auth.png")',
+        backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
       }}
     >
+      {/* Dynamic Holi Splashes (Reduced opacity since we have a main image) */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[120px] rounded-full animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[20%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse delay-700" />
+      <div className="absolute top-[20%] right-[-10%] w-[30%] h-[30%] bg-yellow-400/10 blur-[100px] rounded-full animate-pulse delay-1000" />
       {/* Subtle darkening only on the right to maintain text contrast */}
       <div className="absolute inset-0 bg-gradient-to-l from-black/40 via-transparent to-transparent pointer-events-none" />
 
@@ -107,9 +111,10 @@ function LoginContent() {
         </div>
 
         <div className="bg-white/5 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 p-10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] relative overflow-hidden">
-          {/* Internal festive glows */}
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500/30 blur-[60px] pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-rose-500/30 blur-[60px] pointer-events-none" />
+          {/* Internal festive glows - Holi themed */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/20 blur-[60px] pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/20 blur-[60px] pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-pink-500/10 blur-[80px] pointer-events-none" />
           {/* Session Expired Warning */}
           {sessionExpired && !deviceLimitData && (
             <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-400 p-4 rounded-lg mb-6">
@@ -215,7 +220,7 @@ function LoginContent() {
 
               <Button
                 type="submit"
-                className="w-full bg-pink-500 hover:bg-pink-600 text-white h-11"
+                className="w-full bg-gradient-to-r from-pink-500 to-blue-500 hover:from-pink-600 hover:to-blue-600 text-white h-11 border-none shadow-[0_0_15px_rgba(236,72,153,0.3)] transition-all duration-300"
                 disabled={loading || !captchaValid}
               >
                 {loading ? (
@@ -236,7 +241,7 @@ function LoginContent() {
                 Don&apos;t have an account?{" "}
                 <Link
                   href="/request-access"
-                  className="text-pink-400 hover:text-pink-300 font-medium"
+                  className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors"
                 >
                   Request Access
                 </Link>
@@ -254,13 +259,12 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div
-        className="min-h-screen relative flex items-center justify-center bg-[#1a0f2e]"
+        className="min-h-screen relative flex items-center justify-center bg-[#0a0515]"
         style={{
-          backgroundImage: 'url("/valentines_day_bg.png")',
-          backgroundSize: '100% 100%',
-          backgroundPosition: 'center'
+          background: 'radial-gradient(circle at center, #1a0f2e 0%, #0a0515 100%)',
         }}
       >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-500/20 blur-[100px]" />
         <div className="absolute inset-0 bg-[#0a0515]/60" />
         <Spinner size="lg" className="relative z-10" />
       </div>

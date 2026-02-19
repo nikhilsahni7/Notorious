@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  PasswordChangeRequest,
-  passwordService,
+    PasswordChangeRequest,
+    passwordService,
 } from "@/services/password.service";
 import { format } from "date-fns";
 import { ArrowLeft, CheckCircle, Clock, Send, XCircle } from "lucide-react";
@@ -94,17 +94,28 @@ export default function PasswordChangePage() {
 
   if (isLoading || loadingRequests) {
     return (
-      <div className="min-h-screen bg-[#2D1B4E] flex items-center justify-center">
-        <Spinner size="lg" />
+      <div className="min-h-screen bg-[#0a0515] flex items-center justify-center">
+        <Spinner size="lg" className="text-pink-500" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#2D1B4E] p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-black p-4 relative overflow-hidden"
+      style={{
+        backgroundImage: 'url("/holi-auth.png")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {/* Holi Background Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/5 blur-[120px] rounded-full" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full" />
+
+      <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4 bg-[#1a0f2e] p-4 rounded-lg border border-gray-700">
+        <div className="flex justify-between items-center mb-4 bg-white/5 backdrop-blur-xl p-4 rounded-xl border border-white/10 shadow-xl">
           <div className="flex items-center gap-4">
             <Button
               onClick={() => router.push("/search")}
@@ -125,7 +136,7 @@ export default function PasswordChangePage() {
         </div>
 
         {/* Request Form */}
-        <div className="bg-[#1a0f2e] p-6 rounded-lg border border-gray-700 mb-4">
+        <div className="bg-white/5 backdrop-blur-xl p-6 rounded-xl border border-white/10 mb-4 shadow-xl">
           <h2 className="text-lg font-semibold text-white mb-4">
             Request Password Change
           </h2>
@@ -159,7 +170,7 @@ export default function PasswordChangePage() {
             <Button
               type="submit"
               disabled={loading || !reason.trim()}
-              className="w-full bg-pink-500 hover:bg-pink-600 text-white"
+              className="w-full bg-gradient-to-r from-pink-500 to-blue-500 hover:from-pink-600 hover:to-blue-600 text-white h-11 border-none shadow-[0_0_15px_rgba(236,72,153,0.3)] transition-all duration-300 font-bold"
             >
               {loading ? (
                 <>
@@ -177,8 +188,8 @@ export default function PasswordChangePage() {
         </div>
 
         {/* Request History */}
-        <div className="bg-[#1a0f2e] rounded-lg border border-gray-700">
-          <div className="p-4 border-b border-gray-700">
+        <div className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 shadow-xl overflow-hidden">
+          <div className="p-4 border-b border-white/10">
             <h2 className="text-lg font-semibold text-white">
               Your Password Change Requests
             </h2>
@@ -196,7 +207,7 @@ export default function PasswordChangePage() {
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-700">
+            <div className="divide-y divide-white/10">
               {requests.map((request) => (
                 <div
                   key={request.id}

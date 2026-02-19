@@ -2,7 +2,7 @@
 
 import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
-import { Heart } from "lucide-react";
+import { Palette } from "lucide-react";
 import React, { useEffect } from "react";
 
 export const triggerFestiveBlast = () => {
@@ -21,18 +21,18 @@ export const triggerFestiveBlast = () => {
     }
 
     const particleCount = 50 * (timeLeft / duration);
-    // Valentine's Day — reds, pinks, whites
+    // Holi — vibrant multi-colors
     confetti({
       ...defaults,
       particleCount,
       origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-      colors: ["#E11D48", "#FB7185", "#FFFFFF", "#FDA4AF"],
+      colors: ["#FF1493", "#FFFF00", "#00BFFF", "#FF8C00", "#32CD32"],
     });
     confetti({
       ...defaults,
       particleCount,
       origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-      colors: ["#E11D48", "#FB7185", "#FFFFFF", "#FDA4AF"],
+      colors: ["#FF1493", "#FFFF00", "#00BFFF", "#FF8C00", "#32CD32"],
     });
   }, 250);
 };
@@ -42,11 +42,11 @@ export const triggerFestiveQuickBlast = () => {
     particleCount: 150,
     spread: 70,
     origin: { y: 0.6 },
-    colors: ["#E11D48", "#FB7185", "#FFFFFF", "#FDA4AF", "#FF1493"],
+    colors: ["#FF1493", "#FFFF00", "#00BFFF", "#FF8C00", "#32CD32"],
     ticks: 200,
     gravity: 1.2,
     scalar: 1.2,
-    shapes: ["star", "circle"],
+    shapes: ["circle"],
   });
 };
 
@@ -71,57 +71,70 @@ const FloatingElement = ({ children, delay = 0, duration = 4 }: { children: Reac
 
 export const FestiveHeader = () => {
   return (
-    <div className="hidden lg:flex items-center px-8 py-2.5 bg-gradient-to-r from-rose-600/20 via-pink-400/10 to-red-600/20 rounded-2xl border border-white/10 mx-6 flex-1 justify-center max-w-lg shadow-[0_0_30px_rgba(225,29,72,0.25)] relative overflow-hidden group">
-      {/* Animated background glow - Valentine themed */}
+    <div
+      className="hidden lg:flex items-center px-10 py-3 rounded-2xl border border-white/20 mx-6 flex-1 justify-center max-w-xl shadow-[0_0_40px_rgba(255,20,147,0.3)] relative overflow-hidden group transition-all duration-500 hover:shadow-[0_0_50px_rgba(255,20,147,0.5)]"
+      style={{
+        backgroundImage: 'url("/holi-header.png")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      {/* Dark overlay for better readability */}
+      <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-500" />
+
+      {/* Animated light sweep */}
       <motion.div
         animate={{
-          opacity: [0.1, 0.2, 0.1],
-          scale: [1, 1.1, 1],
+          x: ["-100%", "200%"],
         }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-0 bg-gradient-to-r from-rose-500/10 via-pink-300/5 to-red-500/10 pointer-events-none"
+        transition={{
+          duration: 3,
+          repeat: Infinity,
+          ease: "linear",
+          delay: 1
+        }}
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none"
       />
 
-      <div className="flex items-center gap-6 relative z-10">
+      <div className="flex items-center gap-8 relative z-10">
         <motion.div
-          animate={{ rotate: [-10, 10, -10], scale: [1, 1.2, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          animate={{ rotate: [-20, 20, -20], scale: [1, 1.2, 1] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          className="bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-lg"
         >
-          <Heart size={24} fill="#FB7185" className="text-rose-400 drop-shadow-[0_0_10px_rgba(251,113,133,0.8)]" />
+          <Palette size={22} className="text-pink-400 drop-shadow-[0_0_8px_rgba(255,20,147,0.8)]" />
         </motion.div>
 
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-6 py-2 rounded-xl border border-white/10">
           <motion.div
             initial={{ y: -5, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="flex items-center gap-3"
+            className="flex items-center"
           >
-            <span className="text-base font-black text-white tracking-[0.3em] uppercase drop-shadow-md">
-              Happy Valentine's Day
+            <span className="text-lg font-black text-white tracking-[0.4em] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              Happy Holi
             </span>
           </motion.div>
 
-          <div className="h-[1.5px] w-full bg-gradient-to-r from-rose-500 via-pink-300 to-red-500 my-1.5 opacity-60" />
+          <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-pink-500 via-yellow-400 via-blue-500 to-transparent my-1.5 opacity-80" />
 
           <motion.span
-            animate={{ opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="text-[10px] text-white/80 font-black uppercase tracking-[0.4em]"
+            animate={{ opacity: [0.7, 1, 0.7], y: [0, -1, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity }}
+            className="text-[11px] text-white/90 font-black uppercase tracking-[0.5em] space-x-1"
           >
-            Spread Love & Joy 💕
+            Celebrate with Colors 🌈
           </motion.span>
         </div>
 
         <motion.div
-          animate={{ rotate: [10, -10, 10], scale: [1, 1.2, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          animate={{ rotate: [20, -20, 20], scale: [1, 1.2, 1] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          className="bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-lg"
         >
-          <Heart size={24} fill="#FB7185" className="text-rose-400 drop-shadow-[0_0_10px_rgba(251,113,133,0.8)]" />
+          <Palette size={22} className="text-blue-400 drop-shadow-[0_0_8px_rgba(0,191,255,0.8)]" />
         </motion.div>
       </div>
-
-      {/* Shimmer effect on hover */}
-      <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-pink-200/20 to-transparent" />
     </div>
   );
 };
