@@ -1,5 +1,6 @@
 "use client";
 
+import { ChatNotificationBadge } from "@/components/chat/ChatNotificationBadge";
 import { FestiveHeader, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
 import { Pagination } from "@/components/Pagination";
 import { RefineSearch } from "@/components/RefineSearch";
@@ -12,24 +13,24 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSearch } from "@/hooks/useSearch";
 import { searchService } from "@/services/search.service";
 import {
-  Person,
-  Refinement,
-  SearchFields,
-  SearchOperator,
+    Person,
+    Refinement,
+    SearchFields,
+    SearchOperator,
 } from "@/types/person";
 import {
-  copyToClipboard,
-  formatPersonForClipboard,
-  formatPersonsForClipboard,
+    copyToClipboard,
+    formatPersonForClipboard,
+    formatPersonsForClipboard,
 } from "@/utils/clipboard";
 import {
-  AlertCircle,
-  Download,
-  History,
-  LogOut,
-  RotateCcw,
-  Search as SearchIcon,
-  User,
+    AlertCircle,
+    Download,
+    History,
+    LogOut,
+    RotateCcw,
+    Search as SearchIcon,
+    User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -437,6 +438,12 @@ export default function SearchPage() {
               <Download className="h-4 w-4" />
               <span className="hidden md:inline ml-1">Export</span>
             </Button>
+
+            <ChatNotificationBadge
+              href="/chat"
+              size="sm"
+              className="h-8 px-2"
+            />
 
             {user?.role === "admin" && (
               <Button

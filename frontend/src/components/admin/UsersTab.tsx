@@ -3,19 +3,20 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, User } from "@/services/admin.service";
 import {
-  CheckSquare,
-  Download,
-  Edit,
-  History,
-  Key,
-  Plus,
-  Power,
-  Smartphone,
-  Square,
-  Trash2,
-  UserCheck,
-  UserX,
-  X
+    CheckSquare,
+    Download,
+    Edit,
+    History,
+    Key,
+    MessageCircle,
+    Plus,
+    Power,
+    Smartphone,
+    Square,
+    Trash2,
+    UserCheck,
+    UserX,
+    X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -444,6 +445,16 @@ export function UsersTab({ token }: UsersTabProps) {
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/admin/chat?user=${user.id}`);
+                        }}
+                        className="text-indigo-400 hover:text-indigo-300 transition-colors"
+                        title="Send message"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
