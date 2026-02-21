@@ -56,6 +56,17 @@ CREATE INDEX IF NOT EXISTS idx_chat_broadcasts_sent_at ON chat_broadcasts(sent_a
 CREATE SEQUENCE IF NOT EXISTS chat_message_seq;
 
 -- FK for last_message_id (added after messages table exists)
-ALTER TABLE chat_conversations
-    ADD CONSTRAINT fk_last_message
-    FOREIGN KEY (last_message_id) REFERENCES chat_messages(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_schema = 'public'
+          AND table_name = 'chat_conversations'
+          AND constraint_name = 'fk_last_message'
+    ) THEN
+        ALTER TABLE chat_conversations
+            ADD CONSTRAINT fk_last_message
+            FOREIGN KEY (last_message_id) REFERENCES chat_messages(id) ON DELETE SET NULL;
+    END IF;
+END $$;
