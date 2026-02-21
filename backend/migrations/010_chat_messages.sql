@@ -45,12 +45,12 @@ CREATE TABLE IF NOT EXISTS chat_broadcast_reads (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_chat_messages_conversation ON chat_messages(conversation_id, sequence_num DESC);
-CREATE INDEX idx_chat_messages_receiver_unread ON chat_messages(receiver_id, status) WHERE status != 'read';
-CREATE INDEX idx_chat_messages_sent_at ON chat_messages(sent_at);
-CREATE INDEX idx_chat_conversations_participants ON chat_conversations(participant_a, participant_b);
-CREATE INDEX idx_chat_conversations_last_msg ON chat_conversations(last_message_at DESC);
-CREATE INDEX idx_chat_broadcasts_sent_at ON chat_broadcasts(sent_at);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages(conversation_id, sequence_num DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_receiver_unread ON chat_messages(receiver_id, status) WHERE status != 'read';
+CREATE INDEX IF NOT EXISTS idx_chat_messages_sent_at ON chat_messages(sent_at);
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_participants ON chat_conversations(participant_a, participant_b);
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_last_msg ON chat_conversations(last_message_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_broadcasts_sent_at ON chat_broadcasts(sent_at);
 
 -- Sequence for server-assigned message ordering
 CREATE SEQUENCE IF NOT EXISTS chat_message_seq;
