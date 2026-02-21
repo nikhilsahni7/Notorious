@@ -224,7 +224,7 @@ func (h *Hub) deliverPendingMessages(client *Client) {
 		}
 	}
 }
-
+//new 
 // HandleUpgrade handles the WebSocket upgrade request with JWT authentication.
 func (h *Hub) HandleUpgrade(c *gin.Context) {
 	// Get token from query parameter (WebSocket can't set headers)
