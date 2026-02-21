@@ -57,12 +57,12 @@ jobs:
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             OPENSEARCH_ENDPOINT=${{ secrets.OPENSEARCH_ENDPOINT }}
             OPENSEARCH_INDEX=${{ secrets.OPENSEARCH_INDEX }}
-            OPENSEARCH_INDICES='${{ secrets.OPENSEARCH_INDICES }}'
+            OPENSEARCH_INDICES=${{ secrets.OPENSEARCH_INDICES }}
             S3_UPLOAD_BUCKET=${{ secrets.S3_UPLOAD_BUCKET }}
             S3_UPLOAD_PREFIX=${{ secrets.S3_UPLOAD_PREFIX }}
             OPENSEARCH_MASTER_USER=${{ secrets.OPENSEARCH_MASTER_USER }}
             OPENSEARCH_MASTER_PASSWORD=${{ secrets.OPENSEARCH_MASTER_PASSWORD }}
-            DATABASE_URL='${{ secrets.DATABASE_URL }}'
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             INGEST_BATCH_SIZE=${{ secrets.INGEST_BATCH_SIZE }}
             INGEST_WORKER_MULTIPLIER=${{ secrets.INGEST_WORKER_MULTIPLIER }}
