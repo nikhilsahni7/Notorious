@@ -49,25 +49,34 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("AUTH_LOGIN: bind failed ip=%s ua=%q err=%v", utils.GetClientIP(c.Request), c.Request.UserAgent(), err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "email and password are required"})
 		return
 	}
 
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	log.Printf("AUTH_LOGIN: attempt email=%s ip=%s", req.Email, utils.GetClientIP(c.Request))
+
 	user, err := h.userRepo.GetByEmail(c.Request.Context(), req.Email)
 	if err != nil {
+		log.Printf("AUTH_LOGIN: user lookup failed email=%s err=%v", req.Email, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
 	if !user.IsActive {
+		log.Printf("AUTH_LOGIN: inactive account email=%s user_id=%s", req.Email, user.ID)
 		c.JSON(http.StatusForbidden, gin.H{"error": "account is inactive"})
 		return
 	}
 
 	if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
+		log.Printf("AUTH_LOGIN: password mismatch email=%s user_id=%s hash_prefix=%s hash_len=%d err=%v", req.Email, user.ID, prefix(user.PasswordHash, 4), len(user.PasswordHash), err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
+
+	log.Printf("AUTH_LOGIN: password verified email=%s user_id=%s role=%s", req.Email, user.ID, user.Role)
 
 	// Device Limit Check (Skip for Admins)
 	if user.Role != models.RoleAdmin && h.sessionRepo != nil {
@@ -94,6 +103,7 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 
 	token, err := h.jwtManager.Generate(user.ID, user.Email, string(user.Role))
 	if err != nil {
+		log.Printf("AUTH_LOGIN: token generation failed email=%s user_id=%s err=%v", req.Email, user.ID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
@@ -255,17 +265,22 @@ func (h *AuthGinHandler) RevokeSession(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("AUTH_REVOKE: bind failed ip=%s err=%v", utils.GetClientIP(c.Request), err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "email, password, and session_id are required"})
 		return
 	}
 
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+
 	user, err := h.userRepo.GetByEmail(c.Request.Context(), req.Email)
 	if err != nil {
+		log.Printf("AUTH_REVOKE: user lookup failed email=%s err=%v", req.Email, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
 	if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
+		log.Printf("AUTH_REVOKE: password mismatch email=%s user_id=%s hash_prefix=%s hash_len=%d err=%v", req.Email, user.ID, prefix(user.PasswordHash, 4), len(user.PasswordHash), err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
@@ -326,4 +341,14 @@ func (h *AuthGinHandler) Logout(c *gin.Context) {
 	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
+}
+
+func prefix(s string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
