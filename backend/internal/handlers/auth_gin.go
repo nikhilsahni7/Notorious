@@ -71,9 +71,13 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 	}
 
 	if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
-		log.Printf("AUTH_LOGIN: password mismatch email=%s user_id=%s hash_prefix=%s hash_len=%d err=%v", req.Email, user.ID, prefix(user.PasswordHash, 4), len(user.PasswordHash), err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
+		trimmedPassword := strings.TrimSpace(req.Password)
+		if trimmedPassword == req.Password || auth.CheckPassword(user.PasswordHash, trimmedPassword) != nil {
+			log.Printf("AUTH_LOGIN: password mismatch email=%s user_id=%s hash_prefix=%s hash_len=%d err=%v", req.Email, user.ID, prefix(user.PasswordHash, 4), len(user.PasswordHash), err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			return
+		}
+		log.Printf("AUTH_LOGIN: password verified after trim email=%s user_id=%s", req.Email, user.ID)
 	}
 
 	log.Printf("AUTH_LOGIN: password verified email=%s user_id=%s role=%s", req.Email, user.ID, user.Role)
@@ -280,9 +284,13 @@ func (h *AuthGinHandler) RevokeSession(c *gin.Context) {
 	}
 
 	if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
-		log.Printf("AUTH_REVOKE: password mismatch email=%s user_id=%s hash_prefix=%s hash_len=%d err=%v", req.Email, user.ID, prefix(user.PasswordHash, 4), len(user.PasswordHash), err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
+		trimmedPassword := strings.TrimSpace(req.Password)
+		if trimmedPassword == req.Password || auth.CheckPassword(user.PasswordHash, trimmedPassword) != nil {
+			log.Printf("AUTH_REVOKE: password mismatch email=%s user_id=%s hash_prefix=%s hash_len=%d err=%v", req.Email, user.ID, prefix(user.PasswordHash, 4), len(user.PasswordHash), err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			return
+		}
+		log.Printf("AUTH_REVOKE: password verified after trim email=%s user_id=%s", req.Email, user.ID)
 	}
 
 	sessionID, err := uuid.Parse(req.SessionID)

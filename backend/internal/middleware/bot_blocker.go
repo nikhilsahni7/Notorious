@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -38,6 +39,7 @@ func BotBlocker() gin.HandlerFunc {
 		// Check for blocked agents
 		for _, blocked := range blockedAgents {
 			if strings.Contains(userAgent, blocked) {
+				log.Printf("BOT_BLOCKER: blocked path=%s ip=%s ua=%q matched=%s", c.Request.URL.Path, c.ClientIP(), c.GetHeader("User-Agent"), blocked)
 				c.JSON(http.StatusForbidden, gin.H{
 					"error": "automated access is not permitted",
 				})
