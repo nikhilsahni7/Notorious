@@ -209,6 +209,9 @@ func (h *AuthGinHandler) RequestAccess(c *gin.Context) {
 		return
 	}
 
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Phone = strings.TrimSpace(req.Phone)
+
 	userRequest := &models.UserRequest{
 		Email:                   req.Email,
 		Name:                    req.Name,

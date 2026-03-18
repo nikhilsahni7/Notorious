@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"notorious-backend/internal/database"
@@ -21,6 +22,9 @@ func NewUserRepository(db *database.DB) *UserRepository {
 }
 
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
+	normalizedEmail := strings.ToLower(strings.TrimSpace(user.Email))
+	normalizedPhone := strings.TrimSpace(user.Phone)
+
 	query := `
 		INSERT INTO users (email, password_hash, name, phone, role, region, daily_search_limit, is_active, device_limit)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -28,10 +32,10 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	`
 
 	return r.db.Pool.QueryRow(ctx, query,
-		user.Email,
+		normalizedEmail,
 		user.PasswordHash,
 		user.Name,
-		user.Phone,
+		normalizedPhone,
 		user.Role,
 		user.Region,
 		user.DailySearchLimit,
@@ -48,7 +52,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 		       COALESCE(last_search_query, '') as last_search_query,
 		       COALESCE(region, 'pan-india') as region, device_limit
 		FROM users
-		WHERE email = $1
+		WHERE lower(trim(email)) = lower(trim($1))
 	`
 
 	err := r.db.Pool.QueryRow(ctx, query, email).Scan(

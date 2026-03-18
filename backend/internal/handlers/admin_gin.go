@@ -65,6 +65,9 @@ func (h *AdminGinHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Phone = strings.TrimSpace(req.Phone)
+
 	// SECURITY: Validate daily search limit has a maximum
 	if req.DailySearchLimit > maxDailySearchLimit {
 		c.JSON(http.StatusBadRequest, gin.H{
