@@ -29,8 +29,6 @@ type OpenSearchService struct {
 	cfg    *config.Config
 }
 
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 type Document struct {
 	Mobile             string `json:"mobile"`
 	Name               string `json:"name"`
@@ -269,7 +267,8 @@ func (s *OpenSearchService) inspectBulkErrors(resp *opensearchapi.BulkResp) erro
 
 func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Document {
 	// Generate random year of registration
-	year := 2022 + seededRand.Intn(3) // 2022, 2023, or 2024
+	// Use package-level rand.Intn, which is safe for concurrent use.
+	year := 2022 + rand.Intn(3) // 2022, 2023, or 2024
 
 	doc := Document{
 		YearOfRegistration: year,
