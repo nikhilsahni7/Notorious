@@ -43,7 +43,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
 	query := `
-		SELECT id, email, password_hash, name, phone, role, daily_search_limit,
+		SELECT id, email, password_hash, name, COALESCE(phone, '') as phone, role, daily_search_limit,
 		       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 		       COALESCE(last_search_query, '') as last_search_query,
 		       COALESCE(region, 'pan-india') as region, device_limit
@@ -79,7 +79,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	var user models.User
 	query := `
-		SELECT id, email, password_hash, name, phone, role, daily_search_limit,
+		SELECT id, email, password_hash, name, COALESCE(phone, '') as phone, role, daily_search_limit,
 		       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 		       COALESCE(last_search_query, '') as last_search_query,
 		       COALESCE(region, 'pan-india') as region, device_limit
@@ -153,7 +153,7 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 
 	if role != "" {
 		query = `
-			SELECT id, email, password_hash, name, phone, role, daily_search_limit,
+			SELECT id, email, password_hash, name, COALESCE(phone, '') as phone, role, daily_search_limit,
 			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 			       COALESCE(last_search_query, '') as last_search_query,
 			       COALESCE(region, 'pan-india') as region,
@@ -166,7 +166,7 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 		args = []interface{}{role, limit, offset}
 	} else {
 		query = `
-			SELECT id, email, password_hash, name, phone, role, daily_search_limit,
+			SELECT id, email, password_hash, name, COALESCE(phone, '') as phone, role, daily_search_limit,
 			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 			       COALESCE(last_search_query, '') as last_search_query,
 			       COALESCE(region, 'pan-india') as region,
