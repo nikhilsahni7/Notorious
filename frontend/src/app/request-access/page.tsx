@@ -28,7 +28,9 @@ export default function RequestAccessPage() {
 
       await authService.requestAccess({
         ...formData,
-        requested_searches_per_day: parseInt(formData.requested_searches_per_day),
+        requested_searches_per_day: parseInt(
+          formData.requested_searches_per_day,
+        ),
       });
 
       setSuccess(true);
@@ -43,15 +45,18 @@ export default function RequestAccessPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-[#0a0515] flex items-center justify-center p-6 relative overflow-hidden">
-        {/* Holi Background Elements */}
+        {/* Navratri background elements */}
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
 
         <div className="w-full max-w-md relative z-10">
           <div className="bg-green-500/10 border border-green-500 p-8 rounded-lg text-center">
-            <h2 className="text-2xl font-bold text-green-400 mb-4">Request Submitted!</h2>
+            <h2 className="text-2xl font-bold text-green-400 mb-4">
+              Request Submitted!
+            </h2>
             <p className="text-gray-300 mb-4">
-              Your access request has been submitted successfully. An administrator will review your request and contact you via email.
+              Your access request has been submitted successfully. An
+              administrator will review your request and contact you via email.
             </p>
             <p className="text-gray-400 text-sm">
               Redirecting to login page...
@@ -63,15 +68,16 @@ export default function RequestAccessPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden"
+    <div
+      className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden"
       style={{
-        backgroundImage: 'url("/holi-auth.png")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
+        backgroundImage: 'url("/navratri3.png")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
       }}
     >
-      {/* Holi Background Elements */}
+      {/* Navratri background elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/5 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full" />
 
@@ -94,7 +100,9 @@ export default function RequestAccessPage() {
               </label>
               <Input
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="John Doe"
                 className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-400"
                 required
@@ -108,7 +116,9 @@ export default function RequestAccessPage() {
               <Input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
                 placeholder="john@example.com"
                 className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-400"
                 required
@@ -122,7 +132,9 @@ export default function RequestAccessPage() {
               <Input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
                 placeholder="+91 98765 43210"
                 className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-400"
                 required
@@ -136,7 +148,12 @@ export default function RequestAccessPage() {
               <Input
                 type="number"
                 value={formData.requested_searches_per_day}
-                onChange={(e) => setFormData({ ...formData, requested_searches_per_day: e.target.value })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    requested_searches_per_day: e.target.value,
+                  })
+                }
                 min="1"
                 max="10000"
                 className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-400"
@@ -172,7 +189,10 @@ export default function RequestAccessPage() {
           <div className="mt-8 text-center pt-6 border-t border-white/10">
             <p className="text-white/60 text-sm font-medium">
               Already have an account?{" "}
-              <a href="/login" className="text-yellow-400 hover:text-yellow-300 font-bold transition-colors">
+              <a
+                href="/login"
+                className="text-yellow-400 hover:text-yellow-300 font-bold transition-colors"
+              >
                 Sign in
               </a>
             </p>

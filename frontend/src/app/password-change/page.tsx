@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-    PasswordChangeRequest,
-    passwordService,
+  PasswordChangeRequest,
+  passwordService,
 } from "@/services/password.service";
 import { format } from "date-fns";
 import { ArrowLeft, CheckCircle, Clock, Send, XCircle } from "lucide-react";
@@ -101,15 +101,16 @@ export default function PasswordChangePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black p-4 relative overflow-hidden"
+    <div
+      className="min-h-screen bg-black p-4 relative overflow-hidden"
       style={{
-        backgroundImage: 'url("/holi-auth.png")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
+        backgroundImage: 'url("/navratri3.png")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
       }}
     >
-      {/* Holi Background Elements */}
+      {/* Navratri background elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/5 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full" />
 

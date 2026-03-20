@@ -21,7 +21,7 @@ export const triggerFestiveBlast = () => {
     }
 
     const particleCount = 50 * (timeLeft / duration);
-    // Holi — vibrant multi-colors
+    // Navratri celebration colors
     confetti({
       ...defaults,
       particleCount,
@@ -50,19 +50,27 @@ export const triggerFestiveQuickBlast = () => {
   });
 };
 
-const FloatingElement = ({ children, delay = 0, duration = 4 }: { children: React.ReactNode, delay?: number, duration?: number }) => (
+const FloatingElement = ({
+  children,
+  delay = 0,
+  duration = 4,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  duration?: number;
+}) => (
   <motion.div
     initial={{ y: 0, opacity: 0 }}
     animate={{
       y: [0, -20, 0],
       opacity: [0.4, 0.8, 0.4],
-      rotate: [0, 10, -10, 0]
+      rotate: [0, 10, -10, 0],
     }}
     transition={{
       duration,
       repeat: Infinity,
       delay,
-      ease: "easeInOut"
+      ease: "easeInOut",
     }}
   >
     {children}
@@ -74,9 +82,9 @@ export const FestiveHeader = () => {
     <div
       className="hidden lg:flex items-center px-10 py-3 rounded-2xl border border-white/20 mx-6 flex-1 justify-center max-w-xl shadow-[0_0_40px_rgba(255,20,147,0.3)] relative overflow-hidden group transition-all duration-500 hover:shadow-[0_0_50px_rgba(255,20,147,0.5)]"
       style={{
-        backgroundImage: 'url("/holi-header.png")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundImage: 'url("/navratri3.png")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
       }}
     >
       {/* Dark overlay for better readability */}
@@ -91,7 +99,7 @@ export const FestiveHeader = () => {
           duration: 3,
           repeat: Infinity,
           ease: "linear",
-          delay: 1
+          delay: 1,
         }}
         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none"
       />
@@ -102,7 +110,10 @@ export const FestiveHeader = () => {
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           className="bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-lg"
         >
-          <Palette size={22} className="text-pink-400 drop-shadow-[0_0_8px_rgba(255,20,147,0.8)]" />
+          <Palette
+            size={22}
+            className="text-pink-400 drop-shadow-[0_0_8px_rgba(255,20,147,0.8)]"
+          />
         </motion.div>
 
         <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-6 py-2 rounded-xl border border-white/10">
@@ -112,18 +123,18 @@ export const FestiveHeader = () => {
             className="flex items-center"
           >
             <span className="text-lg font-black text-white tracking-[0.4em] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              Happy Holi
+              Happy Navratri
             </span>
           </motion.div>
 
-          <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-pink-500 via-yellow-400 via-blue-500 to-transparent my-1.5 opacity-80" />
+          <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent my-1.5 opacity-80" />
 
           <motion.span
             animate={{ opacity: [0.7, 1, 0.7], y: [0, -1, 0] }}
             transition={{ duration: 2.5, repeat: Infinity }}
             className="text-[11px] text-white/90 font-black uppercase tracking-[0.5em] space-x-1"
           >
-            Celebrate with Colors 🌈
+            Celebrate with Devotion
           </motion.span>
         </div>
 
@@ -132,7 +143,10 @@ export const FestiveHeader = () => {
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           className="bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-lg"
         >
-          <Palette size={22} className="text-blue-400 drop-shadow-[0_0_8px_rgba(0,191,255,0.8)]" />
+          <Palette
+            size={22}
+            className="text-blue-400 drop-shadow-[0_0_8px_rgba(0,191,255,0.8)]"
+          />
         </motion.div>
       </div>
     </div>
@@ -143,7 +157,7 @@ export const FestiveCelebration = () => {
   useEffect(() => {
     // Auto blast on mount for festive feel
     const blastTimer = setTimeout(() => {
-        triggerFestiveQuickBlast();
+      triggerFestiveQuickBlast();
     }, 1500);
 
     return () => clearTimeout(blastTimer);

@@ -89,13 +89,13 @@ function LoginContent() {
     <div
       className="min-h-screen relative flex items-center justify-end md:pr-[5%] p-4 overflow-hidden bg-black"
       style={{
-        backgroundImage: 'url("/holi-auth.png")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
+        backgroundImage: 'url("/navratri3.png")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
       }}
     >
-      {/* Dynamic Holi Splashes (Reduced opacity since we have a main image) */}
+      {/* Dynamic Navratri splashes (reduced opacity since we have a main image) */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[120px] rounded-full animate-pulse" />
       <div className="absolute bottom-[-10%] right-[20%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse delay-700" />
       <div className="absolute top-[20%] right-[-10%] w-[30%] h-[30%] bg-yellow-400/10 blur-[100px] rounded-full animate-pulse delay-1000" />
@@ -104,14 +104,16 @@ function LoginContent() {
 
       <div className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-right-10 duration-1000">
         <div className="text-center mb-10 relative">
-          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">Welcome</h1>
+          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">
+            Welcome
+          </h1>
           <p className="text-white/60 font-medium text-sm tracking-wide">
             Sign in to access your search dashboard
           </p>
         </div>
 
         <div className="bg-white/5 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 p-10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] relative overflow-hidden">
-          {/* Internal festive glows - Holi themed */}
+          {/* Internal festive glows - Navratri themed */}
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/20 blur-[60px] pointer-events-none" />
           <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/20 blur-[60px] pointer-events-none" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-pink-500/10 blur-[80px] pointer-events-none" />
@@ -257,18 +259,21 @@ function LoginContent() {
 // Default export with Suspense boundary for useSearchParams
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div
-        className="min-h-screen relative flex items-center justify-center bg-[#0a0515]"
-        style={{
-          background: 'radial-gradient(circle at center, #1a0f2e 0%, #0a0515 100%)',
-        }}
-      >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-500/20 blur-[100px]" />
-        <div className="absolute inset-0 bg-[#0a0515]/60" />
-        <Spinner size="lg" className="relative z-10" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div
+          className="min-h-screen relative flex items-center justify-center bg-[#0a0515]"
+          style={{
+            background:
+              "radial-gradient(circle at center, #1a0f2e 0%, #0a0515 100%)",
+          }}
+        >
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-500/20 blur-[100px]" />
+          <div className="absolute inset-0 bg-[#0a0515]/60" />
+          <Spinner size="lg" className="relative z-10" />
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   );
