@@ -99,6 +99,9 @@ func main() {
 
 	r := gin.Default()
 
+
+	//new code migration for delhi-ncr data 
+
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001",
 			"https://knotorious.us", "https://notorious-sigma.vercel.app",
