@@ -99,8 +99,7 @@ func main() {
 
 	r := gin.Default()
 
-
-	//new code migration for delhi-ncr data 
+	// CORS configuration - allow frontend origins and common headers
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001",
