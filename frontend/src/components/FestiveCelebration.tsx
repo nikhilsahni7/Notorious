@@ -82,7 +82,7 @@ export const FestiveHeader = () => {
     <div
       className="hidden lg:flex items-center px-10 py-3 rounded-2xl border border-white/20 mx-6 flex-1 justify-center max-w-xl shadow-[0_0_40px_rgba(255,20,147,0.3)] relative overflow-hidden group transition-all duration-500 hover:shadow-[0_0_50px_rgba(255,20,147,0.5)]"
       style={{
-        backgroundImage: 'url("/navratri3.png")',
+        backgroundImage: 'url("/third_eye_emblem.png")',
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
@@ -123,7 +123,7 @@ export const FestiveHeader = () => {
             className="flex items-center"
           >
             <span className="text-lg font-black text-white tracking-[0.4em] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              Happy Navratri
+              Third Eye Vision
             </span>
           </motion.div>
 
@@ -134,7 +134,7 @@ export const FestiveHeader = () => {
             transition={{ duration: 2.5, repeat: Infinity }}
             className="text-[11px] text-white/90 font-black uppercase tracking-[0.5em] space-x-1"
           >
-            Celebrate with Devotion
+            See the solution. Let&apos;s build.
           </motion.span>
         </div>
 

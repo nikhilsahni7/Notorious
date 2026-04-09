@@ -28,7 +28,7 @@ export default function RequestAccessPage() {
 
       await authService.requestAccess({
         ...formData,
-        requested_searches_per_day: parseInt(
+        requested_searches_per_day: Number.parseInt(
           formData.requested_searches_per_day,
         ),
       });
@@ -71,7 +71,7 @@ export default function RequestAccessPage() {
     <div
       className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden"
       style={{
-        backgroundImage: 'url("/navratri3.png")',
+        backgroundImage: 'url("/third_eye_emblem.png")',
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",

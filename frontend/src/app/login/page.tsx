@@ -86,23 +86,33 @@ function LoginContent() {
   };
 
   return (
-    <div
-      className="min-h-screen relative flex items-center justify-end md:pr-[5%] p-4 overflow-hidden bg-black"
-      style={{
-        backgroundImage: 'url("/navratri3.png")',
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundAttachment: "fixed",
-      }}
-    >
-      {/* Dynamic Navratri splashes (reduced opacity since we have a main image) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[120px] rounded-full animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[20%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse delay-700" />
-      <div className="absolute top-[20%] right-[-10%] w-[30%] h-[30%] bg-yellow-400/10 blur-[100px] rounded-full animate-pulse delay-1000" />
-      {/* Subtle darkening only on the right to maintain text contrast */}
-      <div className="absolute inset-0 bg-gradient-to-l from-black/40 via-transparent to-transparent pointer-events-none" />
+    <div className="min-h-screen bg-[#05070d] p-3 md:p-5 overflow-hidden">
+      <div
+        className="relative h-[calc(100vh-1.5rem)] md:h-[calc(100vh-2.5rem)] rounded-2xl border border-cyan-300/25 shadow-[0_0_40px_rgba(34,211,238,0.18)] overflow-hidden"
+        style={{
+          backgroundImage: 'url("/third_eye_login_hero.png")',
+          backgroundSize: "112% auto",
+          backgroundPosition: "34% center",
+          backgroundRepeat: "no-repeat",
+          backgroundColor: "#070d1d",
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-[#080e1f]/40 via-[#070c1a]/20 to-[#050812]/78 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_30%,rgba(56,189,248,0.18),transparent_45%),radial-gradient(circle_at_8%_10%,rgba(236,72,153,0.12),transparent_30%)] pointer-events-none" />
 
-      <div className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-right-10 duration-1000">
+        <div className="absolute left-[6%] md:left-[10%] top-[67%] md:top-[69%] -translate-y-1/2 z-10 w-[min(88vw,38rem)] md:w-[min(46vw,40rem)]">
+          <p className="text-white text-center font-black leading-[1.12] text-[clamp(1.25rem,2.35vw,2.35rem)] drop-shadow-[0_6px_18px_rgba(0,0,0,0.9)]">
+            Two eyes see the problem.
+            <br />
+            The Third Eye sees the solution. Let&apos;s build.
+          </p>
+          <p className="mt-2.5 text-center text-white/70 text-[0.82rem] md:text-[0.95rem] font-medium drop-shadow-[0_3px_12px_rgba(0,0,0,0.9)]">
+            Third Eye is not just a project. It&apos;s our unfair advantage.
+          </p>
+        </div>
+
+        <div className="w-full h-full flex items-center justify-end px-4 md:px-10">
+          <div className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-right-10 duration-1000">
         <div className="text-center mb-10 relative">
           <h1 className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">
             Welcome
@@ -250,6 +260,8 @@ function LoginContent() {
               </p>
             </div>
           )}
+        </div>
+          </div>
         </div>
       </div>
     </div>

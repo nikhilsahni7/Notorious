@@ -104,7 +104,7 @@ export default function PasswordChangePage() {
     <div
       className="min-h-screen bg-black p-4 relative overflow-hidden"
       style={{
-        backgroundImage: 'url("/navratri3.png")',
+        backgroundImage: 'url("/third_eye_emblem.png")',
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",
