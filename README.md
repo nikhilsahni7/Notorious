@@ -1,390 +1,311 @@
-# 🔍 Notorious Search - Complete Implementation
+# Notorious Search Platform
 
-A production-ready search system with authentication, role-based access, search limits, and comprehensive admin dashboard.
+Notorious is an internal, production-grade search platform built for teams that need fast discovery over large datasets with strong access control and auditability.
 
-## 🎯 Features
+The system is designed to handle high-volume search traffic on top of a 500GB+ OpenSearch data layer, while PostgreSQL manages application state, user controls, sessions, and operational metadata.
 
-### ✅ Authentication & Authorization
+## What Problem This Solves
 
-- JWT-based authentication (24-hour tokens)
-- Role-based access (Admin/User)
-- Bcrypt password hashing
-- Protected routes with auto-redirect
+Teams often face the same challenges when running internal search tools:
 
-### ✅ Search System
+- Data is large and distributed, so lookups become slow or inconsistent.
+- Access is hard to govern across different user roles.
+- Search usage needs limits, monitoring, and accountability.
+- Admins need tooling to manage users and requests without direct database intervention.
 
-- OpenSearch integration (500GB+ data)
-- Daily search limits per user
-- Smart counting (only results > 0)
-- Search history tracking
-- IST timezone support (auto-reset at 12 AM IST)
-- Real-time limit tracking
+Notorious solves this with a single platform that combines search performance, role-aware workflows, usage governance, and complete audit visibility.
 
-### ✅ Admin Dashboard
+## Core Capabilities
 
-- **Dashboard Tab** - System overview & statistics
-- **Users Tab** - Create, update, delete users
-- **Requests Tab** - Approve/reject access requests
-- **Search History Tab** - Monitor all searches
+### Search at Scale
 
-### ✅ User Management
+- OpenSearch-backed querying over 500GB+ indexed data.
+- Supports logical operators and query refinement flows.
+- Smart search counting (usage increments only on successful result returns).
+- Suggest and refine endpoints for faster query iteration.
+- Export support for end-of-day reporting workflows.
 
-- Create users with custom limits
-- Update user details & limits
-- Activate/deactivate accounts
-- Track search usage per user
-- View individual search history
+### Access Control and Identity
 
-## 🚀 Quick Start
+- JWT authentication with secured API routes.
+- Role-based authorization for user and admin scopes.
+- Password hashing with bcrypt.
+- Session tracking and session revocation.
+- Active/inactive account lifecycle controls.
+
+### Operational Guardrails
+
+- Per-user daily search limits with automatic reset.
+- IST-aware limit reset behavior for predictable daily quotas.
+- Rate-limited auth, search, and admin endpoints.
+- Bot/automation filtering middleware for public entrypoints.
+
+### Admin and Internal Tooling
+
+- User lifecycle management (create, update, deactivate, delete).
+- Access request review (approve/reject).
+- Password change request workflow.
+- Search history and usage visibility by user and system-wide.
+- Admin session management and online-user visibility.
+
+### Collaboration and Communication
+
+- Built-in chat and WebSocket-based real-time messaging.
+- Unread tracking, broadcast messages, and presence monitoring.
+
+### Upload and Ingestion Support
+
+- S3 multipart upload flow (`init`, `presign`, `complete`, `abort`).
+- Ingestion utilities and worker tuning options for large data feeds.
+
+## Architecture Overview
+
+### Backend
+
+- Go 1.24 service using Gin.
+- PostgreSQL via pgx for transactional and metadata storage.
+- OpenSearch integration for search and indexing workflows.
+- Layered structure: handlers -> services -> repository -> database.
+- Scheduled reset services and middleware-based security controls.
+
+### Frontend
+
+- Next.js (App Router) with TypeScript.
+- Auth-aware routing and protected views.
+- User search interface and admin dashboard modules.
+- Centralized API endpoint configuration.
+
+## High-Level Flow
+
+1. User authenticates and receives a JWT.
+2. Search request is authorized and rate-checked.
+3. Query executes against OpenSearch indices.
+4. Result metadata is persisted in PostgreSQL.
+5. Limits, history, and dashboard metrics update in real time.
+
+## Repository Layout
+
+```text
+notorious/
+├── backend/
+│   ├── main.go
+│   ├── migrations/
+│   ├── cmd/
+│   ├── internal/
+│   │   ├── auth/
+│   │   ├── config/
+│   │   ├── database/
+│   │   ├── handlers/
+│   │   ├── middleware/
+│   │   ├── models/
+│   │   ├── repository/
+│   │   ├── scheduler/
+│   │   ├── services/
+│   │   ├── utils/
+│   │   └── websocket/
+│   └── scripts/
+└── frontend/
+    ├── src/app/
+    ├── src/components/
+    ├── src/contexts/
+    ├── src/services/
+    ├── src/config/
+    └── src/types/
+```
+
+## Local Setup
 
 ### Prerequisites
 
 - Go 1.24+
-- PostgreSQL
+- PostgreSQL 14+
 - Node.js 18+
 - pnpm
-- OpenSearch (already configured)
+- Reachable OpenSearch cluster/index
 
-### 1. Backend Setup
+### 1) Clone and install dependencies
+
+```bash
+git clone <your-repo-url>
+cd notorious
+
+cd backend && go mod download
+cd ../frontend && pnpm install
+```
+
+### Using env samples
+
+Linux/macOS:
+
+```bash
+cp backend/.env.sample backend/.env
+cp frontend/.env.sample frontend/.env.local
+```
+
+Windows PowerShell:
+
+```powershell
+Copy-Item backend/.env.sample backend/.env
+Copy-Item frontend/.env.sample frontend/.env.local
+```
+
+Windows Command Prompt:
+
+```bat
+copy backend\.env.sample backend\.env
+copy frontend\.env.sample frontend\.env.local
+```
+
+### 2) Configure backend environment
+
+Create `backend/.env` with your own values:
+
+```env
+PORT=8080
+DATABASE_URL=postgresql://<user>:<password>@localhost:5432/notorious
+JWT_SECRET=<long-random-secret>
+
+OPENSEARCH_ENDPOINT=https://<your-opensearch-endpoint>
+OPENSEARCH_INDEX=<primary-index>
+# Optional: comma-separated list of search indices
+OPENSEARCH_INDICES=<index-a>,<index-b>
+OPENSEARCH_MASTER_USER=<opensearch-username>
+OPENSEARCH_MASTER_PASSWORD=<opensearch-password>
+
+# Optional upload/ingest settings
+AWS_REGION=us-east-1
+S3_UPLOAD_BUCKET=<bucket-name>
+S3_UPLOAD_PREFIX=ingest/raw/
+AWS_ACCESS_KEY_ID=<aws-access-key-id>
+AWS_SECRET_ACCESS_KEY=<aws-secret-access-key>
+```
+
+### 3) Initialize database
 
 ```bash
 cd backend
-
-# Setup database
 createdb notorious
-psql "postgresql://postgres:rajni.surender1@localhost:5432/notorious" \
-  -f migrations/001_init_schema.sql
-
-# Create .env
-cat > .env << EOF
-DATABASE_URL=postgresql://postgres:rajni.surender1@localhost:5432/notorious
-JWT_SECRET=your-super-secret-jwt-key-min-32-chars-for-production
-EOF
-
-# Run server
 go run main.go
-# Server on http://localhost:8080
 ```
 
-### 2. Frontend Setup
+On startup, backend migrations are applied automatically from `backend/migrations`.
 
-```bash
-cd frontend
+### 4) Configure frontend
 
-# Install dependencies
-pnpm install
+Create `frontend/.env.local`:
 
-# Optional: Create .env.local
-echo 'NEXT_PUBLIC_API_URL=http://localhost:8080' > .env.local
-
-# Run development server
-pnpm dev
-# Frontend on http://localhost:3000
-```
-
-### 3. Login
-
-Open `http://localhost:3000`
-
-**Admin Credentials:**
-
-```
-Email: admin@notorious.com
-Password: admin123
-```
-
-**⚠️ Change this immediately in production!**
-
-## 📁 Project Structure
-
-```
-notorious/
-├── backend/                    # Go backend
-│   ├── main.go                 # Entry point (Gin + routes)
-│   ├── .env                    # Database & JWT config
-│   ├── migrations/             # Database schema
-│   └── internal/
-│       ├── auth/               # JWT & password utils
-│       ├── database/           # PostgreSQL connection
-│       ├── middleware/         # Auth middleware
-│       ├── models/             # Data models
-│       ├── repository/         # Database operations
-│       ├── scheduler/          # Daily limit reset
-│       ├── handlers/           # API handlers
-│       ├── services/           # OpenSearch service
-│       └── config/             # Configuration
-└── frontend/                   # Next.js frontend
-    ├── src/
-    │   ├── app/                # Pages (Next.js 14 app router)
-    │   │   ├── page.tsx        # Home (auto-redirect)
-    │   │   ├── login/          # Login page
-    │   │   ├── request-access/ # Request form
-    │   │   ├── search/         # Search page
-    │   │   └── admin/          # Admin dashboard
-    │   ├── components/         # Reusable UI components
-    │   │   └── admin/          # Admin dashboard components
-    │   ├── contexts/           # React contexts (Auth)
-    │   ├── hooks/              # Custom hooks
-    │   ├── services/           # API service layer
-    │   ├── lib/                # Utilities (API client)
-    │   ├── config/             # Configuration (API URLs)
-    │   ├── types/              # TypeScript types
-    │   └── utils/              # Helper functions
-    └── .env.local              # API URL configuration
-```
-
-## 🎨 User Interface
-
-### Login & Redirect Logic
-
-1. Visit `/` → Auto-redirects based on auth status:
-   - **Not logged in** → `/login`
-   - **Admin** → `/admin`
-   - **Regular user** → `/search`
-
-### Search Page (`/search`)
-
-- Search form with AND/OR operators
-- Real-time limit tracking with progress bar
-- User info: Name, email, current usage
-- Color-coded warnings (green → yellow → red)
-- Results table with pagination
-- Client-side filtering
-- Copy to clipboard
-
-### Admin Dashboard (`/admin`)
-
-- **Stats Tab**: Overview metrics
-- **Users Tab**: Full user management
-- **Requests Tab**: Access request workflow
-- **Search History Tab**: System-wide search tracking
-
-## 🔐 Security
-
-- JWT tokens with expiry
-- Bcrypt password hashing (cost: 12)
-- Protected API routes
-- Role-based authorization
-- Active/inactive account status
-- Session management
-
-## 📊 Database Schema
-
-### Users Table
-
-```sql
-- id (UUID)
-- email (unique)
-- password_hash
-- name, phone, role
-- daily_search_limit
-- searches_used_today
-- is_active
-- last_reset_date (for IST timezone)
-```
-
-### User Requests Table
-
-```sql
-- id (UUID)
-- email, name, phone
-- requested_searches_per_day
-- status (pending/approved/rejected)
-- admin_notes
-```
-
-### Search History Table
-
-```sql
-- id (UUID)
-- user_id (FK)
-- query
-- total_results
-- top_results (JSONB - top 5)
-- searched_at
-```
-
-## 📡 API Endpoints
-
-### Public
-
-```
-POST /auth/login                    # Login
-POST /auth/request-access           # Request account
-```
-
-### Authenticated (All Users)
-
-```
-GET  /search                        # Search with tracking
-POST /search                        # Search with tracking
-```
-
-### Admin Only
-
-```
-GET    /api/admin/users                            # List users
-POST   /api/admin/users                            # Create user
-GET    /api/admin/users/:id                        # Get user
-PUT    /api/admin/users/:id                        # Update user
-DELETE /api/admin/users/:id                        # Delete user
-GET    /api/admin/user-requests                    # List requests
-POST   /api/admin/user-requests/:id/approve        # Approve request
-POST   /api/admin/user-requests/:id/reject         # Reject request
-GET    /api/admin/search-history                   # All search history
-GET    /api/admin/users/:id/search-history         # User search history
-```
-
-## 🔧 Configuration
-
-### Change API URL (Single Place!)
-
-```typescript
-// frontend/src/config/api.ts
-export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080",
-  // All endpoints defined here
-};
-```
-
-### Environment Variables
-
-**Backend (.env):**
-
-```
-DATABASE_URL=postgresql://user:pass@localhost:5432/notorious
-JWT_SECRET=your-secret-key-min-32-chars
-```
-
-**Frontend (.env.local):**
-
-```
+```env
 NEXT_PUBLIC_API_URL=http://localhost:8080
 ```
 
-## 📚 Documentation
-
-- **ADMIN_CREDENTIALS.md** - Admin access & full feature guide
-- **backend/README_AUTH.md** - API authentication details
-- **IMPLEMENTATION_COMPLETE.md** - Technical implementation details
-
-## 🧪 Testing
-
-### Test Admin Login
+### 5) Run both services
 
 ```bash
-curl -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@notorious.com","password":"admin123"}'
-```
+# Terminal 1
+cd backend
+go run main.go
 
-### Test Search (with token)
-
-```bash
-TOKEN="your-jwt-token"
-
-curl -X POST http://localhost:8080/search \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "query": "name:John",
-    "fields": ["name", "fname", "mobile"],
-    "and_or": "AND",
-    "size": 50
-  }'
-```
-
-## 🛠️ Tech Stack
-
-**Backend:**
-
-- Go 1.24
-- Gin (HTTP framework)
-- PostgreSQL (database)
-- pgx (PostgreSQL driver)
-- JWT authentication
-- bcrypt password hashing
-- OpenSearch (search engine)
-
-**Frontend:**
-
-- Next.js 15.5 (App Router)
-- TypeScript
-- React 18
-- Tailwind CSS
-- pnpm (package manager)
-
-## ✨ Code Quality
-
-- ✅ Industry-standard architecture
-- ✅ Service layer pattern
-- ✅ Custom hooks for reusability
-- ✅ Centralized API configuration
-- ✅ Full TypeScript coverage
-- ✅ Error handling throughout
-- ✅ Modular & maintainable
-- ✅ Production-ready
-
-## 🐛 Troubleshooting
-
-### Backend won't start
-
-```bash
-# Check database connection
-psql "postgresql://postgres:rajni.surender1@localhost:5432/notorious" -c "SELECT 1"
-
-# Check .env exists
-cat backend/.env
-
-# Rebuild
-cd backend && go build -o notorious main.go
-```
-
-### Frontend errors
-
-```bash
-# Clear and reinstall
+# Terminal 2
 cd frontend
-rm -rf .next node_modules
-pnpm install
 pnpm dev
 ```
 
-### Admin cannot login
+Frontend: `http://localhost:3000`
+Backend health: `http://localhost:8080/health`
 
-```bash
-# Verify admin exists
-psql "postgresql://postgres:rajni.surender1@localhost:5432/notorious" \
-  -c "SELECT * FROM users WHERE email='admin@notorious.com'"
+## API Surface (Summary)
 
-# Re-run migrations if needed
-psql "postgresql://postgres:rajni.surender1@localhost:5432/notorious" \
-  -f backend/migrations/001_init_schema.sql
-```
+### Public
 
-## 🎉 Features Summary
+- `POST /auth/login`
+- `POST /auth/request-access`
+- `POST /auth/revoke-session`
 
-| Feature          | Status | Description                                 |
-| ---------------- | ------ | ------------------------------------------- |
-| Authentication   | ✅     | JWT-based with role support                 |
-| Search Limits    | ✅     | Per-user daily limits with IST reset        |
-| Search Tracking  | ✅     | Complete audit trail with top results       |
-| Admin Dashboard  | ✅     | Full user & system management               |
-| User Management  | ✅     | Create, update, delete, activate/deactivate |
-| Access Requests  | ✅     | Workflow for new user approval              |
-| Search History   | ✅     | System-wide and per-user tracking           |
-| Auto-redirect    | ✅     | Role-based routing on login                 |
-| Real-time UI     | ✅     | Live limit tracking with progress bar       |
-| Production Ready | ✅     | Error handling, security, best practices    |
+### Authenticated User
 
-## 📝 License
+- `GET|POST /search`
+- `POST /search/refine`
+- `GET /search/suggest`
+- `GET /search/export-eod`
+- `GET /api/user/search-history`
+- `GET /api/user/metadata`
+- `POST /api/user/heartbeat`
+- `POST /api/user/password-change/request`
+- `GET /api/user/password-change/requests`
 
-Private project
+### Admin
 
-## 🤝 Support
+- User management endpoints under `/api/admin/users`
+- Request handling under `/api/admin/user-requests`
+- Password-change review under `/api/admin/password-change-requests`
+- Search visibility under `/api/admin/search-history`
+- Session and online metrics under `/api/admin/sessions`, `/api/admin/users/online`
 
-For detailed instructions, see **ADMIN_CREDENTIALS.md**
+### Realtime and Upload
 
----
+- WebSocket endpoint: `GET /ws`
+- Chat endpoints under `/api/chat/*`
+- Multipart upload endpoints under `/upload/*`
 
-**Built with ❤️ using Go, PostgreSQL, Next.js, and TypeScript**
+## Security Notes
+
+- Use strong, rotated secrets for JWT and service credentials.
+- Keep all environment files out of version control.
+- Restrict network access to Postgres and OpenSearch to trusted networks.
+- Prefer HTTPS/TLS termination in production.
+- Monitor rate-limit events and failed auth patterns.
+
+## Production Readiness Checklist
+
+- Configure managed PostgreSQL backups and retention.
+- Configure OpenSearch snapshots and index lifecycle policies.
+- Add centralized logging and request tracing.
+- Run behind a reverse proxy / load balancer with TLS.
+- Set up alerting for auth spikes, 5xx errors, and latency.
+- Periodically verify migration, restore, and rollback workflows.
+
+## Troubleshooting
+
+### Backend fails to boot
+
+- Verify `DATABASE_URL` and `JWT_SECRET` are set.
+- Confirm Postgres is reachable from the backend host.
+- Check backend logs for migration or connection errors.
+
+### Search returns empty unexpectedly
+
+- Verify OpenSearch endpoint and credentials.
+- Confirm target index names in `OPENSEARCH_INDEX` or `OPENSEARCH_INDICES`.
+- Validate the query payload format and selected fields.
+
+### Frontend cannot reach API
+
+- Verify `NEXT_PUBLIC_API_URL` points to the running backend.
+- Check CORS allowlist for your frontend origin.
+- Confirm auth token presence for protected routes.
+
+## Tech Stack
+
+### Backend
+
+- Go
+- Gin
+- PostgreSQL + pgx
+- OpenSearch client
+- JWT + bcrypt
+- WebSockets
+
+### Frontend
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+
+## Status
+
+This project is actively positioned as production-grade internal software for secure, high-volume search operations and admin-managed access workflows.
+
+## License
+
+Private project.

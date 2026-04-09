@@ -24,6 +24,11 @@ build/
 dist/
 coverage.out
 
+# Local backend binaries generated via go build -o
+ingest
+main
+notorious-backend
+
 # Go modules (keep go.mod and go.sum, ignore replace test)
 # !go.mod
 # !go.sum
@@ -66,6 +71,7 @@ Desktop.ini
 # Never commit private credentials
 .env
 .env.*
+!.env.sample
 .envrc
 *.key
 *.pem
