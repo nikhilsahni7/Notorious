@@ -207,3 +207,10 @@ func (r *SearchHistoryRepository) GetTodaySearches(ctx context.Context) ([]*mode
 
 	return histories, rows.Err()
 }
+
+func (r *SearchHistoryRepository) CountAll(ctx context.Context) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM search_history`
+	err := r.db.Pool.QueryRow(ctx, query).Scan(&count)
+	return count, err
+}

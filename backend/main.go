@@ -190,7 +190,7 @@ func main() {
 			adminRoutes.DELETE("/user-sessions/:sessionId", adminHandler.DeleteUserSession) // Delete user session
 
 			// Dashboard stats
-			adminRoutes.GET("/request-counts", adminHandler.GetRequestCounts) // NEW: Get pending request counts
+			adminRoutes.GET("/dashboard-stats", adminHandler.GetDashboardStats) // NEW: Get pending request counts
 			adminRoutes.GET("/users/online", adminHandler.GetOnlineUsers)     // Get currently online users
 		}
 	}

@@ -10,7 +10,7 @@ import { FestiveHeader } from "@/components/FestiveCelebration";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { adminService, RequestCounts } from "@/services/admin.service";
+import { adminService, DashboardStats } from "@/services/admin.service";
 import {
   BarChart3,
   History,
@@ -35,7 +35,7 @@ export default function AdminDashboard() {
   const { user, token, logout, isLoading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("stats");
-  const [requestCounts, setRequestCounts] = useState<RequestCounts | null>(
+  const [requestCounts, setRequestCounts] = useState<DashboardStats | null>(
     null
   );
 
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
   const loadRequestCounts = async () => {
     if (!token) return;
     try {
-      const counts = await adminService.getRequestCounts(token);
+      const counts = await adminService.getDashboardStats(token);
       setRequestCounts(counts);
     } catch (error) {
       console.error("Failed to load request counts:", error);

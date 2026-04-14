@@ -287,3 +287,17 @@ func (r *UserRepository) BulkUpdateStatus(ctx context.Context, userIDs []uuid.UU
 	}
 	return result.RowsAffected(), nil
 }
+
+func (r *UserRepository) CountTotal(ctx context.Context) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM users`
+	err := r.db.Pool.QueryRow(ctx, query).Scan(&count)
+	return count, err
+}
+
+func (r *UserRepository) CountActive(ctx context.Context) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM users WHERE is_active = true`
+	err := r.db.Pool.QueryRow(ctx, query).Scan(&count)
+	return count, err
+}

@@ -121,9 +121,12 @@ export interface AdminSession {
   expires_at: string;
 }
 
-export interface RequestCounts {
+export interface DashboardStats {
   pending_user_requests: number;
   pending_password_requests: number;
+  total_users: number;
+  active_users: number;
+  total_searches: number;
 }
 
 export const adminService = {
@@ -377,9 +380,9 @@ export const adminService = {
     });
   },
 
-  // Request Counts
-  getRequestCounts: async (token: string): Promise<RequestCounts> => {
-    return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.REQUEST_COUNTS, {
+  // Dashboard Stats
+  getDashboardStats: async (token: string): Promise<DashboardStats> => {
+    return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.DASHBOARD_STATS, {
       method: "GET",
       token,
     });

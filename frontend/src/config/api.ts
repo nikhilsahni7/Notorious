@@ -24,7 +24,7 @@ export const API_CONFIG = {
       PASSWORD_CHANGE_REQUESTS: "/api/admin/password-change-requests",
       SESSIONS: "/api/admin/sessions",
       USER_SESSIONS: "/api/admin/user-sessions",
-      REQUEST_COUNTS: "/api/admin/request-counts",
+      DASHBOARD_STATS: "/api/admin/dashboard-stats",
     },
   },
 } as const;

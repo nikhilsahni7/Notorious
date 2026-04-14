@@ -672,19 +672,24 @@ func (h *AdminGinHandler) DeleteUserSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "user session deleted successfully"})
 }
 
-// GetRequestCounts returns counts of pending requests for admin dashboard
-func (h *AdminGinHandler) GetRequestCounts(c *gin.Context) {
+// GetDashboardStats returns counts of pending requests and overall stats for admin dashboard
+func (h *AdminGinHandler) GetDashboardStats(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Count pending user requests
+	// Count pending requests
 	userRequests, _ := h.userRequestRepo.ListByStatus(ctx, "pending", 1000, 0)
-
-	// Count pending password change requests
 	passwordRequests, _ := h.passwordChangeRepo.ListByStatus(ctx, "pending", 1000, 0)
+
+	totalUsers, _ := h.userRepo.CountTotal(ctx)
+	activeUsers, _ := h.userRepo.CountActive(ctx)
+	totalSearches, _ := h.searchHistoryRepo.CountAll(ctx)
 
 	c.JSON(http.StatusOK, gin.H{
 		"pending_user_requests":     len(userRequests),
 		"pending_password_requests": len(passwordRequests),
+		"total_users":               totalUsers,
+		"active_users":              activeUsers,
+		"total_searches":            totalSearches,
 	})
 }
 
