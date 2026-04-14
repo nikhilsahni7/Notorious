@@ -122,7 +122,7 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 	}
 	dailyVolume := make([]DayVolume, 0, 30)
 	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT DATE(searched_at AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
+		SELECT DATE((searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
 		FROM search_history
 		WHERE user_id = $1
 		  AND searched_at >= NOW() - INTERVAL '30 days'
@@ -143,7 +143,7 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 	peakHourFormatted := "N/A"
 	if totalSearches > 0 {
 		h.db.Pool.QueryRow(ctx, `
-			SELECT EXTRACT(HOUR FROM searched_at AT TIME ZONE 'Asia/Kolkata')::int
+			SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int
 			FROM search_history
 			WHERE user_id = $1
 			GROUP BY 1
@@ -373,7 +373,7 @@ func (h *StatsGinHandler) querySearchVolume(ctx context.Context) gin.H {
 	}
 	dailyTrend := make([]DayVolume, 0, 90)
 	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT DATE(searched_at AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
+		SELECT DATE((searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
 		FROM search_history
 		WHERE searched_at >= NOW() - INTERVAL '90 days'
 		GROUP BY d
@@ -393,7 +393,7 @@ func (h *StatsGinHandler) querySearchVolume(ctx context.Context) gin.H {
 	peakHourFormatted := "N/A"
 	if totalAllTime > 0 {
 		h.db.Pool.QueryRow(ctx, `
-			SELECT EXTRACT(HOUR FROM searched_at AT TIME ZONE 'Asia/Kolkata')::int
+			SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int
 			FROM search_history
 			GROUP BY 1
 			ORDER BY COUNT(*) DESC
@@ -500,7 +500,7 @@ func (h *StatsGinHandler) queryTimeDistributions(ctx context.Context) gin.H {
 	}
 	byHour := make([]HourBucket, 0, 24)
 	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT EXTRACT(HOUR FROM searched_at AT TIME ZONE 'Asia/Kolkata')::int as h, COUNT(*) as cnt
+		SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int as h, COUNT(*) as cnt
 		FROM search_history
 		GROUP BY h
 		ORDER BY h
@@ -524,7 +524,7 @@ func (h *StatsGinHandler) queryTimeDistributions(ctx context.Context) gin.H {
 	}
 	byDow := make([]DowBucket, 0, 7)
 	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT EXTRACT(DOW FROM searched_at AT TIME ZONE 'Asia/Kolkata')::int as d, COUNT(*) as cnt
+		SELECT EXTRACT(DOW FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int as d, COUNT(*) as cnt
 		FROM search_history
 		GROUP BY d
 		ORDER BY d
@@ -548,12 +548,12 @@ func (h *StatsGinHandler) queryTimeDistributions(ctx context.Context) gin.H {
 	}
 	byMonth := make([]MonthBucket, 0, 12)
 	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT TO_CHAR(DATE_TRUNC('month', searched_at AT TIME ZONE 'Asia/Kolkata'), 'Mon YYYY') as m,
+		SELECT TO_CHAR(DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata'), 'Mon YYYY') as m,
 		       COUNT(*) as cnt
 		FROM search_history
 		WHERE searched_at >= NOW() - INTERVAL '12 months'
-		GROUP BY DATE_TRUNC('month', searched_at AT TIME ZONE 'Asia/Kolkata')
-		ORDER BY DATE_TRUNC('month', searched_at AT TIME ZONE 'Asia/Kolkata')
+		GROUP BY DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')
+		ORDER BY DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')
 	`)
 	if rows != nil {
 		for rows.Next() {
