@@ -129,6 +129,132 @@ export interface DashboardStats {
   total_searches: number;
 }
 
+// ── Per-user stats ──────────────────────────────────────────────────────────
+
+export interface TermFreq {
+  query: string;
+  count: number;
+}
+
+export interface DayVolume {
+  date: string;
+  count: number;
+}
+
+export interface UserStats {
+  identity: {
+    id: string;
+    email: string;
+    name: string;
+    created_at: string;
+    is_active: boolean;
+    device_limit: number;
+    daily_search_limit: number;
+    searches_used_today: number;
+    region: string;
+  };
+  sessions: {
+    devices_registered: number;
+    last_login: string | null;
+  };
+  search_behavior: {
+    total_searches: number;
+    avg_searches_per_day: string;
+    first_search_at: string | null;
+    last_search_at: string | null;
+    top_terms: TermFreq[];
+    daily_volume: DayVolume[];
+    peak_hour: number;
+    peak_hour_formatted: string;
+    zero_result_searches: number;
+    zero_result_pct: string;
+  };
+  security: {
+    total_password_reset_requests: number;
+    last_password_reset_at: string | null;
+    devices_registered: number;
+    device_limit: number;
+  };
+  engagement: {
+    first_search_at: string | null;
+    last_search_at: string | null;
+    longest_gap_days: number;
+  };
+}
+
+// ── System-wide stats ───────────────────────────────────────────────────────
+
+export interface HourBucket {
+  hour: number;
+  label: string;
+  count: number;
+}
+
+export interface DowBucket {
+  dow: number;
+  day_name: string;
+  count: number;
+}
+
+export interface MonthBucket {
+  month: string;
+  count: number;
+}
+
+export interface ActiveUser {
+  id: string;
+  name: string;
+  email: string;
+  search_count: number;
+}
+
+export interface DeviceBucket {
+  device_count: number;
+  user_count: number;
+}
+
+export interface DeviceExceeded {
+  id: string;
+  name: string;
+  email: string;
+  device_limit: number;
+  session_count: number;
+}
+
+export interface SystemStats {
+  search_volume: {
+    total_all_time: number;
+    total_last_30_days: number;
+    avg_daily: string;
+    avg_per_user_per_day: string;
+    daily_trend: DayVolume[];
+    peak_hour: number;
+    peak_hour_formatted: string;
+  };
+  user_patterns: {
+    total_users: number;
+    active_users_last_30d: number;
+    avg_searches_per_user: string;
+    most_active_users: ActiveUser[];
+    device_distribution: DeviceBucket[];
+  };
+  search_patterns: {
+    top_terms: TermFreq[];
+    zero_result_count: number;
+    zero_result_pct: string;
+  };
+  security: {
+    total_password_resets: number;
+    password_resets_last_30_days: number;
+    users_exceeding_device_limit: DeviceExceeded[];
+  };
+  time_distributions: {
+    by_hour: HourBucket[];
+    by_day_of_week: DowBucket[];
+    by_month: MonthBucket[];
+  };
+}
+
 export const adminService = {
   // Users
   listUsers: async (token: string, limit = 100): Promise<User[]> => {
@@ -300,10 +426,11 @@ export const adminService = {
   getUserSearchHistory: async (
     userId: string,
     token: string,
-    limit = 50
+    limit = 50,
+    offset = 0
   ): Promise<SearchHistoryItem[]> => {
     return apiRequest(
-      `${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/search-history?limit=${limit}`,
+      `${API_CONFIG.ENDPOINTS.ADMIN.USERS}/${userId}/search-history?limit=${limit}&offset=${offset}`,
       {
         method: "GET",
         token,
@@ -417,4 +544,21 @@ export const adminService = {
       token,
     });
   },
+
+  // Per-user detailed stats
+  getUserStats: async (userId: string, token: string): Promise<UserStats> => {
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USER_STATS}/${userId}`, {
+      method: "GET",
+      token,
+    });
+  },
+
+  // System-wide stats
+  getSystemStats: async (token: string): Promise<SystemStats> => {
+    return apiRequest(API_CONFIG.ENDPOINTS.ADMIN.SYSTEM_STATS, {
+      method: "GET",
+      token,
+    });
+  },
 };
+

@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { adminService, User } from "@/services/admin.service";
 import {
+  BarChart3,
   CheckSquare,
   Download,
   Edit,
@@ -462,6 +463,15 @@ export function UsersTab({ token }: UsersTabProps) {
                         title="View search history"
                       >
                         <History className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          router.push(`/admin/users/${user.id}/stats`)
+                        }
+                        className="text-blue-400 hover:text-blue-300 transition-colors"
+                        title="View stats"
+                      >
+                        <BarChart3 className="h-4 w-4" />
                       </button>
                       <button
                         onClick={(e) => {

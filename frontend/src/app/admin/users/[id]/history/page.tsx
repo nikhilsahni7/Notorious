@@ -27,9 +27,13 @@ export default function UserHistoryPage() {
   const params = useParams();
   const userId = params.id as string;
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [user, setUser] = useState<UserDetails | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const limit = 50;
 
   useEffect(() => {
     if (!isLoading && !token) {
@@ -39,23 +43,27 @@ export default function UserHistoryPage() {
 
   useEffect(() => {
     if (token && userId) {
-      loadData();
+      loadData(page);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, userId]);
+  }, [token, userId, page]);
 
-  const loadData = async () => {
+  const loadData = async (currentPage: number) => {
+    setLoading(true);
     try {
+      const offset = (currentPage - 1) * limit;
       const [historyData, userData] = await Promise.all([
-        adminService.getUserSearchHistory(userId, token!),
-        adminService.getUser(userId, token!),
+        adminService.getUserSearchHistory(userId, token!, limit, offset),
+        user ? Promise.resolve(user) : adminService.getUser(userId, token!),
       ]);
       setHistory(historyData || []);
+      setHasMore((historyData || []).length === limit);
       setUser(userData);
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -65,7 +73,7 @@ export default function UserHistoryPage() {
     return "AND";
   };
 
-  if (isLoading || !token || loading) {
+  if (isLoading || !token || initialLoading) {
     return (
       <div className="min-h-screen bg-[#2D1B4E] flex items-center justify-center">
         <Spinner size="lg" />
@@ -94,14 +102,14 @@ export default function UserHistoryPage() {
                 <h1 className="text-2xl font-bold text-white">{user?.name}</h1>
               </div>
               <p className="text-sm text-gray-400">
-                {user?.email} • {history.length} total searches
+                {user?.email} • Search History
               </p>
             </div>
           </div>
         </div>
 
         {/* History List */}
-        <div className="bg-[#1a0f2e] rounded-lg border border-gray-700">
+        <div className={`bg-[#1a0f2e] rounded-lg border border-gray-700 transition-opacity duration-300 ${loading ? "opacity-50 pointer-events-none" : "opacity-100"}`}>
           {history.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -121,7 +129,7 @@ export default function UserHistoryPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                           <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded font-medium">
-                            #{history.length - index}
+                            #{(page - 1) * limit + index + 1}
                           </span>
                           <span className={`text-xs px-2 py-1 rounded font-medium ${
                             operator === "AND" 
@@ -159,6 +167,29 @@ export default function UserHistoryPage() {
             </div>
           )}
         </div>
+
+        {/* Pagination */
+        (history.length > 0 || page > 1) && (
+          <div className="flex justify-between items-center mt-6 p-4 bg-[#1a0f2e] rounded-lg border border-gray-700">
+            <Button
+              disabled={page === 1 || loading}
+              onClick={() => setPage((p) => p - 1)}
+              variant="outline"
+              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
+            >
+              Previous
+            </Button>
+            <span className="text-gray-400 font-medium">Page {page}</span>
+            <Button
+              disabled={!hasMore || loading}
+              onClick={() => setPage((p) => p + 1)}
+              variant="outline"
+              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

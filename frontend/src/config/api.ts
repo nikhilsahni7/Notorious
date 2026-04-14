@@ -25,6 +25,8 @@ export const API_CONFIG = {
       SESSIONS: "/api/admin/sessions",
       USER_SESSIONS: "/api/admin/user-sessions",
       DASHBOARD_STATS: "/api/admin/dashboard-stats",
+      USER_STATS: "/api/admin/stats/user",
+      SYSTEM_STATS: "/api/admin/stats/system",
     },
   },
 } as const;

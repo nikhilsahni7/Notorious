@@ -42,6 +42,7 @@ func main() {
 	var searchHandler *handlers.SearchHandler
 	var chatHandler *handlers.ChatHandler
 	var wsHub *chatws.Hub
+	var statsHandler *handlers.StatsGinHandler
 
 	if databaseURL != "" && jwtSecret != "" {
 		var err error
@@ -87,6 +88,9 @@ func main() {
 			go wsHub.Run()
 			chatHandler = handlers.NewChatHandler(chatRepo, wsHub)
 			log.Println("Chat system initialized with WebSocket hub")
+
+			// Initialize stats handler
+			statsHandler = handlers.NewStatsGinHandler(db)
 
 			resetter := scheduler.NewSearchLimitResetter(userRepo)
 			ctx := context.Background()
@@ -192,6 +196,12 @@ func main() {
 			// Dashboard stats
 			adminRoutes.GET("/dashboard-stats", adminHandler.GetDashboardStats) // NEW: Get pending request counts
 			adminRoutes.GET("/users/online", adminHandler.GetOnlineUsers)     // Get currently online users
+
+			// Detailed stats endpoints
+			if statsHandler != nil {
+				adminRoutes.GET("/stats/user/:userId", statsHandler.GetUserStats)
+				adminRoutes.GET("/stats/system", statsHandler.GetSystemStats)
+			}
 		}
 	}
 

@@ -5,9 +5,10 @@ import { Users, Search, Clock, UserCheck } from "lucide-react";
 
 interface StatsTabProps {
   token: string;
+  onNavigate?: (tab: string) => void;
 }
 
-export function StatsTab({ token }: StatsTabProps) {
+export function StatsTab({ token, onNavigate }: StatsTabProps) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -119,15 +120,15 @@ export function StatsTab({ token }: StatsTabProps) {
           Quick Actions
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="group cursor-pointer p-4 rounded-xl hover:bg-white/5 transition-colors duration-300">
+          <div onClick={() => onNavigate?.('users')} className="group cursor-pointer p-4 rounded-xl hover:bg-white/5 transition-colors duration-300">
             <p className="font-semibold text-white mb-2 group-hover:text-pink-400 transition-colors">User Management</p>
             <p className="text-gray-400 text-sm leading-relaxed">View and manage all users, set search limits, activate/deactivate accounts seamlessly.</p>
           </div>
-          <div className="group cursor-pointer p-4 rounded-xl hover:bg-white/5 transition-colors duration-300">
+          <div onClick={() => onNavigate?.('requests')} className="group cursor-pointer p-4 rounded-xl hover:bg-white/5 transition-colors duration-300">
             <p className="font-semibold text-white mb-2 group-hover:text-yellow-400 transition-colors">Access Requests</p>
             <p className="text-gray-400 text-sm leading-relaxed">Approve or reject user access requests instantly, and set primary search limits.</p>
           </div>
-          <div className="group cursor-pointer p-4 rounded-xl hover:bg-white/5 transition-colors duration-300">
+          <div onClick={() => onNavigate?.('history')} className="group cursor-pointer p-4 rounded-xl hover:bg-white/5 transition-colors duration-300">
             <p className="font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">Search History</p>
             <p className="text-gray-400 text-sm leading-relaxed">Monitor all ongoing searches, examine user activity, and evaluate platform usage patterns.</p>
           </div>

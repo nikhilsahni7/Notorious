@@ -4,6 +4,7 @@ import { PasswordRequestsTab } from "@/components/admin/PasswordRequestsTab";
 import { SearchHistoryTab } from "@/components/admin/SearchHistoryTab";
 import { SessionsTab } from "@/components/admin/SessionsTab";
 import { StatsTab } from "@/components/admin/StatsTab";
+import { SystemStatsTab } from "@/components/admin/SystemStatsTab";
 import { UserRequestsTab } from "@/components/admin/UserRequestsTab";
 import { UsersTab } from "@/components/admin/UsersTab";
 import { FestiveHeader } from "@/components/FestiveCelebration";
@@ -12,6 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { adminService, DashboardStats } from "@/services/admin.service";
 import {
+  Activity,
   BarChart3,
   History,
   Key,
@@ -29,7 +31,8 @@ type Tab =
   | "history"
   | "stats"
   | "password-requests"
-  | "sessions";
+  | "sessions"
+  | "system-stats";
 
 export default function AdminDashboard() {
   const { user, token, logout, isLoading } = useAuth();
@@ -91,6 +94,7 @@ export default function AdminDashboard() {
     },
     { id: "sessions" as Tab, label: "Sessions", icon: Shield },
     { id: "history" as Tab, label: "Search History", icon: History },
+    { id: "system-stats" as Tab, label: "System Stats", icon: Activity },
   ];
 
   return (
@@ -152,7 +156,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="p-6">
-            {activeTab === "stats" && <StatsTab token={token!} />}
+            {activeTab === "stats" && <StatsTab token={token!} onNavigate={(tab) => setActiveTab(tab as Tab)} />}
             {activeTab === "users" && <UsersTab token={token!} />}
             {activeTab === "requests" && (
               <UserRequestsTab token={token!} onApprove={loadRequestCounts} />
@@ -162,6 +166,7 @@ export default function AdminDashboard() {
             )}
             {activeTab === "sessions" && <SessionsTab token={token!} />}
             {activeTab === "history" && <SearchHistoryTab token={token!} />}
+            {activeTab === "system-stats" && <SystemStatsTab token={token!} />}
           </div>
         </div>
       </div>
