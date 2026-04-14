@@ -7,7 +7,6 @@ import { StatsTab } from "@/components/admin/StatsTab";
 import { SystemStatsTab } from "@/components/admin/SystemStatsTab";
 import { UserRequestsTab } from "@/components/admin/UserRequestsTab";
 import { UsersTab } from "@/components/admin/UsersTab";
-import { FestiveHeader } from "@/components/FestiveCelebration";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -100,28 +99,26 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#2D1B4E] p-6">
       <div className="max-w-[1800px] mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-            <p className="text-gray-400 text-sm">
+            <h1 className="text-3xl font-bold text-white tracking-tight">Admin Dashboard</h1>
+            <p className="text-gray-400 text-sm mt-1">
               Manage users, requests, and view analytics for KNotorious
             </p>
           </div>
 
-          <FestiveHeader />
-
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Button
               onClick={() => router.push("/search")}
               variant="outline"
-              className="bg-transparent border-gray-600 text-white hover:bg-[#1a0f2e]"
+              className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all rounded-full px-6"
             >
               Go to Search
             </Button>
             <Button
               onClick={logout}
               variant="outline"
-              className="bg-transparent border-gray-600 text-white hover:bg-[#1a0f2e]"
+              className="bg-white/5 border-white/10 text-pink-400 hover:bg-pink-500/10 hover:border-pink-500/30 hover:text-pink-300 transition-all rounded-full px-6"
             >
               <LogOut className="h-4 w-4 mr-2" />
               Logout
@@ -129,24 +126,29 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="bg-[#1a0f2e] rounded-lg border border-gray-700 mb-6">
-          <div className="flex border-b border-gray-700">
+        <div className="bg-[#1a0f2e] rounded-2xl border border-white/10 mb-8 shadow-xl overflow-hidden">
+          <div className="flex overflow-x-auto hide-scrollbar border-b border-white/5 bg-black/20 p-2 gap-2">
             {tabs.map((tab) => {
               const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors relative ${
-                    activeTab === tab.id
-                      ? "text-pink-500 border-b-2 border-pink-500 bg-[#2D1B4E]"
-                      : "text-gray-400 hover:text-white hover:bg-[#2D1B4E]/50"
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all duration-200 whitespace-nowrap ${
+                    isActive
+                      ? "bg-pink-500/10 text-pink-400 border border-pink-500/20 shadow-[0_0_15px_rgba(236,72,153,0.1)]"
+                      : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
                   }`}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className={`h-4 w-4 ${isActive ? "text-pink-400" : "opacity-70"}`} />
                   {tab.label}
-                  {tab.badge && tab.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                  {typeof tab.badge === "number" && tab.badge > 0 && (
+                    <span className={`ml-1.5 px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold rounded-full ${
+                      isActive 
+                        ? "bg-pink-500/20 text-pink-300"
+                        : "bg-red-500/20 text-red-400"
+                    }`}>
                       {tab.badge}
                     </span>
                   )}
