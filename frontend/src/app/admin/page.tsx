@@ -38,7 +38,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("stats");
   const [requestCounts, setRequestCounts] = useState<DashboardStats | null>(
-    null
+    null,
   );
 
   useEffect(() => {
@@ -101,7 +101,9 @@ export default function AdminDashboard() {
       <div className="max-w-[1800px] mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold text-white tracking-tight">
+              Admin Dashboard
+            </h1>
             <p className="text-gray-400 text-sm mt-1">
               Manage users, requests, and view analytics for KNotorious
             </p>
@@ -141,14 +143,18 @@ export default function AdminDashboard() {
                       : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${isActive ? "text-pink-400" : "opacity-70"}`} />
+                  <Icon
+                    className={`h-4 w-4 ${isActive ? "text-pink-400" : "opacity-70"}`}
+                  />
                   {tab.label}
                   {typeof tab.badge === "number" && tab.badge > 0 && (
-                    <span className={`ml-1.5 px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold rounded-full ${
-                      isActive 
-                        ? "bg-pink-500/20 text-pink-300"
-                        : "bg-red-500/20 text-red-400"
-                    }`}>
+                    <span
+                      className={`ml-1.5 px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold rounded-full ${
+                        isActive
+                          ? "bg-pink-500/20 text-pink-300"
+                          : "bg-red-500/20 text-red-400"
+                      }`}
+                    >
                       {tab.badge}
                     </span>
                   )}
@@ -158,7 +164,13 @@ export default function AdminDashboard() {
           </div>
 
           <div className="p-6">
-            {activeTab === "stats" && <StatsTab token={token!} onNavigate={(tab) => setActiveTab(tab as Tab)} />}
+            {activeTab === "stats" && (
+              <StatsTab
+                token={token!}
+                onNavigate={(tab) => setActiveTab(tab as Tab)}
+                initialStats={requestCounts}
+              />
+            )}
             {activeTab === "users" && <UsersTab token={token!} />}
             {activeTab === "requests" && (
               <UserRequestsTab token={token!} onApprove={loadRequestCounts} />

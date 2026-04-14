@@ -19,6 +19,7 @@ type RateLimiter struct {
 type visitor struct {
 	count    int
 	lastSeen time.Time
+	windowAt time.Time
 }
 
 // NewRateLimiter creates a new rate limiter
@@ -52,19 +53,34 @@ func (rl *RateLimiter) cleanupLoop() {
 func (rl *RateLimiter) getVisitor(ip string) *visitor {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
+	now := time.Now()
 
 	v, exists := rl.visitors[ip]
-	if !exists || time.Since(v.lastSeen) > rl.window {
-		// New visitor or window expired
-		rl.visitors[ip] = &visitor{count: 0, lastSeen: time.Now()}
+	if !exists {
+		rl.visitors[ip] = &visitor{count: 0, lastSeen: now, windowAt: now}
 		return rl.visitors[ip]
 	}
+
+	// Reset the counter when the active rate-limit window elapses.
+	if now.Sub(v.windowAt) >= rl.window {
+		v.count = 0
+		v.windowAt = now
+	}
+
+	v.lastSeen = now
 
 	return v
 }
 
 // Limit returns a Gin middleware that rate limits requests
 func (rl *RateLimiter) Limit() gin.HandlerFunc {
+	return rl.LimitWithKey(func(c *gin.Context) string {
+		return c.ClientIP()
+	})
+}
+
+// LimitWithKey returns a Gin middleware that rate limits requests by a custom key.
+func (rl *RateLimiter) LimitWithKey(keyFn func(*gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip rate limiting for OPTIONS preflight requests (CORS)
 		if c.Request.Method == "OPTIONS" {
@@ -72,8 +88,12 @@ func (rl *RateLimiter) Limit() gin.HandlerFunc {
 			return
 		}
 
-		ip := c.ClientIP()
-		v := rl.getVisitor(ip)
+		key := keyFn(c)
+		if key == "" {
+			key = c.ClientIP()
+		}
+
+		v := rl.getVisitor(key)
 
 		rl.mu.Lock()
 		v.count++
@@ -98,7 +118,15 @@ func (rl *RateLimiter) Limit() gin.HandlerFunc {
 // Increased from 60 to accommodate online users polling every 30 seconds
 func AdminRateLimiter() gin.HandlerFunc {
 	limiter := NewRateLimiter(120, time.Minute)
-	return limiter.Limit()
+	return limiter.LimitWithKey(func(c *gin.Context) string {
+		if userID, exists := c.Get("user_id"); exists {
+			if id, ok := userID.(string); ok && id != "" {
+				return "admin:" + id
+			}
+		}
+
+		return "ip:" + c.ClientIP()
+	})
 }
 
 // AuthRateLimiter - strict limits for login attempts (15 per minute per IP)

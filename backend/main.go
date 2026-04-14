@@ -160,7 +160,7 @@ func main() {
 
 	if authMiddleware != nil && adminHandler != nil {
 		adminRoutes := r.Group("/api/admin")
-		// Rate limit admin routes (30 per minute per IP)
+		// Rate limit admin routes (120 per minute per admin, fallback to IP)
 		adminRoutes.Use(authMiddleware.AuthRequired(), authMiddleware.RequireRole("admin"), middleware.AdminRateLimiter())
 		{
 			// User management
@@ -195,7 +195,7 @@ func main() {
 
 			// Dashboard stats
 			adminRoutes.GET("/dashboard-stats", adminHandler.GetDashboardStats) // NEW: Get pending request counts
-			adminRoutes.GET("/users/online", adminHandler.GetOnlineUsers)     // Get currently online users
+			adminRoutes.GET("/users/online", adminHandler.GetOnlineUsers)       // Get currently online users
 
 			// Detailed stats endpoints
 			if statsHandler != nil {
