@@ -34,6 +34,7 @@ func main() {
 
 	// Initialize OpenSearch service
 	openSearchService := services.NewOpenSearchService(cfg)
+	openSearchService.SetYearSequenceOffset(*offset)
 
 	// Get input path from command line argument
 	args := flag.Args()

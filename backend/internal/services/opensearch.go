@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"notorious-backend/internal/config"
@@ -24,10 +25,13 @@ import (
 )
 
 type OpenSearchService struct {
-	client *opensearch.Client
-	api    *opensearchapi.Client
-	cfg    *config.Config
+	client  *opensearch.Client
+	api     *opensearchapi.Client
+	cfg     *config.Config
+	yearSeq uint64
 }
+
+var registrationYearCycle = [...]int{2022, 2023, 2024, 2025, 2026}
 
 type Document struct {
 	Mobile             string `json:"mobile"`
@@ -266,9 +270,9 @@ func (s *OpenSearchService) inspectBulkErrors(resp *opensearchapi.BulkResp) erro
 }
 
 func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Document {
-	// Generate random year of registration
-	// Use package-level rand.Intn, which is safe for concurrent use.
-	year := 2022 + rand.Intn(3) // 2022, 2023, or 2024
+	// Assign years in strict round-robin order so every 10 records have
+	// exactly two docs for each year: 2022, 2023, 2024, 2025, 2026.
+	year := s.nextRegistrationYear()
 
 	doc := Document{
 		YearOfRegistration: year,
@@ -316,6 +320,18 @@ func (s *OpenSearchService) TransformDocument(rawDoc map[string]interface{}) Doc
 	}
 
 	return doc
+}
+
+func (s *OpenSearchService) nextRegistrationYear() int {
+	idx := atomic.AddUint64(&s.yearSeq, 1) - 1
+	return registrationYearCycle[idx%uint64(len(registrationYearCycle))]
+}
+
+func (s *OpenSearchService) SetYearSequenceOffset(offset int) {
+	if offset <= 0 {
+		return
+	}
+	atomic.StoreUint64(&s.yearSeq, uint64(offset))
 }
 
 func generateDocumentID(doc Document) string {

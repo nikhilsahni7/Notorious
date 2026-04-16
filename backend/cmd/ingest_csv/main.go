@@ -48,6 +48,7 @@ func main() {
 
 	// Initialize OpenSearch service
 	openSearchService := services.NewOpenSearchService(cfg)
+	openSearchService.SetYearSequenceOffset(*offset)
 
 	// Apply index template
 	log.Println("📋 Applying index template...")
