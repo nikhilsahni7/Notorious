@@ -18,6 +18,7 @@ OLD_ONLY="false"
 POLL_INTERVAL=8
 LOG_FILE=""
 START_TS="$(date +%s)"
+SKIP_DOTENV="false"
 
 ts() {
   date '+%Y-%m-%d %H:%M:%S'
@@ -33,16 +34,18 @@ for arg in "$@"; do
     --old-only) OLD_ONLY="true" ;;
     --poll-interval=*) POLL_INTERVAL="${arg#*=}" ;;
     --log-file=*) LOG_FILE="${arg#*=}" ;;
+    --skip-dotenv) SKIP_DOTENV="true" ;;
     --help|-h)
       cat <<'EOF'
 Usage:
-  ./scripts/update_existing_years.sh [--index=<index-name>] [--old-only] [--poll-interval=8] [--log-file=path]
+  ./scripts/update_existing_years.sh [--index=<index-name>] [--old-only] [--poll-interval=8] [--log-file=path] [--skip-dotenv]
 
 Options:
   --index=<name>  OpenSearch index to update (defaults to OPENSEARCH_INDEX)
   --old-only      Update only docs with year_of_registration in [2022,2023,2024] or missing
   --poll-interval Poll interval seconds for task status (default: 8)
   --log-file      Write all output to this file and stdout (default: logs/update_existing_years_<timestamp>.log)
+  --skip-dotenv   Do not source .env (use already exported env vars)
 EOF
       exit 0
       ;;
@@ -56,11 +59,22 @@ done
 # Prevent history expansion issues with passwords containing '!'.
 set +H
 
-if [[ -f ./.env ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source ./.env
-  set +a
+# Prefer already-exported env vars. Load .env only as a fallback.
+if [[ "$SKIP_DOTENV" != "true" ]]; then
+  if [[ -z "${OPENSEARCH_ENDPOINT:-}" || -z "${OPENSEARCH_MASTER_USER:-}" || -z "${OPENSEARCH_MASTER_PASSWORD:-}" || -z "${OPENSEARCH_INDEX:-}" ]]; then
+    if [[ -f ./.env ]]; then
+      set +e
+      set -a
+      # shellcheck disable=SC1091
+      source ./.env
+      dotenv_rc=$?
+      set +a
+      set -e
+      if [[ "$dotenv_rc" -ne 0 ]]; then
+        echo "Warning: .env could not be sourced cleanly. Continuing with currently exported env vars." >&2
+      fi
+    fi
+  fi
 fi
 
 ENDPOINT="${OPENSEARCH_ENDPOINT:-}"
