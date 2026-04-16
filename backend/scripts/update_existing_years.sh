@@ -143,7 +143,7 @@ UPDATE_PAYLOAD="$(cat <<JSON
 {
   "script": {
     "lang": "painless",
-    "source": "int[] years = new int[]{2022,2023,2024,2025,2026}; int bucket = Math.floorMod(ctx._id.hashCode(), years.length); ctx._source.year_of_registration = years[bucket];"
+    "source": "int[] years = new int[]{2022,2023,2024,2025,2026}; long h = ctx._id.hashCode(); if (h < 0) { h = -h; } int bucket = (int)(h % years.length); ctx._source.year_of_registration = years[bucket];"
   },
   "query": $QUERY_JSON
 }
