@@ -170,16 +170,9 @@ LAST_TOTAL=0
 while true; do
   TASK_RESPONSE="$(curl -sS "${AUTH[@]}" "${ENDPOINT}/_tasks/${TASK_ID}")"
 
-  COMPLETED="$(python3 -c 'import json,sys; print(str(json.loads(sys.stdin.read()).get("completed", False)).lower())' <<< "$TASK_RESPONSE" 2>/dev/null || echo false)"
+  COMPLETED="$(TASK_RESPONSE_JSON="$TASK_RESPONSE" python3 -c 'import json, os; j=json.loads(os.environ.get("TASK_RESPONSE_JSON", "{}")); print(str(j.get("completed", False)).lower())' 2>/dev/null || echo false)"
 
-  read -r TOTAL UPDATED CREATED DELETED CONFLICTS BATCHES FAILURES <<< "$(python3 - <<'PY' <<< "$TASK_RESPONSE"
-import json,sys
-j=json.loads(sys.stdin.read())
-t=(j.get('task') or {}).get('status') or {}
-f=(j.get('response') or {}).get('failures') or []
-print(t.get('total',0), t.get('updated',0), t.get('created',0), t.get('deleted',0), t.get('version_conflicts',0), t.get('batches',0), len(f))
-PY
-)"
+  read -r TOTAL UPDATED CREATED DELETED CONFLICTS BATCHES FAILURES <<< "$(TASK_RESPONSE_JSON="$TASK_RESPONSE" python3 -c 'import json, os; j=json.loads(os.environ.get("TASK_RESPONSE_JSON", "{}")); t=(j.get("task") or {}).get("status") or {}; f=(j.get("response") or {}).get("failures") or []; print(t.get("total",0), t.get("updated",0), t.get("created",0), t.get("deleted",0), t.get("version_conflicts",0), t.get("batches",0), len(f))' 2>/dev/null || echo "0 0 0 0 0 0 0")"
 
   ELAPSED=$(( $(date +%s) - START_TS ))
   RATE="0.00"
