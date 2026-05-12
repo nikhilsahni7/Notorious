@@ -103,6 +103,8 @@ func main() {
 
 	r := gin.Default()
 
+	//testing new deployment for new vps
+
 	// CORS configuration - allow frontend origins and common headers
 
 	r.Use(cors.New(cors.Config{
