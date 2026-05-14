@@ -188,8 +188,6 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	isDuplicate := user.LastSearchQuery == req.Query
 
 	if totalResults > 0 && !isDuplicate {
-		h.userRepo.IncrementSearchUsage(c.Request.Context(), user.ID)
-
 		topResults := make([]map[string]interface{}, 0)
 		limit := 25
 		if len(response.Hits.Hits) < limit {
@@ -228,7 +226,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		// Combined UPDATE: increment search count + set last query in a single DB roundtrip
 		h.userRepo.IncrementSearchAndSetLastQuery(c.Request.Context(), user.ID, req.Query)
 
-		// Update user's searches_used_today counter if not duplicate
+		// Update user's searches_used_today counter for the response
 		user.SearchesUsedToday++
 	} else {
 		// For duplicate or zero-result searches, only update last search query
