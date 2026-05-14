@@ -114,11 +114,20 @@ func (rl *RateLimiter) LimitWithKey(keyFn func(*gin.Context) string) gin.Handler
 	}
 }
 
+// Package-level rate limiter singletons — each is created once at startup.
+// Using singletons avoids accidentally spawning duplicate cleanup goroutines
+// if the factory functions were ever called more than once.
+var (
+	adminLimiter         = NewRateLimiter(120, time.Minute)
+	authLimiter          = NewRateLimiter(15, time.Minute)
+	accessRequestLimiter = NewRateLimiter(5, time.Hour)
+	searchLimiter        = NewRateLimiter(100, time.Minute)
+)
+
 // AdminRateLimiter - limits for admin endpoints (120 requests per minute)
 // Increased from 60 to accommodate online users polling every 30 seconds
 func AdminRateLimiter() gin.HandlerFunc {
-	limiter := NewRateLimiter(120, time.Minute)
-	return limiter.LimitWithKey(func(c *gin.Context) string {
+	return adminLimiter.LimitWithKey(func(c *gin.Context) string {
 		if userID, exists := c.Get("user_id"); exists {
 			if id, ok := userID.(string); ok && id != "" {
 				return "admin:" + id
@@ -132,20 +141,17 @@ func AdminRateLimiter() gin.HandlerFunc {
 // AuthRateLimiter - strict limits for login attempts (15 per minute per IP)
 // Prevents brute force attacks while allowing a few password typos
 func AuthRateLimiter() gin.HandlerFunc {
-	limiter := NewRateLimiter(15, time.Minute)
-	return limiter.Limit()
+	return authLimiter.Limit()
 }
 
 // AccessRequestRateLimiter - very strict limits for public access requests (5 per hour per IP)
 // Prevents spam registration requests
 func AccessRequestRateLimiter() gin.HandlerFunc {
-	limiter := NewRateLimiter(5, time.Hour)
-	return limiter.Limit()
+	return accessRequestLimiter.Limit()
 }
 
 // SearchRateLimiter - allows up to 100 searches per minute per IP
 // Increased to accommodate heartbeat polling + active user searching
 func SearchRateLimiter() gin.HandlerFunc {
-	limiter := NewRateLimiter(100, time.Minute)
-	return limiter.Limit()
+	return searchLimiter.Limit()
 }

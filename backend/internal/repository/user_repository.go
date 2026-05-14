@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 
@@ -12,6 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
+
+// ErrUserNotFound is returned when a user lookup by ID or email finds no matching row.
+var ErrUserNotFound = errors.New("user not found")
 
 type UserRepository struct {
 	db *database.DB
@@ -74,7 +77,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 	)
 
 	if err == pgx.ErrNoRows {
-		return nil, fmt.Errorf("user not found")
+		return nil, ErrUserNotFound
 	}
 
 	return &user, err
@@ -110,7 +113,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 	)
 
 	if err == pgx.ErrNoRows {
-		return nil, fmt.Errorf("user not found")
+		return nil, ErrUserNotFound
 	}
 
 	return &user, err
@@ -229,6 +232,19 @@ func (r *UserRepository) UpdateLastSearchQuery(ctx context.Context, userID uuid.
 	sql := `
 		UPDATE users
 		SET last_search_query = $1
+		WHERE id = $2
+	`
+	_, err := r.db.Pool.Exec(ctx, sql, query, userID)
+	return err
+}
+
+// IncrementSearchAndSetLastQuery combines IncrementSearchUsage and UpdateLastSearchQuery
+// into a single SQL statement, eliminating one DB roundtrip per search request.
+func (r *UserRepository) IncrementSearchAndSetLastQuery(ctx context.Context, userID uuid.UUID, query string) error {
+	sql := `
+		UPDATE users
+		SET searches_used_today = searches_used_today + 1,
+		    last_search_query = $1
 		WHERE id = $2
 	`
 	_, err := r.db.Pool.Exec(ctx, sql, query, userID)

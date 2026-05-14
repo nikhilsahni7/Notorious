@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"notorious-backend/internal/auth"
 	"notorious-backend/internal/repository"
@@ -10,15 +13,69 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// sessionCacheEntry holds a cached session existence check result.
+type sessionCacheEntry struct {
+	expiresAt time.Time
+}
+
+// sessionCache is an in-memory TTL cache for session token existence checks.
+// This avoids hitting PostgreSQL on every authenticated request.
+type sessionCache struct {
+	mu      sync.RWMutex
+	entries map[string]sessionCacheEntry
+}
+
+func newSessionCache() *sessionCache {
+	sc := &sessionCache{entries: make(map[string]sessionCacheEntry)}
+	go sc.cleanupLoop()
+	return sc
+}
+
+func (sc *sessionCache) exists(tokenHash string) bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	e, ok := sc.entries[tokenHash]
+	return ok && time.Now().Before(e.expiresAt)
+}
+
+func (sc *sessionCache) set(tokenHash string, ttl time.Duration) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.entries[tokenHash] = sessionCacheEntry{expiresAt: time.Now().Add(ttl)}
+}
+
+func (sc *sessionCache) remove(tokenHash string) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	delete(sc.entries, tokenHash)
+}
+
+func (sc *sessionCache) cleanupLoop() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		sc.mu.Lock()
+		now := time.Now()
+		for hash, entry := range sc.entries {
+			if now.After(entry.expiresAt) {
+				delete(sc.entries, hash)
+			}
+		}
+		sc.mu.Unlock()
+	}
+}
+
 type GinAuthMiddleware struct {
 	jwtManager  *auth.JWTManager
 	sessionRepo *repository.SessionRepository
+	cache       *sessionCache
 }
 
 func NewGinAuthMiddleware(jwtManager *auth.JWTManager, sessionRepo *repository.SessionRepository) *GinAuthMiddleware {
 	return &GinAuthMiddleware{
 		jwtManager:  jwtManager,
 		sessionRepo: sessionRepo,
+		cache:       newSessionCache(),
 	}
 }
 
@@ -66,25 +123,38 @@ func (m *GinAuthMiddleware) AuthRequired() gin.HandlerFunc {
 
 		if claims.Role == "user" && m.sessionRepo != nil {
 			tokenHash := auth.HashToken(tokenString)
-			exists, err := m.sessionRepo.ExistsByTokenHash(c.Request.Context(), tokenHash)
-			if err != nil {
-				// If DB error, fail safe? Or allow?
-				// Fail safe: deny access.
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify session"})
-				c.Abort()
-				return
+
+			// Check in-memory cache first to avoid DB hit on every request.
+			// Cache TTL of 30s means a revoked session takes at most 30s to take effect.
+			if !m.cache.exists(tokenHash) {
+				exists, err := m.sessionRepo.ExistsByTokenHash(c.Request.Context(), tokenHash)
+				if err != nil {
+					// If DB error, fail safe? Or allow?
+					// Fail safe: deny access.
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify session"})
+					c.Abort()
+					return
+				}
+				if !exists {
+					c.JSON(http.StatusUnauthorized, gin.H{"error": "session revoked or invalid"})
+					c.Abort()
+					return
+				}
+				// Session verified — cache for 30 seconds
+				m.cache.set(tokenHash, 30*time.Second)
 			}
-			if !exists {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "session revoked or invalid"})
-				c.Abort()
-				return
-			}
+
 			// Store token hash for heartbeat functionality
 			c.Set("token_hash", tokenHash)
 
-			// Update last_active on every authenticated request for reliable presence tracking
-			// This runs async to not slow down the request
-			go m.sessionRepo.UpdateLastActive(c.Request.Context(), tokenHash)
+			// Update last_active on every authenticated request for reliable presence tracking.
+			// Uses context.Background() because c.Request.Context() is cancelled when
+			// the HTTP response is sent, which would cause this DB update to fail silently.
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				m.sessionRepo.UpdateLastActive(ctx, tokenHash)
+			}()
 		}
 
 		c.Set("user_id", claims.UserID)
