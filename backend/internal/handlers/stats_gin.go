@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -10,6 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/errgroup"
 )
 
 // StatsGinHandler handles analytics endpoints for per-user and system-wide stats.
@@ -48,7 +50,7 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 	}
 	ctx := c.Request.Context()
 
-	// ── 1. User identity ──────────────────────────────────────────────────
+	// ── 1. User identity (must succeed before parallel queries) ───────────
 	type UserIdentity struct {
 		ID               uuid.UUID `json:"id"`
 		Email            string    `json:"email"`
@@ -77,99 +79,98 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 		return
 	}
 
-	// ── 2. Search summary ─────────────────────────────────────────────────
-	var totalSearches int
-	var firstSearchAt, lastSearchAt *time.Time
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*), MIN(searched_at), MAX(searched_at)
-		FROM search_history WHERE user_id = $1
-	`, userID).Scan(&totalSearches, &firstSearchAt, &lastSearchAt)
+	// ── Run all remaining queries in parallel ─────────────────────────────
+	var (
+		totalSearches                int
+		firstSearchAt, lastSearchAt  *time.Time
+		zeroResultCount              int
+		longestGapDays               int
+		totalPasswordResets          int
+		lastPasswordResetAt          *time.Time
+		devicesRegistered            int
+		lastLogin                    *time.Time
+		peakHour                     int = -1
+	)
 
-	// avg searches per day = total / max(days since created_at, 1)
-	daysSinceCreation := int(time.Since(identity.CreatedAt).Hours()/24) + 1
-	avgSearchesPerDay := 0.0
-	if daysSinceCreation > 0 {
-		avgSearchesPerDay = float64(totalSearches) / float64(daysSinceCreation)
-	}
-
-	// ── 3. Top 10 search terms ────────────────────────────────────────────
 	type TermFreq struct {
 		Query string `json:"query"`
 		Count int    `json:"count"`
 	}
-	topTerms := make([]TermFreq, 0, 10)
-	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT query, COUNT(*) as freq
-		FROM search_history
-		WHERE user_id = $1
-		GROUP BY query
-		ORDER BY freq DESC
-		LIMIT 10
-	`, userID)
-	if rows != nil {
-		for rows.Next() {
-			var t TermFreq
-			rows.Scan(&t.Query, &t.Count)
-			topTerms = append(topTerms, t)
-		}
-		rows.Close()
-	}
-
-	// ── 4. Daily volume – last 30 days ─────────────────────────────────────
 	type DayVolume struct {
 		Date  string `json:"date"`
 		Count int    `json:"count"`
 	}
+	topTerms := make([]TermFreq, 0, 10)
 	dailyVolume := make([]DayVolume, 0, 30)
-	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT DATE((searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
-		FROM search_history
-		WHERE user_id = $1
-		  AND searched_at >= NOW() - INTERVAL '30 days'
-		GROUP BY d
-		ORDER BY d
-	`, userID)
-	if rows != nil {
-		for rows.Next() {
-			var dv DayVolume
-			rows.Scan(&dv.Date, &dv.Count)
-			dailyVolume = append(dailyVolume, dv)
-		}
-		rows.Close()
-	}
 
-	// ── 5. Peak hour ──────────────────────────────────────────────────────
-	peakHour := -1
-	peakHourFormatted := "N/A"
-	if totalSearches > 0 {
-		h.db.Pool.QueryRow(ctx, `
-			SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int
+	g, gctx := errgroup.WithContext(ctx)
+
+	// 2. Search summary
+	g.Go(func() error {
+		return h.db.Pool.QueryRow(gctx, `
+			SELECT COUNT(*), MIN(searched_at), MAX(searched_at)
+			FROM search_history WHERE user_id = $1
+		`, userID).Scan(&totalSearches, &firstSearchAt, &lastSearchAt)
+	})
+
+	// 3. Top 10 search terms
+	g.Go(func() error {
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT query, COUNT(*) as freq
 			FROM search_history
 			WHERE user_id = $1
-			GROUP BY 1
-			ORDER BY COUNT(*) DESC
-			LIMIT 1
-		`, userID).Scan(&peakHour)
-		if peakHour >= 0 {
-			peakHourFormatted = formatHour(peakHour)
+			GROUP BY query
+			ORDER BY freq DESC
+			LIMIT 10
+		`, userID)
+		if err != nil {
+			return err
 		}
-	}
+		defer rows.Close()
+		for rows.Next() {
+			var t TermFreq
+			if err := rows.Scan(&t.Query, &t.Count); err != nil {
+				return err
+			}
+			topTerms = append(topTerms, t)
+		}
+		return rows.Err()
+	})
 
-	// ── 6. Zero-result searches ───────────────────────────────────────────
-	var zeroResultCount int
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM search_history WHERE user_id = $1 AND total_results = 0
-	`, userID).Scan(&zeroResultCount)
+	// 4. Daily volume – last 30 days
+	g.Go(func() error {
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT DATE((searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
+			FROM search_history
+			WHERE user_id = $1
+			  AND searched_at >= NOW() - INTERVAL '30 days'
+			GROUP BY d
+			ORDER BY d
+		`, userID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var dv DayVolume
+			if err := rows.Scan(&dv.Date, &dv.Count); err != nil {
+				return err
+			}
+			dailyVolume = append(dailyVolume, dv)
+		}
+		return rows.Err()
+	})
 
-	zeroResultPct := 0.0
-	if totalSearches > 0 {
-		zeroResultPct = float64(zeroResultCount) / float64(totalSearches) * 100
-	}
+	// 5. Zero-result searches
+	g.Go(func() error {
+		return h.db.Pool.QueryRow(gctx, `
+			SELECT COUNT(*) FROM search_history WHERE user_id = $1 AND total_results = 0
+		`, userID).Scan(&zeroResultCount)
+	})
 
-	// ── 7. Longest gap between searches (days) ───────────────────────────
-	longestGapDays := 0
-	if totalSearches > 1 {
-		h.db.Pool.QueryRow(ctx, `
+	// 6. Longest gap
+	g.Go(func() error {
+		err := h.db.Pool.QueryRow(gctx, `
 			SELECT COALESCE(MAX(gap_days), 0)::int FROM (
 				SELECT EXTRACT(DAY FROM
 					(searched_at - LAG(searched_at) OVER (ORDER BY searched_at))
@@ -178,26 +179,63 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 				WHERE user_id = $1
 			) t WHERE gap_days IS NOT NULL
 		`, userID).Scan(&longestGapDays)
+		if err == pgx.ErrNoRows {
+			return nil // no data is not an error
+		}
+		return err
+	})
+
+	// 7. Password reset requests
+	g.Go(func() error {
+		return h.db.Pool.QueryRow(gctx, `
+			SELECT COUNT(*), MAX(created_at) FROM password_change_requests WHERE user_id = $1
+		`, userID).Scan(&totalPasswordResets, &lastPasswordResetAt)
+	})
+
+	// 8. Session / device count + last login
+	g.Go(func() error {
+		return h.db.Pool.QueryRow(gctx, `
+			SELECT COUNT(*), MAX(last_active) FROM user_sessions WHERE user_id = $1
+		`, userID).Scan(&devicesRegistered, &lastLogin)
+	})
+
+	// 9. Peak hour (ErrNoRows if user has no searches — not an error)
+	g.Go(func() error {
+		err := h.db.Pool.QueryRow(gctx, `
+			SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int
+			FROM search_history
+			WHERE user_id = $1
+			GROUP BY 1
+			ORDER BY COUNT(*) DESC
+			LIMIT 1
+		`, userID).Scan(&peakHour)
+		if err == pgx.ErrNoRows {
+			return nil
+		}
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Printf("stats: user %s query error: %v", userID, err)
+		// Non-fatal: continue with whatever data we have
 	}
 
-	// ── 8. Password reset requests ────────────────────────────────────────
-	var totalPasswordResets int
-	var lastPasswordResetAt *time.Time
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*), MAX(created_at) FROM password_change_requests WHERE user_id = $1
-	`, userID).Scan(&totalPasswordResets, &lastPasswordResetAt)
+	// ── Compute derived values ────────────────────────────────────────────
+	daysSinceCreation := int(time.Since(identity.CreatedAt).Hours()/24) + 1
+	avgSearchesPerDay := 0.0
+	if daysSinceCreation > 0 {
+		avgSearchesPerDay = float64(totalSearches) / float64(daysSinceCreation)
+	}
 
-	// ── 9. Session / device count ─────────────────────────────────────────
-	var devicesRegistered int
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM user_sessions WHERE user_id = $1
-	`, userID).Scan(&devicesRegistered)
+	zeroResultPct := 0.0
+	if totalSearches > 0 {
+		zeroResultPct = float64(zeroResultCount) / float64(totalSearches) * 100
+	}
 
-	// ── 10. Last login (proxy: most recent session last_active) ──────────
-	var lastLogin *time.Time
-	h.db.Pool.QueryRow(ctx, `
-		SELECT MAX(last_active) FROM user_sessions WHERE user_id = $1
-	`, userID).Scan(&lastLogin)
+	peakHourFormatted := "N/A"
+	if peakHour >= 0 {
+		peakHourFormatted = formatHour(peakHour)
+	}
 
 	// ── Assemble response ─────────────────────────────────────────────────
 	c.JSON(http.StatusOK, gin.H{
@@ -249,53 +287,37 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 func (h *StatsGinHandler) GetSystemStats(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// ── 1. Search volume ──────────────────────────────────────────────────
-	searchVolume := h.querySearchVolume(ctx)
+	// All independent query groups run in parallel.
+	var (
+		// search volume
+		totalAllTime    int
+		totalLast30d    int
+		oldestSearch    *time.Time
+		totalUsers      int
+		peakHour        int = -1
 
-	// ── 2. User patterns ──────────────────────────────────────────────────
-	userPatterns := h.queryUserPatterns(ctx)
+		// zero result
+		zeroResultCount int
 
-	// ── 3. Top search terms (system-wide) ────────────────────────────────
+		// password resets
+		totalPasswordResets    int
+		passwordResetsLast30d  int
+	)
+
 	type TermFreq struct {
 		Query string `json:"query"`
 		Count int    `json:"count"`
 	}
-	topTerms := make([]TermFreq, 0, 20)
-	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT query, COUNT(*) as freq
-		FROM search_history
-		GROUP BY query
-		ORDER BY freq DESC
-		LIMIT 20
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var t TermFreq
-			rows.Scan(&t.Query, &t.Count)
-			topTerms = append(topTerms, t)
-		}
-		rows.Close()
+	type DayVolume struct {
+		Date  string `json:"date"`
+		Count int    `json:"count"`
 	}
-
-	// ── 4. Zero results ───────────────────────────────────────────────────
-	var totalSearchesForPct, zeroResultCount int
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history`).Scan(&totalSearchesForPct)
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history WHERE total_results = 0`).Scan(&zeroResultCount)
-	zeroResultPct := 0.0
-	if totalSearchesForPct > 0 {
-		zeroResultPct = float64(zeroResultCount) / float64(totalSearchesForPct) * 100
+	type ActiveUser struct {
+		ID          uuid.UUID `json:"id"`
+		Name        string    `json:"name"`
+		Email       string    `json:"email"`
+		SearchCount int       `json:"search_count"`
 	}
-
-	// ── 5. Password resets ────────────────────────────────────────────────
-	var totalPasswordResets, passwordResetsLast30d int
-	h.db.Pool.QueryRow(ctx, `
-		SELECT
-			COUNT(*),
-			COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')
-		FROM password_change_requests
-	`).Scan(&totalPasswordResets, &passwordResetsLast30d)
-
-	// ── 6. Users exceeding device limit ───────────────────────────────────
 	type DeviceExceeded struct {
 		ID           uuid.UUID `json:"id"`
 		Name         string    `json:"name"`
@@ -303,32 +325,330 @@ func (h *StatsGinHandler) GetSystemStats(c *gin.Context) {
 		DeviceLimit  int       `json:"device_limit"`
 		SessionCount int       `json:"session_count"`
 	}
-	usersExceedingLimit := make([]DeviceExceeded, 0)
-	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT u.id, u.name, u.email, u.device_limit, COUNT(us.id) as session_count
-		FROM users u
-		JOIN user_sessions us ON u.id = us.user_id
-		GROUP BY u.id, u.name, u.email, u.device_limit
-		HAVING COUNT(us.id) > u.device_limit
-		ORDER BY session_count DESC
-		LIMIT 10
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var d DeviceExceeded
-			rows.Scan(&d.ID, &d.Name, &d.Email, &d.DeviceLimit, &d.SessionCount)
-			usersExceedingLimit = append(usersExceedingLimit, d)
-		}
-		rows.Close()
+	type DeviceBucket struct {
+		DeviceCount int `json:"device_count"`
+		UserCount   int `json:"user_count"`
+	}
+	type HourBucket struct {
+		Hour  int    `json:"hour"`
+		Label string `json:"label"`
+		Count int    `json:"count"`
+	}
+	type DowBucket struct {
+		Dow     int    `json:"dow"`
+		DayName string `json:"day_name"`
+		Count   int    `json:"count"`
+	}
+	type MonthBucket struct {
+		Month string `json:"month"`
+		Count int    `json:"count"`
 	}
 
-	// ── 7. Time distributions ─────────────────────────────────────────────
-	timeDistributions := h.queryTimeDistributions(ctx)
+	topTerms := make([]TermFreq, 0, 20)
+	dailyTrend := make([]DayVolume, 0, 90)
+	mostActive := make([]ActiveUser, 0, 10)
+	usersExceedingLimit := make([]DeviceExceeded, 0)
+	deviceDistribution := make([]DeviceBucket, 0)
+	activeUsersLast30d := 0
+	avgSearchesPerUser := 0.0
+
+	byHour := make([]HourBucket, 0, 24)
+	byDow := make([]DowBucket, 0, 7)
+	byMonth := make([]MonthBucket, 0, 12)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	// ── 1. Core counts (totalAllTime, totalLast30d, oldest, zeroResults, totalUsers) ──
+	// These used to be 4 separate SELECT COUNT(*) FROM search_history queries.
+	// Now combined into a single query that computes all counts in one pass.
+	g.Go(func() error {
+		return h.db.Pool.QueryRow(gctx, `
+			SELECT
+				COUNT(*),
+				COUNT(*) FILTER (WHERE searched_at >= NOW() - INTERVAL '30 days'),
+				COUNT(*) FILTER (WHERE total_results = 0),
+				MIN(searched_at)
+			FROM search_history
+		`).Scan(&totalAllTime, &totalLast30d, &zeroResultCount, &oldestSearch)
+	})
+
+	g.Go(func() error {
+		return h.db.Pool.QueryRow(gctx, `
+			SELECT COUNT(*) FROM users WHERE role = 'user'
+		`).Scan(&totalUsers)
+	})
+
+	// ── 2. Top search terms ───────────────────────────────────────────────
+	g.Go(func() error {
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT query, COUNT(*) as freq
+			FROM search_history
+			GROUP BY query
+			ORDER BY freq DESC
+			LIMIT 20
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var t TermFreq
+			if err := rows.Scan(&t.Query, &t.Count); err != nil {
+				return err
+			}
+			topTerms = append(topTerms, t)
+		}
+		return rows.Err()
+	})
+
+	// ── 3. Daily trend last 90 days ───────────────────────────────────────
+	g.Go(func() error {
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT DATE((searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
+			FROM search_history
+			WHERE searched_at >= NOW() - INTERVAL '90 days'
+			GROUP BY d
+			ORDER BY d
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var dv DayVolume
+			if err := rows.Scan(&dv.Date, &dv.Count); err != nil {
+				return err
+			}
+			dailyTrend = append(dailyTrend, dv)
+		}
+		return rows.Err()
+	})
+
+	// ── 4. Peak system hour (ErrNoRows if no searches exist — not an error)
+	g.Go(func() error {
+		err := h.db.Pool.QueryRow(gctx, `
+			SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int
+			FROM search_history
+			GROUP BY 1
+			ORDER BY COUNT(*) DESC
+			LIMIT 1
+		`).Scan(&peakHour)
+		if err == pgx.ErrNoRows {
+			return nil
+		}
+		return err
+	})
+
+	// ── 5. Password resets ────────────────────────────────────────────────
+	g.Go(func() error {
+		return h.db.Pool.QueryRow(gctx, `
+			SELECT
+				COUNT(*),
+				COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')
+			FROM password_change_requests
+		`).Scan(&totalPasswordResets, &passwordResetsLast30d)
+	})
+
+	// ── 6. Users exceeding device limit ───────────────────────────────────
+	g.Go(func() error {
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT u.id, u.name, u.email, u.device_limit, COUNT(us.id) as session_count
+			FROM users u
+			JOIN user_sessions us ON u.id = us.user_id
+			GROUP BY u.id, u.name, u.email, u.device_limit
+			HAVING COUNT(us.id) > u.device_limit
+			ORDER BY session_count DESC
+			LIMIT 10
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var d DeviceExceeded
+			if err := rows.Scan(&d.ID, &d.Name, &d.Email, &d.DeviceLimit, &d.SessionCount); err != nil {
+				return err
+			}
+			usersExceedingLimit = append(usersExceedingLimit, d)
+		}
+		return rows.Err()
+	})
+
+	// ── 7. Active users last 30d + most active users ──────────────────────
+	g.Go(func() error {
+		if err := h.db.Pool.QueryRow(gctx, `
+			SELECT COUNT(DISTINCT user_id) FROM search_history
+			WHERE searched_at >= NOW() - INTERVAL '30 days'
+		`).Scan(&activeUsersLast30d); err != nil {
+			return err
+		}
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT u.id, u.name, u.email, COUNT(sh.id) as search_count
+			FROM users u
+			JOIN search_history sh ON u.id = sh.user_id
+			GROUP BY u.id, u.name, u.email
+			ORDER BY search_count DESC
+			LIMIT 10
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var au ActiveUser
+			if err := rows.Scan(&au.ID, &au.Name, &au.Email, &au.SearchCount); err != nil {
+				return err
+			}
+			mostActive = append(mostActive, au)
+		}
+		return rows.Err()
+	})
+
+	// ── 8. Device distribution ────────────────────────────────────────────
+	g.Go(func() error {
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT device_count, COUNT(*) as user_count FROM (
+				SELECT user_id, COUNT(*) as device_count
+				FROM user_sessions
+				GROUP BY user_id
+			) t
+			GROUP BY device_count
+			ORDER BY device_count
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var db DeviceBucket
+			if err := rows.Scan(&db.DeviceCount, &db.UserCount); err != nil {
+				return err
+			}
+			deviceDistribution = append(deviceDistribution, db)
+		}
+		return rows.Err()
+	})
+
+	// ── 9. Time distributions (hour, dow, month) ──────────────────────────
+	g.Go(func() error {
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int as h, COUNT(*) as cnt
+			FROM search_history
+			GROUP BY h
+			ORDER BY h
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var hb HourBucket
+			if err := rows.Scan(&hb.Hour, &hb.Count); err != nil {
+				return err
+			}
+			hb.Label = formatHour(hb.Hour)
+			byHour = append(byHour, hb)
+		}
+		return rows.Err()
+	})
+
+	g.Go(func() error {
+		dayNames := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT EXTRACT(DOW FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int as d, COUNT(*) as cnt
+			FROM search_history
+			GROUP BY d
+			ORDER BY d
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var db DowBucket
+			if err := rows.Scan(&db.Dow, &db.Count); err != nil {
+				return err
+			}
+			if db.Dow >= 0 && db.Dow < 7 {
+				db.DayName = dayNames[db.Dow]
+			}
+			byDow = append(byDow, db)
+		}
+		return rows.Err()
+	})
+
+	g.Go(func() error {
+		rows, err := h.db.Pool.Query(gctx, `
+			SELECT TO_CHAR(DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata'), 'Mon YYYY') as m,
+			       COUNT(*) as cnt
+			FROM search_history
+			WHERE searched_at >= NOW() - INTERVAL '12 months'
+			GROUP BY DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')
+			ORDER BY DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var mb MonthBucket
+			if err := rows.Scan(&mb.Month, &mb.Count); err != nil {
+				return err
+			}
+			byMonth = append(byMonth, mb)
+		}
+		return rows.Err()
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Printf("stats: system query error: %v", err)
+		// Non-fatal: continue with whatever data we have
+	}
+
+	// ── Compute derived values ────────────────────────────────────────────
+	avgDaily := 0.0
+	if oldestSearch != nil && totalAllTime > 0 {
+		days := int(time.Since(*oldestSearch).Hours()/24) + 1
+		avgDaily = float64(totalAllTime) / float64(days)
+	}
+
+	avgPerUserPerDay := 0.0
+	if totalUsers > 0 && avgDaily > 0 {
+		avgPerUserPerDay = avgDaily / float64(totalUsers)
+	}
+
+	if totalUsers > 0 {
+		avgSearchesPerUser = float64(totalAllTime) / float64(totalUsers)
+	}
+
+	zeroResultPct := 0.0
+	if totalAllTime > 0 {
+		zeroResultPct = float64(zeroResultCount) / float64(totalAllTime) * 100
+	}
+
+	peakHourFormatted := "N/A"
+	if peakHour >= 0 {
+		peakHourFormatted = formatHour(peakHour)
+	}
 
 	// ── Assemble response ─────────────────────────────────────────────────
 	c.JSON(http.StatusOK, gin.H{
-		"search_volume": searchVolume,
-		"user_patterns": userPatterns,
+		"search_volume": gin.H{
+			"total_all_time":       totalAllTime,
+			"total_last_30_days":   totalLast30d,
+			"avg_daily":            fmt.Sprintf("%.1f", avgDaily),
+			"avg_per_user_per_day": fmt.Sprintf("%.2f", avgPerUserPerDay),
+			"daily_trend":          dailyTrend,
+			"peak_hour":            peakHour,
+			"peak_hour_formatted":  peakHourFormatted,
+		},
+		"user_patterns": gin.H{
+			"total_users":            totalUsers,
+			"active_users_last_30d":  activeUsersLast30d,
+			"avg_searches_per_user":  fmt.Sprintf("%.1f", avgSearchesPerUser),
+			"most_active_users":      mostActive,
+			"device_distribution":    deviceDistribution,
+		},
 		"search_patterns": gin.H{
 			"top_terms":         topTerms,
 			"zero_result_count": zeroResultCount,
@@ -339,234 +659,10 @@ func (h *StatsGinHandler) GetSystemStats(c *gin.Context) {
 			"password_resets_last_30_days":   passwordResetsLast30d,
 			"users_exceeding_device_limit":   usersExceedingLimit,
 		},
-		"time_distributions": timeDistributions,
+		"time_distributions": gin.H{
+			"by_hour":        byHour,
+			"by_day_of_week": byDow,
+			"by_month":       byMonth,
+		},
 	})
-}
-
-// querySearchVolume runs all search volume related queries.
-func (h *StatsGinHandler) querySearchVolume(ctx context.Context) gin.H {
-	var totalAllTime, totalLast30d int
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history`).Scan(&totalAllTime)
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history WHERE searched_at >= NOW() - INTERVAL '30 days'`).Scan(&totalLast30d)
-
-	// avg daily = total / days since oldest search
-	avgDaily := 0.0
-	var oldestSearch *time.Time
-	h.db.Pool.QueryRow(ctx, `SELECT MIN(searched_at) FROM search_history`).Scan(&oldestSearch)
-	if oldestSearch != nil && totalAllTime > 0 {
-		days := int(time.Since(*oldestSearch).Hours()/24) + 1
-		avgDaily = float64(totalAllTime) / float64(days)
-	}
-
-	// avg per user per day
-	var totalUsers int
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE role = 'user'`).Scan(&totalUsers)
-	avgPerUserPerDay := 0.0
-	if totalUsers > 0 && avgDaily > 0 {
-		avgPerUserPerDay = avgDaily / float64(totalUsers)
-	}
-
-	// daily trend last 90 days
-	type DayVolume struct {
-		Date  string `json:"date"`
-		Count int    `json:"count"`
-	}
-	dailyTrend := make([]DayVolume, 0, 90)
-	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT DATE((searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
-		FROM search_history
-		WHERE searched_at >= NOW() - INTERVAL '90 days'
-		GROUP BY d
-		ORDER BY d
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var dv DayVolume
-			rows.Scan(&dv.Date, &dv.Count)
-			dailyTrend = append(dailyTrend, dv)
-		}
-		rows.Close()
-	}
-
-	// peak system hour
-	peakHour := -1
-	peakHourFormatted := "N/A"
-	if totalAllTime > 0 {
-		h.db.Pool.QueryRow(ctx, `
-			SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int
-			FROM search_history
-			GROUP BY 1
-			ORDER BY COUNT(*) DESC
-			LIMIT 1
-		`).Scan(&peakHour)
-		if peakHour >= 0 {
-			peakHourFormatted = formatHour(peakHour)
-		}
-	}
-
-	return gin.H{
-		"total_all_time":       totalAllTime,
-		"total_last_30_days":   totalLast30d,
-		"avg_daily":            fmt.Sprintf("%.1f", avgDaily),
-		"avg_per_user_per_day": fmt.Sprintf("%.2f", avgPerUserPerDay),
-		"daily_trend":          dailyTrend,
-		"peak_hour":            peakHour,
-		"peak_hour_formatted":  peakHourFormatted,
-	}
-}
-
-// queryUserPatterns runs user engagement and activity queries.
-func (h *StatsGinHandler) queryUserPatterns(ctx context.Context) gin.H {
-	var totalUsers, activeUsersLast30d int
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE role = 'user'`).Scan(&totalUsers)
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(DISTINCT user_id) FROM search_history
-		WHERE searched_at >= NOW() - INTERVAL '30 days'
-	`).Scan(&activeUsersLast30d)
-
-	// avg searches per user (all time)
-	avgSearchesPerUser := 0.0
-	if totalUsers > 0 {
-		var totalSearches int
-		h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history`).Scan(&totalSearches)
-		avgSearchesPerUser = float64(totalSearches) / float64(totalUsers)
-	}
-
-	// most active users (top 10)
-	type ActiveUser struct {
-		ID          uuid.UUID `json:"id"`
-		Name        string    `json:"name"`
-		Email       string    `json:"email"`
-		SearchCount int       `json:"search_count"`
-	}
-	mostActive := make([]ActiveUser, 0, 10)
-	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT u.id, u.name, u.email, COUNT(sh.id) as search_count
-		FROM users u
-		JOIN search_history sh ON u.id = sh.user_id
-		GROUP BY u.id, u.name, u.email
-		ORDER BY search_count DESC
-		LIMIT 10
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var au ActiveUser
-			rows.Scan(&au.ID, &au.Name, &au.Email, &au.SearchCount)
-			mostActive = append(mostActive, au)
-		}
-		rows.Close()
-	}
-
-	// device count distribution
-	type DeviceBucket struct {
-		DeviceCount int `json:"device_count"`
-		UserCount   int `json:"user_count"`
-	}
-	deviceDistribution := make([]DeviceBucket, 0)
-	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT device_count, COUNT(*) as user_count FROM (
-			SELECT user_id, COUNT(*) as device_count
-			FROM user_sessions
-			GROUP BY user_id
-		) t
-		GROUP BY device_count
-		ORDER BY device_count
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var db DeviceBucket
-			rows.Scan(&db.DeviceCount, &db.UserCount)
-			deviceDistribution = append(deviceDistribution, db)
-		}
-		rows.Close()
-	}
-
-	return gin.H{
-		"total_users":            totalUsers,
-		"active_users_last_30d":  activeUsersLast30d,
-		"avg_searches_per_user":  fmt.Sprintf("%.1f", avgSearchesPerUser),
-		"most_active_users":      mostActive,
-		"device_distribution":    deviceDistribution,
-	}
-}
-
-// queryTimeDistributions runs hour/day-of-week/month distribution queries.
-func (h *StatsGinHandler) queryTimeDistributions(ctx context.Context) gin.H {
-	// by hour (0-23)
-	type HourBucket struct {
-		Hour  int    `json:"hour"`
-		Label string `json:"label"`
-		Count int    `json:"count"`
-	}
-	byHour := make([]HourBucket, 0, 24)
-	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT EXTRACT(HOUR FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int as h, COUNT(*) as cnt
-		FROM search_history
-		GROUP BY h
-		ORDER BY h
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var hb HourBucket
-			rows.Scan(&hb.Hour, &hb.Count)
-			hb.Label = formatHour(hb.Hour)
-			byHour = append(byHour, hb)
-		}
-		rows.Close()
-	}
-
-	// by day of week (0=Sunday … 6=Saturday)
-	dayNames := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
-	type DowBucket struct {
-		Dow     int    `json:"dow"`
-		DayName string `json:"day_name"`
-		Count   int    `json:"count"`
-	}
-	byDow := make([]DowBucket, 0, 7)
-	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT EXTRACT(DOW FROM (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::int as d, COUNT(*) as cnt
-		FROM search_history
-		GROUP BY d
-		ORDER BY d
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var db DowBucket
-			rows.Scan(&db.Dow, &db.Count)
-			if db.Dow >= 0 && db.Dow < 7 {
-				db.DayName = dayNames[db.Dow]
-			}
-			byDow = append(byDow, db)
-		}
-		rows.Close()
-	}
-
-	// by month (last 12 months)
-	type MonthBucket struct {
-		Month string `json:"month"`
-		Count int    `json:"count"`
-	}
-	byMonth := make([]MonthBucket, 0, 12)
-	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT TO_CHAR(DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata'), 'Mon YYYY') as m,
-		       COUNT(*) as cnt
-		FROM search_history
-		WHERE searched_at >= NOW() - INTERVAL '12 months'
-		GROUP BY DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')
-		ORDER BY DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var mb MonthBucket
-			rows.Scan(&mb.Month, &mb.Count)
-			byMonth = append(byMonth, mb)
-		}
-		rows.Close()
-	}
-
-	return gin.H{
-		"by_hour":        byHour,
-		"by_day_of_week": byDow,
-		"by_month":       byMonth,
-	}
 }
