@@ -41,7 +41,7 @@ func (r *SearchHistoryRepository) Create(ctx context.Context, history *models.Se
 func (r *SearchHistoryRepository) GetByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*models.SearchHistory, error) {
 	histories := make([]*models.SearchHistory, 0)
 	query := `
-		SELECT id, user_id, query, total_results, top_results, searched_at
+		SELECT id, user_id, query, total_results, searched_at
 		FROM search_history
 		WHERE user_id = $1
 		ORDER BY searched_at DESC
@@ -56,20 +56,14 @@ func (r *SearchHistoryRepository) GetByUserID(ctx context.Context, userID uuid.U
 
 	for rows.Next() {
 		var history models.SearchHistory
-		var topResultsJSON []byte
 
 		if err := rows.Scan(
 			&history.ID,
 			&history.UserID,
 			&history.Query,
 			&history.TotalResults,
-			&topResultsJSON,
 			&history.SearchedAt,
 		); err != nil {
-			return histories, err
-		}
-
-		if err := json.Unmarshal(topResultsJSON, &history.TopResults); err != nil {
 			return histories, err
 		}
 
@@ -83,7 +77,7 @@ func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, of
 	histories := make([]*models.SearchHistoryWithUser, 0)
 	query := `
 		SELECT
-			sh.id, sh.user_id, sh.query, sh.total_results, sh.top_results, sh.searched_at,
+			sh.id, sh.user_id, sh.query, sh.total_results, sh.searched_at,
 			u.email, u.name
 		FROM search_history sh
 		JOIN users u ON sh.user_id = u.id
@@ -99,22 +93,16 @@ func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, of
 
 	for rows.Next() {
 		var history models.SearchHistoryWithUser
-		var topResultsJSON []byte
 
 		if err := rows.Scan(
 			&history.ID,
 			&history.UserID,
 			&history.Query,
 			&history.TotalResults,
-			&topResultsJSON,
 			&history.SearchedAt,
 			&history.UserEmail,
 			&history.UserName,
 		); err != nil {
-			return histories, err
-		}
-
-		if err := json.Unmarshal(topResultsJSON, &history.TopResults); err != nil {
 			return histories, err
 		}
 
