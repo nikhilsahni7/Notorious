@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 )
 
 type AdminGinHandler struct {
@@ -676,21 +677,91 @@ func (h *AdminGinHandler) DeleteUserSession(c *gin.Context) {
 func (h *AdminGinHandler) GetDashboardStats(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Count pending requests
-	userRequests, _ := h.userRequestRepo.ListByStatus(ctx, "pending", 1000, 0)
-	passwordRequests, _ := h.passwordChangeRepo.ListByStatus(ctx, "pending", 1000, 0)
+	var pendingUserRequests int
+	var pendingPasswordRequests int
+	var totalUsers int
+	var activeUsers int
+	var totalSearches int
 
-	totalUsers, _ := h.userRepo.CountTotal(ctx)
-	activeUsers, _ := h.userRepo.CountActive(ctx)
-	totalSearches, _ := h.searchHistoryRepo.CountAll(ctx)
+	group, groupCtx := errgroup.WithContext(ctx)
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("pending_user_requests", func() error {
+			count, err := h.userRequestRepo.CountByStatus(groupCtx, "pending")
+			if err != nil {
+				return err
+			}
+			pendingUserRequests = count
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("pending_password_requests", func() error {
+			count, err := h.passwordChangeRepo.CountByStatus(groupCtx, "pending")
+			if err != nil {
+				return err
+			}
+			pendingPasswordRequests = count
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("total_users", func() error {
+			count, err := h.userRepo.CountTotal(groupCtx)
+			if err != nil {
+				return err
+			}
+			totalUsers = count
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("active_users", func() error {
+			count, err := h.userRepo.CountActive(groupCtx)
+			if err != nil {
+				return err
+			}
+			activeUsers = count
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("total_searches", func() error {
+			count, err := h.searchHistoryRepo.CountAll(groupCtx)
+			if err != nil {
+				return err
+			}
+			totalSearches = count
+			return nil
+		})
+	})
+
+	if err := group.Wait(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load dashboard stats"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"pending_user_requests":     len(userRequests),
-		"pending_password_requests": len(passwordRequests),
+		"pending_user_requests":     pendingUserRequests,
+		"pending_password_requests": pendingPasswordRequests,
 		"total_users":               totalUsers,
 		"active_users":              activeUsers,
 		"total_searches":            totalSearches,
 	})
+}
+
+func recoverDashboardStatsPanic(metric string, fn func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic while loading %s: %v", metric, r)
+		}
+	}()
+
+	return fn()
 }
 
 // GetOnlineUsers returns list of user IDs currently online (active in last 60 seconds)

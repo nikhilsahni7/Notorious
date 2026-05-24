@@ -104,6 +104,13 @@ func (r *PasswordChangeRepository) ListByStatus(ctx context.Context, status stri
 	return requests, rows.Err()
 }
 
+func (r *PasswordChangeRepository) CountByStatus(ctx context.Context, status string) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM password_change_requests WHERE status = $1`
+	err := r.db.Pool.QueryRow(ctx, query, status).Scan(&count)
+	return count, err
+}
+
 func (r *PasswordChangeRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, adminNotes *string, newPasswordHash *string, processedBy uuid.UUID) error {
 	query := `
 		UPDATE password_change_requests
@@ -113,4 +120,3 @@ func (r *PasswordChangeRepository) UpdateStatus(ctx context.Context, id uuid.UUI
 	_, err := r.db.Pool.Exec(ctx, query, status, adminNotes, newPasswordHash, processedBy, time.Now(), id)
 	return err
 }
-

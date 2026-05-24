@@ -122,6 +122,13 @@ func (r *UserRequestRepository) ListByStatus(ctx context.Context, status string,
 	return requests, rows.Err()
 }
 
+func (r *UserRequestRepository) CountByStatus(ctx context.Context, status string) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM user_requests WHERE status = $1`
+	err := r.db.Pool.QueryRow(ctx, query, status).Scan(&count)
+	return count, err
+}
+
 func (r *UserRequestRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, adminNote *string, reviewedBy *uuid.UUID, reviewedAt *time.Time) error {
 	query := `
 		UPDATE user_requests

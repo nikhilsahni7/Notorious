@@ -79,10 +79,14 @@ func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, of
 		SELECT
 			sh.id, sh.user_id, sh.query, sh.total_results, sh.searched_at,
 			u.email, u.name
-		FROM search_history sh
+		FROM (
+			SELECT id, user_id, query, total_results, searched_at
+			FROM search_history
+			ORDER BY searched_at DESC, id DESC
+			LIMIT $1 OFFSET $2
+		) sh
 		JOIN users u ON sh.user_id = u.id
-		ORDER BY sh.searched_at DESC
-		LIMIT $1 OFFSET $2
+		ORDER BY sh.searched_at DESC, sh.id DESC
 	`
 
 	rows, err := r.db.Pool.Query(ctx, query, limit, offset)
