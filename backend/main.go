@@ -105,6 +105,7 @@ func main() {
 
 
 	// CORS configuration - allow frontend origins and common headers
+	//new vps update
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001",
