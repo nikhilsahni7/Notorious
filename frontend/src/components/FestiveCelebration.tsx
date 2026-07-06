@@ -2,7 +2,6 @@
 
 import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
-import { Palette } from "lucide-react";
 import React, { useEffect } from "react";
 
 export const triggerFestiveBlast = () => {
@@ -78,76 +77,78 @@ const FloatingElement = ({
 );
 
 export const FestiveHeader = () => {
+  const disclaimerText = "Disclaimer: for Maharashtra and Rajasthan data upcoming with live tracking process";
+
   return (
-    <div
-      className="hidden lg:flex items-center px-10 py-3 rounded-2xl border border-white/20 mx-6 flex-1 justify-center max-w-xl shadow-[0_0_40px_rgba(255,20,147,0.3)] relative overflow-hidden group transition-all duration-500 hover:shadow-[0_0_50px_rgba(255,20,147,0.5)]"
+    <div className="hidden md:flex items-center mx-3 flex-1 max-w-3xl relative overflow-hidden rounded-full border border-amber-500/15 h-9 group hover:border-amber-400/30 transition-all duration-700"
       style={{
-        backgroundImage: 'url("/third_eye_emblem.png")',
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        background: "linear-gradient(135deg, rgba(120,53,15,0.25) 0%, rgba(154,52,18,0.15) 50%, rgba(120,53,15,0.25) 100%)",
+        backdropFilter: "blur(16px)",
       }}
     >
-      {/* Dark overlay for better readability */}
-      <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-500" />
+      {/* Sweeping light line along the top edge */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] overflow-hidden">
+        <div
+          className="h-full w-[40%] bg-gradient-to-r from-transparent via-amber-400/70 to-transparent"
+          style={{ animation: "sweep-line 4s ease-in-out infinite" }}
+        />
+      </div>
 
-      {/* Animated light sweep */}
-      <motion.div
-        animate={{
-          x: ["-100%", "200%"],
-        }}
-        transition={{
-          duration: 3,
-          repeat: Infinity,
-          ease: "linear",
-          delay: 1,
-        }}
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none"
-      />
+      {/* Bottom glow line */}
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] overflow-hidden opacity-40">
+        <div
+          className="h-full w-[30%] bg-gradient-to-r from-transparent via-orange-400/60 to-transparent"
+          style={{ animation: "sweep-line 5s ease-in-out infinite", animationDelay: "2s" }}
+        />
+      </div>
 
-      <div className="flex items-center gap-8 relative z-10">
-        <motion.div
-          animate={{ rotate: [-20, 20, -20], scale: [1, 1.2, 1] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          className="bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-lg"
-        >
-          <Palette
-            size={22}
-            className="text-pink-400 drop-shadow-[0_0_8px_rgba(255,20,147,0.8)]"
+      {/* Subtle inner glow */}
+      <div className="absolute inset-0 bg-gradient-to-r from-amber-500/[0.03] via-transparent to-amber-500/[0.03] pointer-events-none" />
+
+      {/* Pulsing indicator */}
+      <div className="flex items-center gap-2 pl-4 pr-3 flex-shrink-0 z-10">
+        <span className="relative flex h-[6px] w-[6px]">
+          <span
+            className="absolute inline-flex h-full w-full rounded-full bg-amber-400/50"
+            style={{ animation: "glow-pulse 2s ease-in-out infinite" }}
           />
-        </motion.div>
+          <span className="relative inline-flex rounded-full h-[6px] w-[6px] bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.6)]" />
+        </span>
+        <span className="text-[9px] font-semibold text-amber-400/80 uppercase tracking-[0.15em] whitespace-nowrap select-none">
+          Live
+        </span>
+        <div className="w-[1px] h-4 bg-amber-500/15 ml-1" />
+      </div>
 
-        <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-6 py-2 rounded-xl border border-white/10">
-          <motion.div
-            initial={{ y: -5, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="flex items-center"
-          >
-            <span className="text-lg font-black text-white tracking-[0.4em] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              Third Eye Vision
+      {/* Scrolling text area */}
+      <div className="flex-1 overflow-hidden relative">
+        {/* Smooth fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
+          style={{ background: "linear-gradient(to right, rgba(120,53,15,0.35), transparent)" }}
+        />
+        <div className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
+          style={{ background: "linear-gradient(to left, rgba(120,53,15,0.35), transparent)" }}
+        />
+
+        {/* The scrolling track — 4 copies for seamless loop */}
+        <div
+          className="flex whitespace-nowrap items-center"
+          style={{
+            animation: "marquee-scroll 24s linear infinite",
+            willChange: "transform",
+          }}
+        >
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className="inline-flex items-center gap-3 px-8 select-none">
+              <span className="text-[11px] font-medium text-amber-200/80 tracking-[0.02em]"
+                style={{ textShadow: "0 0 20px rgba(251,191,36,0.15)" }}
+              >
+                {disclaimerText}
+              </span>
+              <span className="text-amber-500/25 text-[8px]">◆</span>
             </span>
-          </motion.div>
-
-          <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent my-1.5 opacity-80" />
-
-          <motion.span
-            animate={{ opacity: [0.7, 1, 0.7], y: [0, -1, 0] }}
-            transition={{ duration: 2.5, repeat: Infinity }}
-            className="text-[11px] text-white/90 font-black uppercase tracking-[0.5em] space-x-1"
-          >
-            See the solution. Let&apos;s build.
-          </motion.span>
+          ))}
         </div>
-
-        <motion.div
-          animate={{ rotate: [20, -20, 20], scale: [1, 1.2, 1] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          className="bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-lg"
-        >
-          <Palette
-            size={22}
-            className="text-blue-400 drop-shadow-[0_0_8px_rgba(0,191,255,0.8)]"
-          />
-        </motion.div>
       </div>
     </div>
   );

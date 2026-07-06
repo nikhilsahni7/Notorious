@@ -127,74 +127,74 @@ export function PersonTableRow({
       {/* Desktop Grid View */}
       <div className="hidden md:grid grid-cols-[repeat(16,minmax(0,1fr))] gap-2 text-sm bg-white/5 hover:bg-white/10 transition-all duration-300 rounded-lg overflow-hidden border border-white/5 hover:border-white/15 hover:shadow-[0_4px_20px_rgba(0,0,0,0.25)] hover:-translate-y-[1px] transform">
         {/* Master ID */}
-        <div className="col-span-1 bg-[#2D3748]/85 text-white p-3 flex items-center justify-center">
-        <div className="break-all text-xs font-mono">{person.id || "-"}</div>
+        <div className="col-span-1 bg-[#2D3748]/85 text-white p-2 flex items-center justify-center overflow-hidden min-w-0">
+        <div className="break-all text-[11px] font-mono w-full text-center overflow-hidden">{person.id || "-"}</div>
       </div>
 
       {/* ID */}
-      <div className="col-span-1 bg-[#2D3748]/85 text-white p-3 flex items-center justify-center">
-        <div className="break-all text-xs font-mono">{person.oid || "-"}</div>
+      <div className="col-span-1 bg-[#2D3748]/85 text-white p-2 flex items-center justify-center overflow-hidden min-w-0">
+        <div className="break-all text-[11px] font-mono w-full text-center overflow-hidden">{person.oid || "-"}</div>
       </div>
 
       {/* Name */}
-      <div className="col-span-2 bg-[#2D3748]/85 text-white p-3 flex items-center">
-        <div className="break-words text-xs">{person.name || "-"}</div>
+      <div className="col-span-2 bg-[#2D3748]/85 text-white p-2 flex items-center overflow-hidden min-w-0">
+        <div className="break-words text-[11px] w-full overflow-hidden">{person.name || "-"}</div>
       </div>
 
       {/* Father Name */}
-      <div className="col-span-1 bg-[#2D3748]/85 text-white p-3 flex items-center justify-center">
-        <div className="break-words text-xs text-center">
+      <div className="col-span-1 bg-[#2D3748]/85 text-white p-2 flex items-center justify-center overflow-hidden min-w-0">
+        <div className="break-words text-[11px] text-center w-full overflow-hidden">
           {person.fname || "-"}
         </div>
       </div>
 
       {/* Mobile */}
-      <div className="col-span-1 bg-[#ED64A6] text-white p-3 flex items-center justify-center">
-        <div className="text-xs">{person.mobile || "-"}</div>
+      <div className="col-span-1 bg-[#ED64A6] text-white p-2 flex items-center justify-center overflow-hidden min-w-0">
+        <div className="text-[11px] break-all w-full text-center overflow-hidden">{person.mobile || "-"}</div>
       </div>
 
       {/* Alt Phone */}
-      <div className="col-span-1 bg-[#805AD5] text-white p-3 flex items-center justify-center">
-        <div className="text-xs">{person.alt || "-"}</div>
+      <div className="col-span-1 bg-[#805AD5] text-white p-2 flex items-center justify-center overflow-hidden min-w-0">
+        <div className="text-[11px] break-all w-full text-center overflow-hidden">{person.alt || "-"}</div>
       </div>
 
       {/* Email */}
-      <div className={`col-span-1 p-3 flex items-center justify-center text-xs break-all transition-colors ${person.email ? 'bg-[#f97316] text-black font-extrabold' : 'bg-white/5 text-white/40'}`}>
-        <div className="text-center">{person.email || "-"}</div>
+      <div className={`col-span-1 p-2 flex items-center justify-center text-[11px] overflow-hidden min-w-0 transition-colors ${person.email ? 'bg-[#f97316] text-black font-extrabold' : 'bg-white/5 text-white/40'}`}>
+        <div className="text-center break-all w-full overflow-hidden">{person.email || "-"}</div>
       </div>
 
       {/* Address */}
-      <div className="col-span-3 bg-[#68D391] text-gray-900 p-3 flex items-center">
-        <div className="text-xs break-words">
+      <div className="col-span-3 bg-[#68D391] text-gray-900 p-2 flex items-center overflow-hidden min-w-0">
+        <div className="text-[11px] break-words w-full overflow-hidden">
           {formatAddress(person.address)}
         </div>
       </div>
 
       {/* Alt Address */}
-      <div className="col-span-3 bg-[#F56565] text-white p-3 flex items-center">
-        <div className="text-xs break-words">
+      <div className="col-span-3 bg-[#F56565] text-white p-2 flex items-center overflow-hidden min-w-0">
+        <div className="text-[11px] break-words w-full overflow-hidden">
           {formatAddress(person.alt_address)}
         </div>
       </div>
 
       {/* Year */}
-      <div className="col-span-1 bg-[#4299E1] text-white p-3 flex items-center justify-center">
-        <div className="font-semibold text-xs">
+      <div className="col-span-1 bg-[#4299E1] text-white p-2 flex items-center justify-center overflow-hidden min-w-0">
+        <div className="font-semibold text-[11px]">
           {person.year_of_registration || "-"}
         </div>
       </div>
 
       {/* Action */}
-      <div className="col-span-1 bg-gray-700/85 text-white p-3 flex items-center justify-center">
+      <div className="col-span-1 bg-gray-700/85 text-white p-2 flex items-center justify-center overflow-hidden min-w-0">
         <button
           onClick={() => onCopy(person, index)}
-          className="hover:bg-gray-600 p-1 rounded transition-colors"
+          className="hover:bg-gray-600 p-1 rounded transition-colors flex-shrink-0"
           title="Copy all data"
         >
           {isCopied ? (
-            <Check className="h-4 w-4 text-green-400" />
+            <Check className="h-3.5 w-3.5 text-green-400" />
           ) : (
-            <Copy className="h-4 w-4" />
+            <Copy className="h-3.5 w-3.5" />
           )}
         </button>
       </div>

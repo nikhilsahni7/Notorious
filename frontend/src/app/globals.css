@@ -83,3 +83,31 @@ body {
   color: var(--color-foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Smooth marquee ticker animation — GPU accelerated */
+@keyframes marquee-scroll {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(251, 191, 36, 0.4), 0 0 8px rgba(251, 191, 36, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.7), 0 0 16px rgba(251, 191, 36, 0.3);
+  }
+}
+
+@keyframes sweep-line {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}

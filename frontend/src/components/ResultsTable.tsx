@@ -42,17 +42,22 @@ export function ResultsTable({
           </Button>
         </div>
       )}
-      <TableHeader />
-      <div className="space-y-2">
-        {results.map((person, index) => (
-          <PersonTableRow
-            key={`${person.id}-${person.mobile}-${index}`}
-            person={person}
-            index={index}
-            isCopied={copiedIndex === index}
-            onCopy={onCopy}
-          />
-        ))}
+      {/* Horizontally scrollable table wrapper for desktop */}
+      <div className="overflow-x-auto -mx-1 px-1">
+        <div className="min-w-[1200px]">
+          <TableHeader />
+          <div className="space-y-2">
+            {results.map((person, index) => (
+              <PersonTableRow
+                key={`${person.id}-${person.mobile}-${index}`}
+                person={person}
+                index={index}
+                isCopied={copiedIndex === index}
+                onCopy={onCopy}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </>
   );
