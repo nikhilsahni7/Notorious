@@ -100,14 +100,17 @@ function LoginContent() {
         <div className="absolute inset-0 bg-gradient-to-r from-[#080e1f]/40 via-[#070c1a]/20 to-[#050812]/78 pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_30%,rgba(56,189,248,0.18),transparent_45%),radial-gradient(circle_at_8%_10%,rgba(236,72,153,0.12),transparent_30%)] pointer-events-none" />
 
-        <div className="absolute left-[6%] md:left-[10%] top-[67%] md:top-[69%] -translate-y-1/2 z-10 w-[min(88vw,38rem)] md:w-[min(46vw,40rem)]">
-          <p className="text-white text-center font-black leading-[1.12] text-[clamp(1.25rem,2.35vw,2.35rem)] drop-shadow-[0_6px_18px_rgba(0,0,0,0.9)]">
-            Two eyes see the problem.
+        <div className="absolute left-[6%] md:left-[10%] top-[67%] md:top-[69%] -translate-y-1/2 z-10 w-[min(88vw,38rem)] md:w-[min(46vw,40rem)] text-center md:text-left">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 backdrop-blur-md mb-4 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-amber-400 font-bold uppercase tracking-wider text-[0.75rem]">
+              System Notice
+            </span>
+          </div>
+          <p className="text-white font-black leading-[1.25] text-[clamp(1.2rem,2.15vw,2.15rem)] drop-shadow-[0_6px_18px_rgba(0,0,0,0.9)]">
+            Disclaimer: for Maharashtra and Rajasthan data
             <br />
-            The Third Eye sees the solution. Let&apos;s build.
-          </p>
-          <p className="mt-2.5 text-center text-white/70 text-[0.82rem] md:text-[0.95rem] font-medium drop-shadow-[0_3px_12px_rgba(0,0,0,0.9)]">
-            Third Eye is not just a project. It&apos;s our unfair advantage.
+            upcoming with live tracking process
           </p>
         </div>
 

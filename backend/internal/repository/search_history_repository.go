@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"notorious-backend/internal/database"
 	"notorious-backend/internal/models"
@@ -205,4 +206,48 @@ func (r *SearchHistoryRepository) CountAll(ctx context.Context) (int, error) {
 	query := `SELECT COUNT(*) FROM search_history`
 	err := r.db.Pool.QueryRow(ctx, query).Scan(&count)
 	return count, err
+}
+
+// GetTodaySearchesByUserID retrieves all searches for a user within a specific time range
+func (r *SearchHistoryRepository) GetTodaySearchesByUserID(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]*models.SearchHistory, error) {
+	histories := make([]*models.SearchHistory, 0)
+
+	query := `
+		SELECT id, user_id, query, total_results, top_results, searched_at
+		FROM search_history
+		WHERE user_id = $1
+		  AND searched_at >= $2
+		  AND searched_at < $3
+		ORDER BY searched_at ASC
+	`
+
+	rows, err := r.db.Pool.Query(ctx, query, userID, start, end)
+	if err != nil {
+		return histories, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var history models.SearchHistory
+		var topResultsJSON []byte
+
+		if err := rows.Scan(
+			&history.ID,
+			&history.UserID,
+			&history.Query,
+			&history.TotalResults,
+			&topResultsJSON,
+			&history.SearchedAt,
+		); err != nil {
+			return histories, err
+		}
+
+		if err := json.Unmarshal(topResultsJSON, &history.TopResults); err != nil {
+			return histories, err
+		}
+
+		histories = append(histories, &history)
+	}
+
+	return histories, rows.Err()
 }

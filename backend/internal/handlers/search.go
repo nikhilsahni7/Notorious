@@ -467,17 +467,27 @@ func (h *SearchHandler) Suggest(c *gin.Context) {
 	})
 }
 
-// ExportEODReport generates a CSV file with all searches from today (midnight to now IST)
+// ExportEODReport generates a CSV file with all searches from today for the logged-in user (midnight to now IST)
 func (h *SearchHandler) ExportEODReport(c *gin.Context) {
-	// Get today's searches from the database
-	histories, err := h.searchHistoryRepo.GetTodaySearches(c.Request.Context())
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+	uid := userID.(uuid.UUID)
+
+	// Calculate today's start and end times in IST
+	now := time.Now().In(h.istLocation)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, h.istLocation)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	// Get today's searches from the database for this user only
+	histories, err := h.searchHistoryRepo.GetTodaySearchesByUserID(c.Request.Context(), uid, startOfDay, endOfDay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve search history"})
 		return
 	}
 
-	// Generate filename with current date in IST
-	now := time.Now().In(h.istLocation)
 	filename := fmt.Sprintf("EOD_Report_%s.csv", now.Format("2006-01-02"))
 
 	// Set CSV headers

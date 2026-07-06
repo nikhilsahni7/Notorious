@@ -24,6 +24,7 @@ type AdminGinHandler struct {
 	metadataRepo       *repository.MetadataRepository
 	adminSessionRepo   *repository.AdminSessionRepository
 	sessionRepo        *repository.SessionRepository
+	istLocation        *time.Location
 }
 
 func NewAdminGinHandler(
@@ -35,6 +36,7 @@ func NewAdminGinHandler(
 	adminSessionRepo *repository.AdminSessionRepository,
 	sessionRepo *repository.SessionRepository,
 ) *AdminGinHandler {
+	ist, _ := time.LoadLocation("Asia/Kolkata")
 	return &AdminGinHandler{
 		userRepo:           userRepo,
 		userRequestRepo:    userRequestRepo,
@@ -43,6 +45,7 @@ func NewAdminGinHandler(
 		metadataRepo:       metadataRepo,
 		adminSessionRepo:   adminSessionRepo,
 		sessionRepo:        sessionRepo,
+		istLocation:        ist,
 	}
 }
 
@@ -804,23 +807,20 @@ func (h *AdminGinHandler) GenerateUserEOD(c *gin.Context) {
 		return
 	}
 
-	// Get today's search history for this user
-	todaySearches, err := h.searchHistoryRepo.GetTodaySearches(c.Request.Context())
+	// Calculate today's start and end times in IST
+	now := time.Now().In(h.istLocation)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, h.istLocation)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	// Get today's search history for this user only using repository method
+	userSearches, err := h.searchHistoryRepo.GetTodaySearchesByUserID(c.Request.Context(), userID, startOfDay, endOfDay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch search history"})
 		return
 	}
 
-	// Filter searches for this user only
-	userSearches := make([]*models.SearchHistory, 0)
-	for _, search := range todaySearches {
-		if search.UserID == userID {
-			userSearches = append(userSearches, search)
-		}
-	}
-
 	// Set headers for file download
-	filename := user.Name + "_EOD_" + time.Now().Format("2006-01-02") + ".csv"
+	filename := user.Name + "_EOD_" + now.Format("2006-01-02") + ".csv"
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", "attachment; filename="+filename)
 	c.Header("Content-Type", "text/csv")
@@ -876,8 +876,8 @@ func (h *AdminGinHandler) GenerateUserEOD(c *gin.Context) {
 			continue
 		}
 
-		// Format timestamp
-		timestamp := history.SearchedAt.Format("2006-01-02 15:04:05")
+		// Format timestamp in IST
+		timestamp := history.SearchedAt.In(h.istLocation).Format("2006-01-02 15:04:05")
 		totalResults := history.TotalResults
 
 		// Limit to top 25 results
