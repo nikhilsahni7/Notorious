@@ -19,11 +19,18 @@ func NewPasswordChangeRepository(db *database.DB) *PasswordChangeRepository {
 
 func (r *PasswordChangeRepository) Create(ctx context.Context, req *models.PasswordChangeRequest) error {
 	query := `
-		INSERT INTO password_change_requests (user_id, reason, status)
-		VALUES ($1, $2, $3)
+		INSERT INTO password_change_requests (user_id, reason, status, admin_notes, new_password_hash, processed_by)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at
 	`
-	return r.db.Pool.QueryRow(ctx, query, req.UserID, req.Reason, "pending").Scan(
+	return r.db.Pool.QueryRow(ctx, query,
+		req.UserID,
+		req.Reason,
+		req.Status,
+		req.AdminNotes,
+		req.NewPasswordHash,
+		req.ProcessedBy,
+	).Scan(
 		&req.ID, &req.CreatedAt, &req.UpdatedAt,
 	)
 }

@@ -169,25 +169,25 @@ export default function PasswordChangePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Direct Password Change Form */}
-          <div className="bg-white/5 backdrop-blur-xl p-6 rounded-xl border border-white/10 shadow-xl flex flex-col justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white mb-4">
-                Change Password Directly
-              </h2>
+          <div className="bg-white/5 backdrop-blur-xl p-6 rounded-xl border border-white/10 shadow-xl flex flex-col h-full">
+            <h2 className="text-lg font-semibold text-white mb-4">
+              Change Password Directly
+            </h2>
 
-              {directError && (
-                <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm">
-                  {directError}
-                </div>
-              )}
+            {directError && (
+              <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm">
+                {directError}
+              </div>
+            )}
 
-              {directSuccess && (
-                <div className="mb-4 bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm">
-                  {directSuccess}
-                </div>
-              )}
+            {directSuccess && (
+              <div className="mb-4 bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm">
+                {directSuccess}
+              </div>
+            )}
 
-              <form onSubmit={handleDirectSubmit} className="space-y-4">
+            <form onSubmit={handleDirectSubmit} className="flex-1 flex flex-col justify-between">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                     Current Password *
@@ -229,77 +229,75 @@ export default function PasswordChangePage() {
                     required
                   />
                 </div>
+              </div>
 
-                <Button
-                  type="submit"
-                  disabled={directLoading || !currentPassword || !newPassword || !confirmPassword}
-                  className="w-full bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white h-11 border-none shadow-[0_0_15px_rgba(236,72,153,0.3)] transition-all duration-300 font-bold mt-2"
-                >
-                  {directLoading ? (
-                    <>
-                      <Spinner size="sm" className="mr-2" />
-                      Updating...
-                    </>
-                  ) : (
-                    "Update Password"
-                  )}
-                </Button>
-              </form>
-            </div>
+              <Button
+                type="submit"
+                disabled={directLoading || !currentPassword || !newPassword || !confirmPassword}
+                className="w-full bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white h-11 border-none shadow-[0_0_15px_rgba(236,72,153,0.3)] transition-all duration-300 font-bold mt-6"
+              >
+                {directLoading ? (
+                  <>
+                    <Spinner size="sm" className="mr-2" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Password"
+                )}
+              </Button>
+            </form>
           </div>
 
           {/* Request Form */}
-          <div className="bg-white/5 backdrop-blur-xl p-6 rounded-xl border border-white/10 shadow-xl flex flex-col justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white mb-4">
-                Request Password Change
-              </h2>
+          <div className="bg-white/5 backdrop-blur-xl p-6 rounded-xl border border-white/10 shadow-xl flex flex-col h-full">
+            <h2 className="text-lg font-semibold text-white mb-4">
+              Request Password Change
+            </h2>
 
-              {error && (
-                <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm">
-                  {error}
-                </div>
-              )}
+            {error && (
+              <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
 
-              {success && (
-                <div className="mb-4 bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm">
-                  {success}
-                </div>
-              )}
+            {success && (
+              <div className="mb-4 bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm">
+                {success}
+              </div>
+            )}
 
-              <form onSubmit={handleSubmit} className="space-y-4 h-full flex flex-col justify-between">
-                <div className="flex-1">
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    Reason for Password Change *
-                  </label>
-                  <textarea
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="Explain why you need admin to reset/change your password..."
-                    className="w-full h-[180px] bg-[#2D1B4E]/50 border border-gray-600 text-white placeholder:text-gray-500 rounded-md p-3 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-pink-500/20 focus:border-pink-500/50"
-                    required
-                  />
-                </div>
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between">
+              <div className="flex-1 flex flex-col">
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Reason for Password Change *
+                </label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Explain why you need admin to reset/change your password..."
+                  className="flex-1 min-h-[180px] bg-[#2D1B4E]/50 border border-gray-600 text-white placeholder:text-gray-500 rounded-md p-3 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-pink-500/20 focus:border-pink-500/50"
+                  required
+                />
+              </div>
 
-                <Button
-                  type="submit"
-                  disabled={loading || !reason.trim()}
-                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white h-11 border-none shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300 font-bold mt-2"
-                >
-                  {loading ? (
-                    <>
-                      <Spinner size="sm" className="mr-2" />
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Submit Request
-                    </>
-                  )}
-                </Button>
-              </form>
-            </div>
+              <Button
+                type="submit"
+                disabled={loading || !reason.trim()}
+                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white h-11 border-none shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300 font-bold mt-6"
+              >
+                {loading ? (
+                  <>
+                    <Spinner size="sm" className="mr-2" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Submit Request
+                  </>
+                )}
+              </Button>
+            </form>
           </div>
         </div>
 
@@ -307,50 +305,64 @@ export default function PasswordChangePage() {
         <div className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 shadow-xl overflow-hidden">
           <div className="p-4 border-b border-white/10">
             <h2 className="text-lg font-semibold text-white">
-              Your Password Change Requests
+              Your Password Activity Logs
             </h2>
             <p className="text-sm text-gray-400 mt-1">
-              {requests.length} total requests
+              {requests.length} total logs
             </p>
           </div>
 
           {requests.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">No password change requests yet</p>
+              <p className="text-lg">No password activity logged yet</p>
               <p className="text-sm mt-2">
-                Submit a request above to get started
+                Use the forms above to update your password
               </p>
             </div>
           ) : (
             <div className="divide-y divide-white/10">
-              {requests.map((request) => (
-                <div
-                  key={request.id}
-                  className="p-4 hover:bg-[#2D1B4E] transition-colors"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        {getStatusBadge(request.status)}
-                        <span className="text-xs text-gray-500">
-                          {format(new Date(request.created_at), "PPP p")}
-                        </span>
-                      </div>
-                      <p className="text-sm text-white mb-2">
-                        <span className="text-gray-400">Reason:</span>{" "}
-                        {request.reason}
-                      </p>
-                      {request.admin_notes && (
-                        <p className="text-sm text-gray-300 bg-[#2D1B4E] p-2 rounded">
-                          <span className="text-gray-500">Admin Response:</span>{" "}
-                          {request.admin_notes}
+              {requests.map((request) => {
+                const isDirectChange = request.reason === "Self-service password change";
+                return (
+                  <div
+                    key={request.id}
+                    className="p-4 hover:bg-[#2D1B4E] transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          {isDirectChange ? (
+                            <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded font-bold">
+                              <CheckCircle className="h-3 w-3" />
+                              Success (Direct)
+                            </span>
+                          ) : (
+                            getStatusBadge(request.status)
+                          )}
+                          <span className="text-xs text-gray-500">
+                            {format(new Date(request.created_at), "PPP p")}
+                          </span>
+                        </div>
+                        <p className="text-sm text-white mb-2">
+                          <span className="text-gray-400">Action:</span>{" "}
+                          {isDirectChange ? (
+                            <span className="text-green-300 font-medium">Direct self-service password update (Applied Instantly)</span>
+                          ) : (
+                            request.reason
+                          )}
                         </p>
-                      )}
+                        {!isDirectChange && request.admin_notes && (
+                          <p className="text-sm text-gray-300 bg-[#2D1B4E] p-2 rounded">
+                            <span className="text-gray-500">Admin Response:</span>{" "}
+                            {request.admin_notes}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
