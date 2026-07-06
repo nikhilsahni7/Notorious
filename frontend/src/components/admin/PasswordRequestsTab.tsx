@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { passwordService, PasswordChangeRequestWithUser } from "@/services/password.service";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { Check, X, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Check, X, Clock, CheckCircle, XCircle, User } from "lucide-react";
 import { format } from "date-fns";
 
 interface PasswordRequestsTabProps {
@@ -12,7 +12,7 @@ interface PasswordRequestsTabProps {
 export function PasswordRequestsTab({ token }: PasswordRequestsTabProps) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<PasswordChangeRequestWithUser[]>([]);
-  const [filter, setFilter] = useState<"pending" | "approved" | "rejected">("pending");
+  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "self-changed">("pending");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -113,13 +113,22 @@ export function PasswordRequestsTab({ token }: PasswordRequestsTabProps) {
             <XCircle className="h-4 w-4 mr-2" />
             Rejected
           </Button>
+          <Button
+            onClick={() => setFilter("self-changed")}
+            variant={filter === "self-changed" ? "default" : "outline"}
+            size="sm"
+            className={filter === "self-changed" ? "bg-orange-500 text-black font-bold" : "bg-transparent border-gray-600 text-white"}
+          >
+            <User className="h-4 w-4 mr-2" />
+            Self-Changed
+          </Button>
         </div>
       </div>
 
       {requests.length === 0 ? (
         <div className="text-center py-12 text-gray-400 bg-[#2D1B4E] rounded-lg border border-gray-700">
           <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-lg">No {filter} requests</p>
+          <p className="text-lg">No {filter === "self-changed" ? "self-changed logs" : `${filter} requests`}</p>
         </div>
       ) : (
         <div className="bg-[#2D1B4E] rounded-lg border border-gray-700 overflow-hidden">
@@ -129,13 +138,17 @@ export function PasswordRequestsTab({ token }: PasswordRequestsTabProps) {
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">User</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Reason</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Requested</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                    {filter === "self-changed" ? "Changed At" : "Requested"}
+                  </th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
                   {filter === "pending" && (
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Actions</th>
                   )}
-                  {(filter === "approved" || filter === "rejected") && (
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Admin Notes</th>
+                  {(filter === "approved" || filter === "rejected" || filter === "self-changed") && (
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
+                      {filter === "self-changed" ? "Details" : "Admin Notes"}
+                    </th>
                   )}
                 </tr>
               </thead>
@@ -165,9 +178,9 @@ export function PasswordRequestsTab({ token }: PasswordRequestsTabProps) {
                         </span>
                       )}
                       {request.status === "approved" && (
-                        <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded w-fit">
+                        <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded w-fit font-semibold">
                           <CheckCircle className="h-3 w-3" />
-                          Approved
+                          {request.reason === "Self-service password change" ? "Success (Direct)" : "Approved"}
                         </span>
                       )}
                       {request.status === "rejected" && (
@@ -199,9 +212,13 @@ export function PasswordRequestsTab({ token }: PasswordRequestsTabProps) {
                         </div>
                       </td>
                     )}
-                    {(filter === "approved" || filter === "rejected") && (
+                    {(filter === "approved" || filter === "rejected" || filter === "self-changed") && (
                       <td className="px-4 py-3 text-sm text-gray-300">
-                        {request.admin_notes || "-"}
+                        {filter === "self-changed" ? (
+                          <span className="text-green-300 font-medium">Applied instantly (No approval required)</span>
+                        ) : (
+                          request.admin_notes || "-"
+                        )}
                       </td>
                     )}
                   </tr>

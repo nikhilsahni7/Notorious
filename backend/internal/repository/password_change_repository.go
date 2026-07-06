@@ -80,18 +80,38 @@ func (r *PasswordChangeRepository) GetByUserID(ctx context.Context, userID uuid.
 
 func (r *PasswordChangeRepository) ListByStatus(ctx context.Context, status string, limit, offset int) ([]*models.PasswordChangeRequestWithUser, error) {
 	requests := make([]*models.PasswordChangeRequestWithUser, 0)
-	query := `
-		SELECT 
-			pcr.id, pcr.user_id, pcr.reason, pcr.status, pcr.admin_notes,
-			pcr.created_at, pcr.updated_at, pcr.processed_by,
-			u.email, u.name
-		FROM password_change_requests pcr
-		JOIN users u ON pcr.user_id = u.id
-		WHERE pcr.status = $1
-		ORDER BY pcr.created_at DESC
-		LIMIT $2 OFFSET $3
-	`
-	rows, err := r.db.Pool.Query(ctx, query, status, limit, offset)
+	var query string
+	var args []any
+
+	if status == "self-changed" {
+		query = `
+			SELECT 
+				pcr.id, pcr.user_id, pcr.reason, pcr.status, pcr.admin_notes,
+				pcr.created_at, pcr.updated_at, pcr.processed_by,
+				u.email, u.name
+			FROM password_change_requests pcr
+			JOIN users u ON pcr.user_id = u.id
+			WHERE pcr.reason = 'Self-service password change'
+			ORDER BY pcr.created_at DESC
+			LIMIT $1 OFFSET $2
+		`
+		args = []any{limit, offset}
+	} else {
+		query = `
+			SELECT 
+				pcr.id, pcr.user_id, pcr.reason, pcr.status, pcr.admin_notes,
+				pcr.created_at, pcr.updated_at, pcr.processed_by,
+				u.email, u.name
+			FROM password_change_requests pcr
+			JOIN users u ON pcr.user_id = u.id
+			WHERE pcr.status = $1 AND pcr.reason != 'Self-service password change'
+			ORDER BY pcr.created_at DESC
+			LIMIT $2 OFFSET $3
+		`
+		args = []any{status, limit, offset}
+	}
+
+	rows, err := r.db.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return requests, err
 	}
@@ -113,8 +133,16 @@ func (r *PasswordChangeRepository) ListByStatus(ctx context.Context, status stri
 
 func (r *PasswordChangeRepository) CountByStatus(ctx context.Context, status string) (int, error) {
 	var count int
-	query := `SELECT COUNT(*) FROM password_change_requests WHERE status = $1`
-	err := r.db.Pool.QueryRow(ctx, query, status).Scan(&count)
+	var query string
+	var err error
+
+	if status == "self-changed" {
+		query = `SELECT COUNT(*) FROM password_change_requests WHERE reason = 'Self-service password change'`
+		err = r.db.Pool.QueryRow(ctx, query).Scan(&count)
+	} else {
+		query = `SELECT COUNT(*) FROM password_change_requests WHERE status = $1 AND reason != 'Self-service password change'`
+		err = r.db.Pool.QueryRow(ctx, query, status).Scan(&count)
+	}
 	return count, err
 }
 
