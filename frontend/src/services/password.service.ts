@@ -32,6 +32,14 @@ export const passwordService = {
     });
   },
 
+  changePassword: async (currentPassword: string, newPassword: string, token: string): Promise<{ message: string }> => {
+    return apiRequest("/api/user/password-change/change", {
+      method: "POST",
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      token,
+    });
+  },
+
   // Admin endpoints
   getPasswordChangeRequests: async (token: string, status: string = "pending"): Promise<PasswordChangeRequestWithUser[]> => {
     return apiRequest(`/api/admin/password-change-requests?status=${status}&limit=100`, {

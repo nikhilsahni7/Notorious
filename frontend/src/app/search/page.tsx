@@ -337,7 +337,7 @@ export default function SearchPage() {
     <div className="min-h-screen bg-[#2D1B4E] p-3">
       <div className="max-w-[1800px] mx-auto">
         {/* Compact Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-3 bg-[#1a0f2e] p-3 rounded-lg border border-gray-700">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3 bg-white/5 backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-2xl">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-xl font-bold text-white">
@@ -371,14 +371,14 @@ export default function SearchPage() {
                   ({searchesRemaining})
                 </span>
               </div>
-              <div className="w-24 md:w-32 h-1.5 bg-gray-700 rounded-full mt-1 overflow-hidden ml-auto">
+              <div className="w-24 md:w-32 h-2 bg-white/5 rounded-full mt-1.5 overflow-hidden ml-auto border border-white/5 shadow-inner">
                 <div
-                  className={`h-full transition-all ${
+                  className={`h-full transition-all duration-500 relative ${
                     percentageUsed > 90
-                      ? "bg-red-500"
+                      ? "bg-gradient-to-r from-red-500 to-rose-600 shadow-[0_0_10px_rgba(239,68,68,0.4)]"
                       : percentageUsed > 70
-                      ? "bg-yellow-500"
-                      : "bg-green-500"
+                      ? "bg-gradient-to-r from-yellow-400 to-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]"
+                      : "bg-gradient-to-r from-green-400 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]"
                   }`}
                   style={{ width: `${Math.min(percentageUsed, 100)}%` }}
                 />
@@ -389,7 +389,7 @@ export default function SearchPage() {
               onClick={() => router.push("/profile")}
               variant="outline"
               size="sm"
-              className="h-8 px-2 bg-transparent border-purple-500 text-purple-400 hover:bg-purple-500/10"
+              className="h-8 px-3 bg-transparent border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:border-purple-400 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
             >
               <User className="h-4 w-4" />
               <span className="hidden md:inline ml-1">Profile</span>
@@ -399,7 +399,7 @@ export default function SearchPage() {
               onClick={() => router.push("/history")}
               variant="outline"
               size="sm"
-              className="h-8 px-2 bg-transparent border-blue-500 text-blue-400 hover:bg-blue-500/10"
+              className="h-8 px-3 bg-transparent border-blue-500/50 text-blue-300 hover:bg-blue-500/20 hover:border-blue-400 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
             >
               <History className="h-4 w-4" />
               <span className="hidden md:inline ml-1">History</span>
@@ -409,7 +409,7 @@ export default function SearchPage() {
               onClick={() => router.push("/password-change")}
               variant="outline"
               size="sm"
-              className="h-8 px-2 bg-transparent border-orange-500 text-orange-400 hover:bg-orange-500/10"
+              className="h-8 px-3 bg-transparent border-orange-500/50 text-orange-300 hover:bg-orange-500/20 hover:border-orange-400 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -432,7 +432,7 @@ export default function SearchPage() {
               onClick={handleExportEOD}
               variant="outline"
               size="sm"
-              className="h-8 px-2 bg-transparent border-green-500 text-green-400 hover:bg-green-500/10"
+              className="h-8 px-3 bg-transparent border-green-500/50 text-green-300 hover:bg-green-500/20 hover:border-green-400 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
             >
               <Download className="h-4 w-4" />
               <span className="hidden md:inline ml-1">Export</span>
@@ -443,7 +443,7 @@ export default function SearchPage() {
                 onClick={() => router.push("/admin")}
                 variant="outline"
                 size="sm"
-                className="h-8 px-2 bg-transparent border-pink-500 text-pink-400 hover:bg-pink-500/10"
+                className="h-8 px-3 bg-transparent border-pink-500/50 text-pink-300 hover:bg-pink-500/20 hover:border-pink-400 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -467,7 +467,7 @@ export default function SearchPage() {
               onClick={logout}
               variant="outline"
               size="sm"
-              className="h-8 px-2 bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
+              className="h-8 px-2 bg-transparent border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:-translate-y-[1px]"
             >
               <LogOut className="h-4 w-4" />
             </Button>
@@ -492,7 +492,7 @@ export default function SearchPage() {
         )}
 
         {/* Compact Search Form */}
-        <div className="bg-[#1a0f2e] p-3 rounded-lg border border-gray-700 mb-3">
+        <div className="bg-white/5 backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-xl mb-3">
           <SearchForm
             searchFields={searchFields}
             operator={operator}
@@ -505,7 +505,7 @@ export default function SearchPage() {
             <Button
               onClick={() => executeSearch(1)}
               disabled={loading || searchesUsed >= searchLimit}
-              className="flex-1 bg-pink-500 hover:bg-pink-600 text-white"
+              className="flex-1 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-bold h-10 border-none shadow-[0_0_15px_rgba(236,72,153,0.35)] transition-all duration-300 hover:shadow-[0_0_20px_rgba(236,72,153,0.55)] hover:-translate-y-[1px]"
             >
               {loading ? (
                 <>
@@ -522,7 +522,7 @@ export default function SearchPage() {
             <Button
               onClick={resetSearch}
               variant="outline"
-              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
+              className="bg-transparent border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 h-10"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
               Reset

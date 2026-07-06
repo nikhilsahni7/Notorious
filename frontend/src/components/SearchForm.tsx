@@ -34,7 +34,7 @@ export function SearchForm({
           value={safeValue(searchFields.id)}
           onChange={(e) => onFieldChange("id", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
+          className="bg-white/5 border-white/10 hover:border-white/25 focus-visible:border-pink-500/50 focus-visible:ring-pink-500/20 text-white placeholder:text-white/40 h-9 text-sm transition-all duration-300 rounded-lg"
         />
         <Input
           id="oid"
@@ -42,7 +42,7 @@ export function SearchForm({
           value={safeValue(searchFields.oid)}
           onChange={(e) => onFieldChange("oid", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
+          className="bg-white/5 border-white/10 hover:border-white/25 focus-visible:border-pink-500/50 focus-visible:ring-pink-500/20 text-white placeholder:text-white/40 h-9 text-sm transition-all duration-300 rounded-lg"
         />
         <Input
           id="name"
@@ -50,7 +50,7 @@ export function SearchForm({
           value={safeValue(searchFields.name)}
           onChange={(e) => onFieldChange("name", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
+          className="bg-white/5 border-white/10 hover:border-white/25 focus-visible:border-pink-500/50 focus-visible:ring-pink-500/20 text-white placeholder:text-white/40 h-9 text-sm transition-all duration-300 rounded-lg"
         />
         <Input
           id="fname"
@@ -58,7 +58,7 @@ export function SearchForm({
           value={safeValue(searchFields.fname)}
           onChange={(e) => onFieldChange("fname", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
+          className="bg-white/5 border-white/10 hover:border-white/25 focus-visible:border-pink-500/50 focus-visible:ring-pink-500/20 text-white placeholder:text-white/40 h-9 text-sm transition-all duration-300 rounded-lg"
         />
         <Input
           id="mobile"
@@ -66,7 +66,7 @@ export function SearchForm({
           value={safeValue(searchFields.mobile)}
           onChange={(e) => onFieldChange("mobile", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
+          className="bg-white/5 border-white/10 hover:border-white/25 focus-visible:border-pink-500/50 focus-visible:ring-pink-500/20 text-white placeholder:text-white/40 h-9 text-sm transition-all duration-300 rounded-lg"
         />
       </div>
 
@@ -77,7 +77,7 @@ export function SearchForm({
           value={safeValue(searchFields.alt)}
           onChange={(e) => onFieldChange("alt", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
+          className="bg-white/5 border-white/10 hover:border-white/25 focus-visible:border-pink-500/50 focus-visible:ring-pink-500/20 text-white placeholder:text-white/40 h-9 text-sm transition-all duration-300 rounded-lg"
         />
         <Input
           id="email"
@@ -85,7 +85,7 @@ export function SearchForm({
           value={safeValue(searchFields.email)}
           onChange={(e) => onFieldChange("email", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm"
+          className="bg-white/5 border-white/10 hover:border-white/25 focus-visible:border-pink-500/50 focus-visible:ring-pink-500/20 text-white placeholder:text-white/40 h-9 text-sm transition-all duration-300 rounded-lg"
         />
         <Input
           id="address"
@@ -93,7 +93,7 @@ export function SearchForm({
           value={safeValue(searchFields.address)}
           onChange={(e) => onFieldChange("address", e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-500 h-9 text-sm md:col-span-2"
+          className="bg-white/5 border-white/10 hover:border-white/25 focus-visible:border-pink-500/50 focus-visible:ring-pink-500/20 text-white placeholder:text-white/40 h-9 text-sm transition-all duration-300 rounded-lg md:col-span-2"
         />
       </div>
 

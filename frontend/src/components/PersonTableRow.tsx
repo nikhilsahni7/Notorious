@@ -92,11 +92,11 @@ export function PersonTableRow({
                 {person.alt || "-"}
               </div>
             </div>
-            <div className="bg-[#ECC94B]/20 border border-[#ECC94B] rounded p-2 text-center flex flex-col justify-center">
-              <div className="text-[10px] text-[#ECC94B] uppercase mb-1">
+            <div className={`rounded p-2 text-center flex flex-col justify-center transition-all ${person.email ? 'bg-orange-500/10 border border-orange-500/30 text-orange-400' : 'bg-white/5 border border-white/10 text-white/40'}`}>
+              <div className="text-[10px] uppercase mb-1 font-bold">
                 Email
               </div>
-              <div className="text-xs text-white break-all">
+              <div className={`text-xs break-all ${person.email ? 'text-white font-medium' : ''}`}>
                 {person.email || "-"}
               </div>
             </div>
@@ -125,24 +125,24 @@ export function PersonTableRow({
       </div>
 
       {/* Desktop Grid View */}
-      <div className="hidden md:grid grid-cols-[repeat(16,minmax(0,1fr))] gap-2 text-sm bg-[#1a0f2e]/50 hover:bg-[#1a0f2e] transition-colors rounded overflow-hidden">
+      <div className="hidden md:grid grid-cols-[repeat(16,minmax(0,1fr))] gap-2 text-sm bg-white/5 hover:bg-white/10 transition-all duration-300 rounded-lg overflow-hidden border border-white/5 hover:border-white/15 hover:shadow-[0_4px_20px_rgba(0,0,0,0.25)] hover:-translate-y-[1px] transform">
         {/* Master ID */}
-        <div className="col-span-1 bg-[#2D3748] text-white p-3 flex items-center justify-center">
+        <div className="col-span-1 bg-[#2D3748]/85 text-white p-3 flex items-center justify-center">
         <div className="break-all text-xs font-mono">{person.id || "-"}</div>
       </div>
 
       {/* ID */}
-      <div className="col-span-1 bg-[#2D3748] text-white p-3 flex items-center justify-center">
+      <div className="col-span-1 bg-[#2D3748]/85 text-white p-3 flex items-center justify-center">
         <div className="break-all text-xs font-mono">{person.oid || "-"}</div>
       </div>
 
       {/* Name */}
-      <div className="col-span-2 bg-[#2D3748] text-white p-3 flex items-center">
+      <div className="col-span-2 bg-[#2D3748]/85 text-white p-3 flex items-center">
         <div className="break-words text-xs">{person.name || "-"}</div>
       </div>
 
       {/* Father Name */}
-      <div className="col-span-1 bg-[#2D3748] text-white p-3 flex items-center justify-center">
+      <div className="col-span-1 bg-[#2D3748]/85 text-white p-3 flex items-center justify-center">
         <div className="break-words text-xs text-center">
           {person.fname || "-"}
         </div>
@@ -159,8 +159,8 @@ export function PersonTableRow({
       </div>
 
       {/* Email */}
-      <div className="col-span-1 bg-[#ECC94B] text-white p-3 flex items-center">
-        <div className="text-xs break-all">{person.email || "-"}</div>
+      <div className={`col-span-1 p-3 flex items-center justify-center text-xs break-all transition-colors ${person.email ? 'bg-[#f97316] text-black font-extrabold' : 'bg-white/5 text-white/40'}`}>
+        <div className="text-center">{person.email || "-"}</div>
       </div>
 
       {/* Address */}
@@ -185,7 +185,7 @@ export function PersonTableRow({
       </div>
 
       {/* Action */}
-      <div className="col-span-1 bg-gray-700 text-white p-3 flex items-center justify-center">
+      <div className="col-span-1 bg-gray-700/85 text-white p-3 flex items-center justify-center">
         <button
           onClick={() => onCopy(person, index)}
           className="hover:bg-gray-600 p-1 rounded transition-colors"

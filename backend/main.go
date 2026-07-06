@@ -79,7 +79,7 @@ func main() {
 			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, sessionRepo, jwtManager)
 			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo, sessionRepo)
 			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo, sessionRepo)
-			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo)
+			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo, userRepo)
 			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
 
 			// Initialize chat system
@@ -156,6 +156,7 @@ func main() {
 		{
 			passwordRoutes.POST("/request", userPasswordHandler.RequestPasswordChange)
 			passwordRoutes.GET("/requests", userPasswordHandler.GetPasswordChangeRequests)
+			passwordRoutes.POST("/change", userPasswordHandler.ChangePassword)
 		}
 	}
 

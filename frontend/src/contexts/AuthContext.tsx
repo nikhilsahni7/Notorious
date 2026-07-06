@@ -13,6 +13,7 @@ interface User {
   daily_search_limit: number;
   searches_used_today: number;
   is_active: boolean;
+  created_at?: string;
 }
 
 interface AuthContextType {
