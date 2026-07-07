@@ -78,7 +78,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#2D1B4E] p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-[#2D1B4E] p-3 md:p-6 relative overflow-hidden">
       {/* Navratri background elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/5 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full" />
@@ -101,7 +101,7 @@ export default function ProfilePage() {
         </div>
 
         {/* User Info Card */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl shadow-xl mb-6">
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-4 md:p-6 rounded-2xl shadow-xl mb-6">
           <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2 border-b border-white/10 pb-3">
             <User className="h-5 w-5 text-purple-400" />
             Account Information
@@ -190,7 +190,7 @@ export default function ProfilePage() {
 
         {/* Signup Metadata Card */}
         {metadata ? (
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl shadow-xl">
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-4 md:p-6 rounded-2xl shadow-xl">
             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2 border-b border-white/10 pb-3">
               <Globe className="h-5 w-5 text-blue-400" />
               Signup Information

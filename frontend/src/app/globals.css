@@ -78,6 +78,15 @@
   border-color: hsl(var(--border));
 }
 
+/* Hide scrollbars while keeping scroll functionality (used by horizontal tab bars) */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   background: var(--color-background);
   color: var(--color-foreground);

@@ -6,6 +6,7 @@ import { Captcha } from "@/components/ui/captcha";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
+import { MapPin } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -100,21 +101,29 @@ function LoginContent() {
         <div className="absolute inset-0 bg-gradient-to-r from-[#080e1f]/40 via-[#070c1a]/20 to-[#050812]/78 pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_30%,rgba(56,189,248,0.18),transparent_45%),radial-gradient(circle_at_8%_10%,rgba(236,72,153,0.12),transparent_30%)] pointer-events-none" />
 
-        <div className="absolute left-[4%] md:left-[6%] lg:left-[10%] bottom-[4%] md:bottom-[8%] z-10 w-[min(55vw,36rem)] md:w-[min(46vw,38rem)] text-center md:text-left">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 backdrop-blur-md mb-4 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-amber-400 font-bold uppercase tracking-wider text-[0.75rem]">
-              System Notice
-            </span>
+        <div className="absolute left-3 right-3 top-3 md:left-[6%] md:right-auto lg:left-[10%] md:top-[6%] z-20 md:w-[min(46vw,30rem)]">
+          <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-amber-400/25 shadow-[0_0_30px_rgba(245,158,11,0.12)] p-3.5 md:p-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 mb-2.5">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400/60 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+              </span>
+              <MapPin className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-amber-400 font-bold uppercase tracking-wider text-[0.7rem]">
+                System Notice
+              </span>
+            </div>
+            <p className="flex items-start gap-1.5 text-white font-bold leading-snug text-[clamp(0.85rem,1.4vw,1.4rem)] drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">
+              <MapPin className="h-4 w-4 md:h-5 md:w-5 mt-0.5 flex-shrink-0 text-amber-300" />
+              <span>
+                Disclaimer: for Maharashtra and Rajasthan data upcoming with live
+                tracking process
+              </span>
+            </p>
           </div>
-          <p className="text-white font-black leading-[1.25] text-[clamp(1rem,1.8vw,2rem)] drop-shadow-[0_6px_18px_rgba(0,0,0,0.9)]">
-            Disclaimer: for Maharashtra and Rajasthan data
-            <br />
-            upcoming with live tracking process
-          </p>
         </div>
 
-        <div className="w-full min-h-full flex items-center justify-end px-4 md:px-10 py-8 md:py-12 overflow-y-auto">
+        <div className="w-full min-h-full flex items-center justify-center md:justify-end px-4 md:px-10 pt-40 pb-8 md:py-12 overflow-y-auto">
           <div className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-right-10 duration-1000 flex-shrink-0">
         <div className="text-center mb-10 relative">
           <h1 className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">

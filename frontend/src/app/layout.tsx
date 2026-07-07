@@ -1,4 +1,5 @@
 import { FestiveCelebration } from "@/components/FestiveCelebration";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { AuthProvider } from "@/providers/AuthProvider";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -22,6 +23,7 @@ export default function RootLayout({
         <AuthProvider>
           <FestiveCelebration />
           {children}
+          <WhatsAppButton />
         </AuthProvider>
       </body>
     </html>

@@ -1,6 +1,6 @@
 "use client";
 
-import { FestiveHeader, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
+import { FestiveHeader, MobileDisclaimer, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
 import { Pagination } from "@/components/Pagination";
 import { RefineSearch } from "@/components/RefineSearch";
 import { ResultsStats } from "@/components/ResultsStats";
@@ -334,7 +334,7 @@ export default function SearchPage() {
   const endIndex = Math.min(startIndex + PAGE_SIZE, totalResults);
 
   return (
-    <div className="min-h-screen bg-[#2D1B4E] p-3">
+    <div className="min-h-screen bg-[#2D1B4E] p-3 pb-24 md:pb-6">
       <div className="max-w-[1800px] mx-auto">
         {/* Compact Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3 bg-white/5 backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-2xl">
@@ -473,6 +473,8 @@ export default function SearchPage() {
             </Button>
           </div>
         </div>
+
+        <MobileDisclaimer />
 
         {searchesUsed >= searchLimit && (
           <div className="mb-3 bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm">

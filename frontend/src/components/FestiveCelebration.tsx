@@ -2,7 +2,11 @@
 
 import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
+import { MapPin } from "lucide-react";
 import React, { useEffect } from "react";
+
+export const DISCLAIMER_TEXT =
+  "Disclaimer: for Maharashtra and Rajasthan data upcoming with live tracking process";
 
 export const triggerFestiveBlast = () => {
   const duration = 5 * 1000;
@@ -76,8 +80,50 @@ const FloatingElement = ({
   </motion.div>
 );
 
+export const MobileDisclaimer = () => {
+  return (
+    <div className="md:hidden mb-3 flex items-center h-9 overflow-hidden rounded-full border border-amber-500/25 bg-amber-500/10 backdrop-blur-md shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+      {/* Fixed left indicator */}
+      <div className="flex items-center gap-1.5 pl-3 pr-2.5 flex-shrink-0 z-10 border-r border-amber-500/20">
+        <span className="relative flex h-[6px] w-[6px]">
+          <span
+            className="absolute inline-flex h-full w-full rounded-full bg-amber-400/60"
+            style={{ animation: "glow-pulse 2s ease-in-out infinite" }}
+          />
+          <span className="relative inline-flex rounded-full h-[6px] w-[6px] bg-amber-400" />
+        </span>
+        <MapPin className="h-3.5 w-3.5 text-amber-400" />
+      </div>
+
+      {/* Scrolling marquee track */}
+      <div className="flex-1 overflow-hidden relative">
+        <div className="absolute left-0 top-0 bottom-0 w-8 z-10 pointer-events-none"
+          style={{ background: "linear-gradient(to right, rgba(120,53,15,0.35), transparent)" }}
+        />
+        <div className="absolute right-0 top-0 bottom-0 w-8 z-10 pointer-events-none"
+          style={{ background: "linear-gradient(to left, rgba(120,53,15,0.35), transparent)" }}
+        />
+        <div
+          className="flex whitespace-nowrap items-center"
+          style={{ animation: "marquee-scroll 18s linear infinite", willChange: "transform" }}
+        >
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className="inline-flex items-center gap-1.5 px-6 select-none">
+              <MapPin className="h-3 w-3 text-amber-400/90 flex-shrink-0" />
+              <span className="text-[11px] font-bold text-amber-200 tracking-[0.02em]">
+                {DISCLAIMER_TEXT}
+              </span>
+              <span className="text-amber-500/30 text-[8px]">◆</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const FestiveHeader = () => {
-  const disclaimerText = "Disclaimer: for Maharashtra and Rajasthan data upcoming with live tracking process";
+  const disclaimerText = DISCLAIMER_TEXT;
 
   return (
     <div className="hidden md:flex items-center mx-3 flex-1 max-w-3xl relative overflow-hidden rounded-full border border-amber-500/15 h-9 group hover:border-amber-400/30 transition-all duration-700"
@@ -139,8 +185,9 @@ export const FestiveHeader = () => {
           }}
         >
           {[0, 1, 2, 3].map((i) => (
-            <span key={i} className="inline-flex items-center gap-3 px-8 select-none">
-              <span className="text-[11px] font-medium text-amber-200/80 tracking-[0.02em]"
+            <span key={i} className="inline-flex items-center gap-2 px-8 select-none">
+              <MapPin className="h-3 w-3 text-amber-400/80 flex-shrink-0" />
+              <span className="text-[11px] font-bold text-amber-200/90 tracking-[0.02em]"
                 style={{ textShadow: "0 0 20px rgba(251,191,36,0.15)" }}
               >
                 {disclaimerText}

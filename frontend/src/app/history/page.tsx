@@ -63,27 +63,27 @@ export default function HistoryPage() {
     <div className="min-h-screen bg-[#2D1B4E] p-4">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4 bg-[#1a0f2e] p-4 rounded-lg border border-gray-700">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 bg-[#1a0f2e] p-4 rounded-lg border border-gray-700">
+          <div className="flex items-center gap-3 md:gap-4 min-w-0">
             <Button
               onClick={() => router.push("/search")}
               variant="outline"
               size="sm"
-              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
+              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E] flex-shrink-0"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Search History</h1>
-              <p className="text-sm text-gray-400">{user?.name} • {history.length} searches</p>
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold text-white">Search History</h1>
+              <p className="text-sm text-gray-400 truncate">{user?.name} • {history.length} searches</p>
             </div>
           </div>
           <Button
             onClick={logout}
             variant="outline"
             size="sm"
-            className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
+            className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E] self-start sm:self-auto flex-shrink-0"
           >
             <LogOut className="h-4 w-4 mr-2" />
             Logout

@@ -140,27 +140,27 @@ export default function PasswordChangePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#2D1B4E] p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#2D1B4E] p-3 md:p-4 relative overflow-hidden">
       {/* Navratri background elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/5 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full" />
 
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4 bg-white/5 backdrop-blur-xl p-4 rounded-xl border border-white/10 shadow-xl">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center mb-4 bg-white/5 backdrop-blur-xl p-4 rounded-xl border border-white/10 shadow-xl">
+          <div className="flex items-center gap-3 md:gap-4 min-w-0">
             <Button
               onClick={() => router.push("/search")}
               variant="outline"
               size="sm"
-              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E]"
+              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E] flex-shrink-0"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Password Change</h1>
-              <p className="text-sm text-gray-400">
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold text-white">Password Change</h1>
+              <p className="text-sm text-gray-400 truncate">
                 {user?.name} • {user?.email}
               </p>
             </div>
@@ -169,7 +169,7 @@ export default function PasswordChangePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Direct Password Change Form */}
-          <div className="bg-white/5 backdrop-blur-xl p-6 rounded-xl border border-white/10 shadow-xl flex flex-col h-full">
+          <div className="bg-white/5 backdrop-blur-xl p-4 md:p-6 rounded-xl border border-white/10 shadow-xl flex flex-col h-full">
             <h2 className="text-lg font-semibold text-white mb-4">
               Change Password Directly
             </h2>
@@ -249,7 +249,7 @@ export default function PasswordChangePage() {
           </div>
 
           {/* Request Form */}
-          <div className="bg-white/5 backdrop-blur-xl p-6 rounded-xl border border-white/10 shadow-xl flex flex-col h-full">
+          <div className="bg-white/5 backdrop-blur-xl p-4 md:p-6 rounded-xl border border-white/10 shadow-xl flex flex-col h-full">
             <h2 className="text-lg font-semibold text-white mb-4">
               Request Password Change
             </h2>

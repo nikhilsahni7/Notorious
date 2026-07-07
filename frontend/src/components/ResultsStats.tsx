@@ -18,7 +18,7 @@ export function ResultsStats({
   onFilterChange,
 }: ResultsStatsProps) {
   return (
-    <div className="text-sm text-gray-300 flex items-center justify-between">
+    <div className="text-sm text-gray-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
       <div>
         Showing{" "}
         <span className="text-white font-bold">
@@ -37,7 +37,7 @@ export function ResultsStats({
         placeholder="Filter results..."
         value={filterQuery}
         onChange={(e) => onFilterChange(e.target.value)}
-        className="w-64 bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400"
+        className="w-full sm:w-64 bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400"
       />
     </div>
   );

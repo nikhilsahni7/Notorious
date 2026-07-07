@@ -17,7 +17,7 @@ export function Pagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-center gap-3 bg-[#1a0f2e] p-3 rounded-lg">
+    <div className="flex flex-wrap items-center justify-center gap-3 bg-[#1a0f2e] p-3 rounded-lg">
       <Button
         onClick={onPrevPage}
         disabled={currentPage === 1}

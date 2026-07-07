@@ -70,11 +70,11 @@ export function RefineSearch({
       </div>
 
       {/* Add Refinement Form */}
-      <div className="flex gap-2 mb-3">
+      <div className="flex flex-col sm:flex-row gap-2 mb-3">
         <select
           value={selectedField}
           onChange={(e) => setSelectedField(e.target.value)}
-          className="bg-[#2D1B4E] border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+          className="w-full sm:w-auto bg-[#2D1B4E] border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-purple-500"
         >
           {REFINEMENT_FIELDS.map((field) => (
             <option key={field.value} value={field.value}>
@@ -89,13 +89,13 @@ export function RefineSearch({
           onChange={(e) => setRefinementValue(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder={`Enter ${getFieldLabel(selectedField).toLowerCase()}...`}
-          className="flex-1 bg-[#2D1B4E] border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+          className="flex-1 min-w-0 bg-[#2D1B4E] border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
         />
 
         <Button
           onClick={handleAddRefinement}
           disabled={!refinementValue.trim()}
-          className="bg-purple-500 hover:bg-purple-600 text-white"
+          className="w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white"
         >
           <Plus className="h-4 w-4 mr-1" />
           Add
