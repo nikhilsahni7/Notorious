@@ -145,7 +145,7 @@ func (s *OpenSearchService) CreateIndex() error {
 	indexSettings := `{
 		"settings": {
 			"number_of_shards": 6,
-			"number_of_replicas": 2,
+			"number_of_replicas": 0,
 			"refresh_interval": "-1"
 		}
 	}`
