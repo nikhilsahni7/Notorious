@@ -3,7 +3,7 @@
   "template": {
     "settings": {
       "number_of_shards": 6,
-      "number_of_replicas": 0,
+      "number_of_replicas": 3,
       "refresh_interval": "-1",
       "index.queries.cache.enabled": true,
       "index.requests.cache.enable": true,
