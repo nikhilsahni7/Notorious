@@ -74,25 +74,36 @@ func (r *SearchHistoryRepository) GetByUserID(ctx context.Context, userID uuid.U
 	return histories, rows.Err()
 }
 
-func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, offset int) ([]*models.SearchHistoryWithUser, error) {
+func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, offset int, search string) ([]*models.SearchHistoryWithUser, int, error) {
 	histories := make([]*models.SearchHistoryWithUser, 0)
+
+	countQuery := `
+		SELECT COUNT(*)
+		FROM search_history sh
+		JOIN users u ON sh.user_id = u.id
+		WHERE ($1 = '' OR u.email ILIKE $2 OR u.name ILIKE $2 OR sh.query ILIKE $2)
+	`
+	wildcardSearch := "%" + search + "%"
+	var total int
+	err := r.db.Pool.QueryRow(ctx, countQuery, search, wildcardSearch).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	query := `
 		SELECT
 			sh.id, sh.user_id, sh.query, sh.total_results, sh.searched_at,
 			u.email, u.name
-		FROM (
-			SELECT id, user_id, query, total_results, searched_at
-			FROM search_history
-			ORDER BY searched_at DESC, id DESC
-			LIMIT $1 OFFSET $2
-		) sh
+		FROM search_history sh
 		JOIN users u ON sh.user_id = u.id
+		WHERE ($3 = '' OR u.email ILIKE $4 OR u.name ILIKE $4 OR sh.query ILIKE $4)
 		ORDER BY sh.searched_at DESC, sh.id DESC
+		LIMIT $1 OFFSET $2
 	`
 
-	rows, err := r.db.Pool.Query(ctx, query, limit, offset)
+	rows, err := r.db.Pool.Query(ctx, query, limit, offset, search, wildcardSearch)
 	if err != nil {
-		return histories, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -108,13 +119,13 @@ func (r *SearchHistoryRepository) GetAllWithUsers(ctx context.Context, limit, of
 			&history.UserEmail,
 			&history.UserName,
 		); err != nil {
-			return histories, err
+			return nil, 0, err
 		}
 
 		histories = append(histories, &history)
 	}
 
-	return histories, rows.Err()
+	return histories, total, rows.Err()
 }
 
 // CountByUserID counts searches for a single user

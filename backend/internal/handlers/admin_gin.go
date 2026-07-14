@@ -426,18 +426,22 @@ func (h *AdminGinHandler) RejectUserRequest(c *gin.Context) {
 func (h *AdminGinHandler) GetSearchHistory(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	search := c.Query("search")
 
 	if limit > 100 {
 		limit = 100
 	}
 
-	histories, err := h.searchHistoryRepo.GetAllWithUsers(c.Request.Context(), limit, offset)
+	histories, total, err := h.searchHistoryRepo.GetAllWithUsers(c.Request.Context(), limit, offset, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch search history"})
 		return
 	}
 
-	c.JSON(http.StatusOK, histories)
+	c.JSON(http.StatusOK, gin.H{
+		"history": histories,
+		"total":   total,
+	})
 }
 
 func (h *AdminGinHandler) GetUserSearchHistory(c *gin.Context) {

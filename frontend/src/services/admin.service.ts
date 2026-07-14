@@ -412,10 +412,12 @@ export const adminService = {
   // Search History
   getSearchHistory: async (
     token: string,
-    limit = 50
-  ): Promise<SearchHistoryItem[]> => {
+    limit = 50,
+    offset = 0,
+    search = ""
+  ): Promise<{ history: SearchHistoryItem[]; total: number }> => {
     return apiRequest(
-      `${API_CONFIG.ENDPOINTS.ADMIN.SEARCH_HISTORY}?limit=${limit}`,
+      `${API_CONFIG.ENDPOINTS.ADMIN.SEARCH_HISTORY}?limit=${limit}&offset=${offset}&search=${encodeURIComponent(search)}`,
       {
         method: "GET",
         token,
