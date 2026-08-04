@@ -5,6 +5,8 @@ import { adminService, User } from "@/services/admin.service";
 import {
   BarChart3,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Edit,
   History,
@@ -16,7 +18,7 @@ import {
   Trash2,
   UserCheck,
   UserX,
-  X
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -32,12 +34,20 @@ interface UsersTabProps {
 export function UsersTab({ token }: UsersTabProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
+  const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState<
     "all" | "pan-india" | "delhi-ncr"
   >("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [counts, setCounts] = useState({
+    all: 0,
+    "pan-india": 0,
+    "delhi-ncr": 0,
+  });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [changingPasswordUser, setChangingPasswordUser] = useState<User | null>(
@@ -46,11 +56,15 @@ export function UsersTab({ token }: UsersTabProps) {
   const [viewingSessionsUser, setViewingSessionsUser] = useState<User | null>(
     null
   );
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
+    new Set()
+  );
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
 
-  // Load online users
+  const limit = 50;
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+
   const loadOnlineUsers = async () => {
     try {
       const data = await adminService.getOnlineUsers(token);
@@ -61,48 +75,113 @@ export function UsersTab({ token }: UsersTabProps) {
   };
 
   useEffect(() => {
-    loadUsers();
     loadOnlineUsers();
-
-    // Poll for online users every 30 seconds
     const interval = setInterval(loadOnlineUsers, 30000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reset to page 1 when filters change
   useEffect(() => {
-    let filtered = users;
+    setCurrentPage(1);
+  }, [searchQuery, regionFilter]);
 
-    // Apply region filter
-    if (regionFilter !== "all") {
-      filtered = filtered.filter((user) => user.region === regionFilter);
+  useEffect(() => {
+    const isFirstLoad = !hasLoadedInitially;
+    if (isFirstLoad) {
+      setHasLoadedInitially(true);
     }
 
-    // Apply search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (user) =>
-          user.name.toLowerCase().includes(query) ||
-          user.email.toLowerCase().includes(query) ||
-          user.phone?.toLowerCase().includes(query)
-      );
+    const delayDebounceFn = setTimeout(
+      () => {
+        loadUsers(currentPage, searchQuery, regionFilter, isFirstLoad);
+      },
+      isFirstLoad ? 0 : 300
+    );
+
+    return () => clearTimeout(delayDebounceFn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, searchQuery, regionFilter]);
+
+  const loadUsers = async (
+    page: number,
+    query: string,
+    region: "all" | "pan-india" | "delhi-ncr",
+    isInitialLoad: boolean
+  ) => {
+    if (isInitialLoad) {
+      setLoading(true);
+    } else {
+      setFetching(true);
     }
-
-    setFilteredUsers(filtered);
-  }, [searchQuery, regionFilter, users]);
-
-  const loadUsers = async () => {
     try {
-      const data = await adminService.listUsers(token, 100);
-      setUsers(data);
-      setFilteredUsers(data);
+      const offset = (page - 1) * limit;
+      const data = await adminService.listUsers(
+        token,
+        limit,
+        offset,
+        query,
+        region
+      );
+      setUsers(data.users || []);
+      setTotalCount(data.total || 0);
+      setCounts({
+        all: data.counts?.all ?? 0,
+        "pan-india": data.counts?.["pan-india"] ?? 0,
+        "delhi-ncr": data.counts?.["delhi-ncr"] ?? 0,
+      });
+      setSelectedUserIds(new Set());
     } catch (error) {
       console.error("Failed to load users:", error);
       alert("Failed to load users");
     } finally {
       setLoading(false);
+      setFetching(false);
     }
+  };
+
+  const reloadCurrentPage = () => {
+    loadUsers(currentPage, searchQuery, regionFilter, false);
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const siblingCount = 1;
+
+    pages.push(1);
+
+    const leftSiblingIndex = Math.max(currentPage - siblingCount, 2);
+    const rightSiblingIndex = Math.min(
+      currentPage + siblingCount,
+      totalPages - 1
+    );
+
+    const showLeftSpill = leftSiblingIndex > 2;
+    const showRightSpill = rightSiblingIndex < totalPages - 1;
+
+    if (showLeftSpill) {
+      pages.push("...");
+    }
+
+    for (let i = leftSiblingIndex; i <= rightSiblingIndex; i++) {
+      pages.push(i);
+    }
+
+    if (showRightSpill) {
+      pages.push("...");
+    }
+
+    if (totalPages > 1) {
+      pages.push(totalPages);
+    }
+
+    return pages;
   };
 
   const handleDelete = async (userId: string, userName: string) => {
@@ -112,7 +191,7 @@ export function UsersTab({ token }: UsersTabProps) {
 
     try {
       await adminService.deleteUser(userId, token);
-      await loadUsers();
+      reloadCurrentPage();
     } catch (error) {
       console.error("Failed to delete user:", error);
       alert("Failed to delete user");
@@ -138,12 +217,11 @@ export function UsersTab({ token }: UsersTabProps) {
     }
   };
 
-  // Selection handlers
   const toggleSelectAll = () => {
-    if (selectedUserIds.size === filteredUsers.length) {
+    if (selectedUserIds.size === users.length) {
       setSelectedUserIds(new Set());
     } else {
-      setSelectedUserIds(new Set(filteredUsers.map((u) => u.id)));
+      setSelectedUserIds(new Set(users.map((u) => u.id)));
     }
   };
 
@@ -161,7 +239,6 @@ export function UsersTab({ token }: UsersTabProps) {
     setSelectedUserIds(new Set());
   };
 
-  // Bulk update handler
   const handleBulkUpdate = async (isActive: boolean) => {
     if (selectedUserIds.size === 0) return;
 
@@ -182,7 +259,7 @@ export function UsersTab({ token }: UsersTabProps) {
         token
       );
       clearSelection();
-      await loadUsers();
+      reloadCurrentPage();
     } catch (error) {
       console.error(`Failed to ${action} users:`, error);
       alert(`Failed to ${action} users`);
@@ -191,11 +268,10 @@ export function UsersTab({ token }: UsersTabProps) {
     }
   };
 
-  // Quick toggle for single user
   const handleToggleStatus = async (user: User) => {
     try {
       await adminService.toggleUserStatus(user.id, !user.is_active, token);
-      await loadUsers();
+      reloadCurrentPage();
     } catch (error) {
       console.error("Failed to toggle user status:", error);
       alert("Failed to toggle user status");
@@ -213,7 +289,12 @@ export function UsersTab({ token }: UsersTabProps) {
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-white">User Management</h2>
+        <div>
+          <h2 className="text-xl font-bold text-white">User Management</h2>
+          <p className="text-sm text-gray-400 mt-1">
+            Showing {users.length} of {totalCount} total users
+          </p>
+        </div>
         <Button
           onClick={() => setShowCreateModal(true)}
           className="bg-pink-500 hover:bg-pink-600 text-white"
@@ -242,7 +323,7 @@ export function UsersTab({ token }: UsersTabProps) {
               : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
           }`}
         >
-          All Users ({users.length})
+          All Users ({counts.all})
         </button>
         <button
           onClick={() => setRegionFilter("pan-india")}
@@ -252,7 +333,7 @@ export function UsersTab({ token }: UsersTabProps) {
               : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
           }`}
         >
-          🌏 Pan-India ({users.filter((u) => u.region === "pan-india").length})
+          🌏 Pan-India ({counts["pan-india"]})
         </button>
         <button
           onClick={() => setRegionFilter("delhi-ncr")}
@@ -262,7 +343,7 @@ export function UsersTab({ token }: UsersTabProps) {
               : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
           }`}
         >
-          📍 Delhi-NCR ({users.filter((u) => u.region === "delhi-ncr").length})
+          📍 Delhi-NCR ({counts["delhi-ncr"]})
         </button>
       </div>
 
@@ -307,8 +388,12 @@ export function UsersTab({ token }: UsersTabProps) {
         </div>
       )}
 
-      <div className="bg-[#2D1B4E] rounded-lg border border-gray-700 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-[#2D1B4E] rounded-lg border border-gray-700 overflow-hidden relative">
+        <div
+          className={`overflow-x-auto transition-opacity duration-200 ${
+            fetching ? "opacity-40" : "opacity-100"
+          }`}
+        >
           <table className="w-full">
             <thead className="bg-[#1a0f2e] border-b border-gray-700">
               <tr>
@@ -316,9 +401,14 @@ export function UsersTab({ token }: UsersTabProps) {
                   <button
                     onClick={toggleSelectAll}
                     className="text-gray-300 hover:text-white transition-colors"
-                    title={selectedUserIds.size === filteredUsers.length ? "Deselect all" : "Select all"}
+                    title={
+                      selectedUserIds.size === users.length
+                        ? "Deselect all"
+                        : "Select all"
+                    }
                   >
-                    {selectedUserIds.size === filteredUsers.length && filteredUsers.length > 0 ? (
+                    {selectedUserIds.size === users.length &&
+                    users.length > 0 ? (
                       <CheckSquare className="h-5 w-5 text-purple-400" />
                     ) : (
                       <Square className="h-5 w-5" />
@@ -358,10 +448,12 @@ export function UsersTab({ token }: UsersTabProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <tr
                   key={user.id}
-                  className={`hover:bg-[#1a0f2e] transition-colors ${selectedUserIds.has(user.id) ? "bg-purple-500/10" : ""}`}
+                  className={`hover:bg-[#1a0f2e] transition-colors ${
+                    selectedUserIds.has(user.id) ? "bg-purple-500/10" : ""
+                  }`}
                 >
                   <td className="px-3 py-3">
                     <button
@@ -383,7 +475,11 @@ export function UsersTab({ token }: UsersTabProps) {
                             ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]"
                             : "bg-gray-500"
                         }`}
-                        title={onlineUserIds.has(user.id) ? "Online now" : "Offline"}
+                        title={
+                          onlineUserIds.has(user.id)
+                            ? "Online now"
+                            : "Offline"
+                        }
                       />
                       {user.name}
                     </div>
@@ -437,7 +533,11 @@ export function UsersTab({ token }: UsersTabProps) {
                           ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
                           : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
                       }`}
-                      title={user.is_active ? "Click to deactivate" : "Click to activate"}
+                      title={
+                        user.is_active
+                          ? "Click to deactivate"
+                          : "Click to activate"
+                      }
                     >
                       <Power className="h-3 w-3" />
                       {user.is_active ? "Active" : "Inactive"}
@@ -522,13 +622,86 @@ export function UsersTab({ token }: UsersTabProps) {
             </tbody>
           </table>
         </div>
+
+        {fetching && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+            <Spinner size="md" />
+          </div>
+        )}
       </div>
 
-      {filteredUsers.length === 0 && (
+      {users.length === 0 && (
         <div className="text-center py-12 text-gray-400">
           {searchQuery
             ? "No users found matching your search"
             : "No users found"}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-1">
+          <div className="text-sm text-gray-400">
+            Page <span className="text-white font-medium">{currentPage}</span> of{" "}
+            <span className="text-white font-medium">{totalPages}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || fetching}
+              className={`p-2 rounded-md border text-sm transition-all ${
+                currentPage === 1 || fetching
+                  ? "bg-[#1a0f2e] border-gray-800 text-gray-600 cursor-not-allowed opacity-50"
+                  : "bg-[#1a0f2e] border-gray-700 text-gray-300 hover:bg-[#2D1B4E] hover:text-white"
+              }`}
+              title="Previous Page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+
+            {getPageNumbers().map((pageNum, idx) => {
+              if (pageNum === "...") {
+                return (
+                  <span
+                    key={`ellipsis-${idx}`}
+                    className="px-3 py-1.5 text-gray-500 text-sm"
+                  >
+                    ...
+                  </span>
+                );
+              }
+
+              const isCurrent = pageNum === currentPage;
+              return (
+                <button
+                  key={`page-${pageNum}`}
+                  onClick={() => handlePageChange(pageNum as number)}
+                  disabled={fetching}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    isCurrent
+                      ? "bg-purple-600 text-white shadow-[0_0_8px_rgba(147,51,234,0.4)]"
+                      : "bg-[#1a0f2e] border border-gray-700 text-gray-300 hover:bg-[#2D1B4E] hover:text-white"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages || fetching}
+              className={`p-2 rounded-md border text-sm transition-all ${
+                currentPage === totalPages || fetching
+                  ? "bg-[#1a0f2e] border-gray-800 text-gray-600 cursor-not-allowed opacity-50"
+                  : "bg-[#1a0f2e] border-gray-700 text-gray-300 hover:bg-[#2D1B4E] hover:text-white"
+              }`}
+              title="Next Page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -538,7 +711,7 @@ export function UsersTab({ token }: UsersTabProps) {
           onClose={() => setShowCreateModal(false)}
           onSuccess={() => {
             setShowCreateModal(false);
-            loadUsers();
+            reloadCurrentPage();
           }}
         />
       )}
@@ -550,7 +723,7 @@ export function UsersTab({ token }: UsersTabProps) {
           onClose={() => setEditingUser(null)}
           onSuccess={() => {
             setEditingUser(null);
-            loadUsers();
+            reloadCurrentPage();
           }}
         />
       )}
@@ -563,7 +736,7 @@ export function UsersTab({ token }: UsersTabProps) {
           onClose={() => setChangingPasswordUser(null)}
           onSuccess={() => {
             setChangingPasswordUser(null);
-            loadUsers();
+            reloadCurrentPage();
           }}
         />
       )}

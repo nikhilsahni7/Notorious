@@ -257,8 +257,28 @@ export interface SystemStats {
 
 export const adminService = {
   // Users
-  listUsers: async (token: string, limit = 100): Promise<User[]> => {
-    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}?limit=${limit}`, {
+  listUsers: async (
+    token: string,
+    limit = 50,
+    offset = 0,
+    search = "",
+    region = "all"
+  ): Promise<{
+    users: User[];
+    total: number;
+    counts: { all: number; "pan-india": number; "delhi-ncr": number };
+  }> => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    if (search.trim()) {
+      params.set("search", search.trim());
+    }
+    if (region && region !== "all") {
+      params.set("region", region);
+    }
+    return apiRequest(`${API_CONFIG.ENDPOINTS.ADMIN.USERS}?${params.toString()}`, {
       method: "GET",
       token,
     });

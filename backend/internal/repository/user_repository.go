@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -153,41 +154,68 @@ func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-func (r *UserRepository) List(ctx context.Context, role string, limit, offset int) ([]*models.User, error) {
-	users := make([]*models.User, 0)
-	var query string
-	var args []interface{}
+func (r *UserRepository) buildListFilters(role, region, search string) (string, []interface{}) {
+	conditions := make([]string, 0)
+	args := make([]interface{}, 0)
+	argIdx := 1
 
 	if role != "" {
-		query = `
-			SELECT id, email, password_hash, name, COALESCE(phone, '') as phone, role, daily_search_limit,
-			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
-			       COALESCE(last_search_query, '') as last_search_query,
-			       COALESCE(region, 'pan-india') as region,
-			       device_limit
-			FROM users
-			WHERE role = $1
-			ORDER BY created_at DESC
-			LIMIT $2 OFFSET $3
-		`
-		args = []interface{}{role, limit, offset}
-	} else {
-		query = `
-			SELECT id, email, password_hash, name, COALESCE(phone, '') as phone, role, daily_search_limit,
-			       searches_used_today, is_active, created_at, updated_at, last_reset_date,
-			       COALESCE(last_search_query, '') as last_search_query,
-			       COALESCE(region, 'pan-india') as region,
-			       device_limit
-			FROM users
-			ORDER BY created_at DESC
-			LIMIT $1 OFFSET $2
-		`
-		args = []interface{}{limit, offset}
+		conditions = append(conditions, fmt.Sprintf("role = $%d", argIdx))
+		args = append(args, role)
+		argIdx++
 	}
 
-	rows, err := r.db.Pool.Query(ctx, query, args...)
+	if region != "" && region != "all" {
+		conditions = append(conditions, fmt.Sprintf("COALESCE(region, 'pan-india') = $%d", argIdx))
+		args = append(args, region)
+		argIdx++
+	}
+
+	if search != "" {
+		pattern := "%" + search + "%"
+		conditions = append(conditions, fmt.Sprintf(
+			"(name ILIKE $%d OR email ILIKE $%d OR COALESCE(phone, '') ILIKE $%d)",
+			argIdx, argIdx, argIdx,
+		))
+		args = append(args, pattern)
+		argIdx++
+	}
+
+	where := ""
+	if len(conditions) > 0 {
+		where = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	return where, args
+}
+
+func (r *UserRepository) List(ctx context.Context, role, region, search string, limit, offset int) ([]*models.User, int, error) {
+	users := make([]*models.User, 0)
+	where, args := r.buildListFilters(role, region, search)
+
+	countQuery := "SELECT COUNT(*) FROM users " + where
+	var total int
+	if err := r.db.Pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return users, 0, err
+	}
+
+	argIdx := len(args) + 1
+	query := fmt.Sprintf(`
+		SELECT id, email, password_hash, name, COALESCE(phone, '') as phone, role, daily_search_limit,
+		       searches_used_today, is_active, created_at, updated_at, last_reset_date,
+		       COALESCE(last_search_query, '') as last_search_query,
+		       COALESCE(region, 'pan-india') as region,
+		       device_limit
+		FROM users
+		%s
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, where, argIdx, argIdx+1)
+
+	listArgs := append(append([]interface{}{}, args...), limit, offset)
+	rows, err := r.db.Pool.Query(ctx, query, listArgs...)
 	if err != nil {
-		return users, err
+		return users, 0, err
 	}
 	defer rows.Close()
 
@@ -210,12 +238,48 @@ func (r *UserRepository) List(ctx context.Context, role string, limit, offset in
 			&user.Region,
 			&user.DeviceLimit,
 		); err != nil {
-			return users, err
+			return users, 0, err
 		}
 		users = append(users, &user)
 	}
 
-	return users, rows.Err()
+	return users, total, rows.Err()
+}
+
+// CountByRegion returns user counts grouped by region, optionally filtered by search/role.
+func (r *UserRepository) CountByRegion(ctx context.Context, role, search string) (map[string]int, error) {
+	where, args := r.buildListFilters(role, "", search)
+
+	query := `
+		SELECT COALESCE(region, 'pan-india') as region, COUNT(*)
+		FROM users
+		` + where + `
+		GROUP BY COALESCE(region, 'pan-india')
+	`
+
+	rows, err := r.db.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := map[string]int{
+		"all":       0,
+		"pan-india": 0,
+		"delhi-ncr": 0,
+	}
+
+	for rows.Next() {
+		var region string
+		var count int
+		if err := rows.Scan(&region, &count); err != nil {
+			return nil, err
+		}
+		counts[region] = count
+		counts["all"] += count
+	}
+
+	return counts, rows.Err()
 }
 
 func (r *UserRepository) IncrementSearchUsage(ctx context.Context, userID uuid.UUID) error {

@@ -124,14 +124,28 @@ func (h *AdminGinHandler) ListUsers(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	role := c.Query("role")
+	region := c.Query("region")
+	search := c.Query("search")
 
+	if limit <= 0 {
+		limit = 50
+	}
 	if limit > 100 {
 		limit = 100
 	}
+	if offset < 0 {
+		offset = 0
+	}
 
-	users, err := h.userRepo.List(c.Request.Context(), role, limit, offset)
+	users, total, err := h.userRepo.List(c.Request.Context(), role, region, search, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch users"})
+		return
+	}
+
+	counts, err := h.userRepo.CountByRegion(c.Request.Context(), role, search)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user counts"})
 		return
 	}
 
@@ -141,37 +155,32 @@ func (h *AdminGinHandler) ListUsers(c *gin.Context) {
 		TotalSearches int `json:"total_searches"`
 	}
 
-	if len(users) == 0 {
-		c.JSON(http.StatusOK, []UserWithStats{})
-		return
-	}
-
-	userIDs := make([]uuid.UUID, len(users))
-	for i, user := range users {
-		userIDs[i] = user.ID
-	}
-
-	searchCounts, err := h.searchHistoryRepo.CountByUserIDs(c.Request.Context(), userIDs)
-	if err != nil {
-		// Log error but continue with 0 counts? Or fail?
-		// Let's log and continue to not break the UI completely
-		// But for now, let's just return 0s if it fails or handle error.
-		// Given the user's report, performance is key.
-		// Let's assume 0 if error for now to be safe, or return error.
-		// Returning error is safer for correctness.
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch search counts"})
-		return
-	}
-
 	usersWithStats := make([]UserWithStats, len(users))
-	for i, user := range users {
-		usersWithStats[i] = UserWithStats{
-			User:          user,
-			TotalSearches: searchCounts[user.ID],
+	if len(users) > 0 {
+		userIDs := make([]uuid.UUID, len(users))
+		for i, user := range users {
+			userIDs[i] = user.ID
+		}
+
+		searchCounts, err := h.searchHistoryRepo.CountByUserIDs(c.Request.Context(), userIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch search counts"})
+			return
+		}
+
+		for i, user := range users {
+			usersWithStats[i] = UserWithStats{
+				User:          user,
+				TotalSearches: searchCounts[user.ID],
+			}
 		}
 	}
 
-	c.JSON(http.StatusOK, usersWithStats)
+	c.JSON(http.StatusOK, gin.H{
+		"users":  usersWithStats,
+		"total":  total,
+		"counts": counts,
+	})
 }
 
 func (h *AdminGinHandler) GetUser(c *gin.Context) {
