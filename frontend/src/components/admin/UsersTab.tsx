@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { CreateUserModal } from "./CreateUserModal";
 import { EditUserModal } from "./EditUserModal";
@@ -29,6 +29,29 @@ import { UserSessionsModal } from "./UserSessionsModal";
 
 interface UsersTabProps {
   token: string;
+}
+
+function ActionButton({
+  title,
+  onClick,
+  className,
+  children,
+}: {
+  title: string;
+  onClick: (e: MouseEvent) => void;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500/40 ${className}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function UsersTab({ token }: UsersTabProps) {
@@ -287,83 +310,97 @@ export function UsersTab({ token }: UsersTabProps) {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white">User Management</h2>
-          <p className="text-sm text-gray-400 mt-1">
-            Showing {users.length} of {totalCount} total users
+          <h2 className="text-xl font-semibold tracking-tight text-white">
+            User Management
+          </h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Showing{" "}
+            <span className="text-gray-300 tabular-nums">{users.length}</span> of{" "}
+            <span className="text-gray-300 tabular-nums">{totalCount}</span>{" "}
+            total users
           </p>
         </div>
         <Button
           onClick={() => setShowCreateModal(true)}
-          className="bg-pink-500 hover:bg-pink-600 text-white"
+          className="bg-pink-500 hover:bg-pink-600 text-white shadow-sm shadow-pink-500/20"
         >
           <Plus className="h-4 w-4 mr-2" />
           Create User
         </Button>
       </div>
 
-      <div className="mb-4">
+      <div className="space-y-3">
         <Input
           placeholder="Search users by name, email, or phone..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-[#2D1B4E] border-gray-600 text-white placeholder:text-gray-400"
+          className="bg-[#2D1B4E]/80 border-gray-600/80 text-white placeholder:text-gray-500 focus-visible:ring-pink-500/30"
         />
+
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              {
+                key: "all" as const,
+                label: "All Users",
+                count: counts.all,
+                active: "bg-pink-500 text-white shadow-sm shadow-pink-500/25",
+              },
+              {
+                key: "pan-india" as const,
+                label: "Pan-India",
+                count: counts["pan-india"],
+                active: "bg-blue-500 text-white shadow-sm shadow-blue-500/25",
+              },
+              {
+                key: "delhi-ncr" as const,
+                label: "Delhi-NCR",
+                count: counts["delhi-ncr"],
+                active: "bg-emerald-500 text-white shadow-sm shadow-emerald-500/25",
+              },
+            ] as const
+          ).map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => setRegionFilter(filter.key)}
+              className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors duration-150 ${
+                regionFilter === filter.key
+                  ? filter.active
+                  : "bg-[#2D1B4E]/80 text-gray-400 hover:bg-[#3D2B5E] hover:text-gray-200"
+              }`}
+            >
+              {filter.label}
+              <span
+                className={`ml-1.5 tabular-nums ${
+                  regionFilter === filter.key ? "text-white/80" : "text-gray-500"
+                }`}
+              >
+                ({filter.count})
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Region Filter */}
-      <div className="mb-4 flex gap-2">
-        <button
-          onClick={() => setRegionFilter("all")}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            regionFilter === "all"
-              ? "bg-pink-500 text-white"
-              : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
-          }`}
-        >
-          All Users ({counts.all})
-        </button>
-        <button
-          onClick={() => setRegionFilter("pan-india")}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            regionFilter === "pan-india"
-              ? "bg-blue-500 text-white"
-              : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
-          }`}
-        >
-          🌏 Pan-India ({counts["pan-india"]})
-        </button>
-        <button
-          onClick={() => setRegionFilter("delhi-ncr")}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            regionFilter === "delhi-ncr"
-              ? "bg-green-500 text-white"
-              : "bg-[#2D1B4E] text-gray-300 hover:bg-[#3D2B5E]"
-          }`}
-        >
-          📍 Delhi-NCR ({counts["delhi-ncr"]})
-        </button>
-      </div>
-
-      {/* Bulk Actions Toolbar */}
       {selectedUserIds.size > 0 && (
-        <div className="mb-4 bg-[#2D1B4E] border border-purple-500/30 rounded-lg p-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-white font-medium">
-              <CheckSquare className="h-4 w-4 inline mr-2 text-purple-400" />
-              {selectedUserIds.size} user(s) selected
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 rounded-xl border border-purple-500/25 bg-[#2D1B4E]/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="flex items-center gap-2 text-sm font-medium text-white">
+            <CheckSquare className="h-4 w-4 text-purple-400" />
+            {selectedUserIds.size} user{selectedUserIds.size === 1 ? "" : "s"}{" "}
+            selected
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={() => handleBulkUpdate(true)}
               disabled={bulkUpdating}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm"
               size="sm"
             >
-              <UserCheck className="h-4 w-4 mr-1" />
+              <UserCheck className="h-4 w-4 mr-1.5" />
               Activate
             </Button>
             <Button
@@ -372,35 +409,36 @@ export function UsersTab({ token }: UsersTabProps) {
               className="bg-red-600 hover:bg-red-700 text-white text-sm"
               size="sm"
             >
-              <UserX className="h-4 w-4 mr-1" />
+              <UserX className="h-4 w-4 mr-1.5" />
               Deactivate
             </Button>
             <Button
               onClick={clearSelection}
               variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-700 text-sm"
+              className="border-gray-600/80 text-gray-300 hover:bg-gray-700/50 text-sm"
               size="sm"
             >
-              <X className="h-4 w-4 mr-1" />
+              <X className="h-4 w-4 mr-1.5" />
               Clear
             </Button>
           </div>
         </div>
       )}
 
-      <div className="bg-[#2D1B4E] rounded-lg border border-gray-700 overflow-hidden relative">
+      <div className="relative overflow-hidden rounded-xl border border-gray-700/80 bg-[#2D1B4E]/60">
         <div
           className={`overflow-x-auto transition-opacity duration-200 ${
             fetching ? "opacity-40" : "opacity-100"
           }`}
         >
-          <table className="w-full">
-            <thead className="bg-[#1a0f2e] border-b border-gray-700">
+          <table className="w-full min-w-[1100px]">
+            <thead className="border-b border-gray-700/80 bg-[#1a0f2e]/90">
               <tr>
-                <th className="px-3 py-3 text-left">
+                <th className="w-12 px-3 py-3.5 text-left">
                   <button
+                    type="button"
                     onClick={toggleSelectAll}
-                    className="text-gray-300 hover:text-white transition-colors"
+                    className="rounded-md p-1 text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
                     title={
                       selectedUserIds.size === users.length
                         ? "Deselect all"
@@ -409,129 +447,118 @@ export function UsersTab({ token }: UsersTabProps) {
                   >
                     {selectedUserIds.size === users.length &&
                     users.length > 0 ? (
-                      <CheckSquare className="h-5 w-5 text-purple-400" />
+                      <CheckSquare className="h-4 w-4 text-purple-400" />
                     ) : (
-                      <Square className="h-5 w-5" />
+                      <Square className="h-4 w-4" />
                     )}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Email
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Role
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Region
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Daily Limit
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Device Limit
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Used Today
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Total Searches
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">
-                  Actions
-                </th>
+                {[
+                  "Name",
+                  "Email",
+                  "Role",
+                  "Region",
+                  "Daily Limit",
+                  "Device Limit",
+                  "Used Today",
+                  "Total Searches",
+                  "Status",
+                  "Actions",
+                ].map((label) => (
+                  <th
+                    key={label}
+                    className={`px-3 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 ${
+                      label === "Actions" ? "pr-4" : ""
+                    }`}
+                  >
+                    {label}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-800/80">
               {users.map((user) => (
                 <tr
                   key={user.id}
-                  className={`hover:bg-[#1a0f2e] transition-colors ${
-                    selectedUserIds.has(user.id) ? "bg-purple-500/10" : ""
+                  className={`transition-colors duration-150 hover:bg-white/[0.03] ${
+                    selectedUserIds.has(user.id) ? "bg-purple-500/[0.08]" : ""
                   }`}
                 >
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5">
                     <button
+                      type="button"
                       onClick={() => toggleSelectUser(user.id)}
-                      className="text-gray-300 hover:text-white transition-colors"
+                      className="rounded-md p-1 text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
                     >
                       {selectedUserIds.has(user.id) ? (
-                        <CheckSquare className="h-5 w-5 text-purple-400" />
+                        <CheckSquare className="h-4 w-4 text-purple-400" />
                       ) : (
-                        <Square className="h-5 w-5" />
+                        <Square className="h-4 w-4" />
                       )}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">
-                    <div className="flex items-center gap-2">
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2.5">
                       <span
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        className={`h-2 w-2 flex-shrink-0 rounded-full ${
                           onlineUserIds.has(user.id)
-                            ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]"
-                            : "bg-gray-500"
+                            ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.55)]"
+                            : "bg-gray-600"
                         }`}
                         title={
-                          onlineUserIds.has(user.id)
-                            ? "Online now"
-                            : "Offline"
+                          onlineUserIds.has(user.id) ? "Online now" : "Offline"
                         }
                       />
-                      {user.name}
+                      <span className="text-sm font-medium text-white">
+                        {user.name}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-300">
+                  <td className="px-3 py-2.5 text-sm text-gray-400">
                     {user.email}
                   </td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-3 py-2.5">
                     <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
+                      className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium capitalize ${
                         user.role === "admin"
-                          ? "bg-purple-500/20 text-purple-400"
-                          : "bg-blue-500/20 text-blue-400"
+                          ? "bg-purple-500/15 text-purple-300"
+                          : "bg-sky-500/15 text-sky-300"
                       }`}
                     >
                       {user.role}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-3 py-2.5">
                     <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
+                      className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
                         user.region === "delhi-ncr"
-                          ? "bg-green-500/20 text-green-400"
-                          : "bg-blue-500/20 text-blue-400"
+                          ? "bg-emerald-500/15 text-emerald-300"
+                          : "bg-blue-500/15 text-blue-300"
                       }`}
                     >
-                      {user.region === "delhi-ncr"
-                        ? "📍 Delhi-NCR"
-                        : "🌏 Pan-India"}
+                      {user.region === "delhi-ncr" ? "Delhi-NCR" : "Pan-India"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">
+                  <td className="px-3 py-2.5 text-sm tabular-nums text-gray-300">
                     {user.daily_search_limit}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">
+                  <td className="px-3 py-2.5 text-sm tabular-nums text-gray-300">
                     {user.device_limit}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">
+                  <td className="px-3 py-2.5 text-sm tabular-nums text-gray-300">
                     {user.searches_used_today}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">
-                    <span className="font-semibold text-blue-400">
-                      {user.total_searches || 0}
-                    </span>
+                  <td className="px-3 py-2.5 text-sm tabular-nums font-medium text-sky-300">
+                    {user.total_searches || 0}
                   </td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-3 py-2.5">
                     <button
+                      type="button"
                       onClick={() => handleToggleStatus(user)}
-                      className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all hover:scale-105 ${
+                      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors duration-150 ${
                         user.is_active
-                          ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                          : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                          ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                          : "bg-red-500/15 text-red-300 hover:bg-red-500/25"
                       }`}
                       title={
                         user.is_active
@@ -543,77 +570,80 @@ export function UsersTab({ token }: UsersTabProps) {
                       {user.is_active ? "Active" : "Inactive"}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <button
+                  <td className="px-3 py-2.5 pr-4">
+                    <div className="flex items-center gap-0.5">
+                      <ActionButton
+                        title="View Active Sessions"
                         onClick={(e) => {
                           e.stopPropagation();
                           setViewingSessionsUser(user);
                         }}
-                        className="text-cyan-400 hover:text-cyan-300 transition-colors"
-                        title="View Active Sessions"
+                        className="text-cyan-400/90 hover:bg-cyan-500/10 hover:text-cyan-300"
                       >
-                        <Smartphone className="h-4 w-4" />
-                      </button>
-                      <button
+                        <Smartphone className="h-3.5 w-3.5" />
+                      </ActionButton>
+                      <ActionButton
+                        title="View search history"
                         onClick={() =>
                           router.push(`/admin/users/${user.id}/history`)
                         }
-                        className="text-green-400 hover:text-green-300 transition-colors"
-                        title="View search history"
+                        className="text-emerald-400/90 hover:bg-emerald-500/10 hover:text-emerald-300"
                       >
-                        <History className="h-4 w-4" />
-                      </button>
-                      <button
+                        <History className="h-3.5 w-3.5" />
+                      </ActionButton>
+                      <ActionButton
+                        title="View stats"
                         onClick={() =>
                           router.push(`/admin/users/${user.id}/stats`)
                         }
-                        className="text-blue-400 hover:text-blue-300 transition-colors"
-                        title="View stats"
+                        className="text-sky-400/90 hover:bg-sky-500/10 hover:text-sky-300"
                       >
-                        <BarChart3 className="h-4 w-4" />
-                      </button>
-                      <button
+                        <BarChart3 className="h-3.5 w-3.5" />
+                      </ActionButton>
+                      <ActionButton
+                        title="Edit user"
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingUser(user);
                         }}
-                        className="text-blue-400 hover:text-blue-300 transition-colors"
-                        title="Edit user"
+                        className="text-blue-400/90 hover:bg-blue-500/10 hover:text-blue-300"
                       >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
+                        <Edit className="h-3.5 w-3.5" />
+                      </ActionButton>
+                      <ActionButton
+                        title="Change password"
                         onClick={(e) => {
                           e.stopPropagation();
                           setChangingPasswordUser(user);
                         }}
-                        className="text-orange-400 hover:text-orange-300 transition-colors"
-                        title="Change password"
+                        className="text-amber-400/90 hover:bg-amber-500/10 hover:text-amber-300"
                       >
-                        <Key className="h-4 w-4" />
-                      </button>
-                      <button
+                        <Key className="h-3.5 w-3.5" />
+                      </ActionButton>
+                      <ActionButton
+                        title="Generate EOD Report"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleGenerateEOD(user.id, user.name);
                         }}
-                        className="text-purple-400 hover:text-purple-300 transition-colors"
-                        title="Generate EOD Report"
+                        className="text-violet-400/90 hover:bg-violet-500/10 hover:text-violet-300"
                       >
-                        <Download className="h-4 w-4" />
-                      </button>
+                        <Download className="h-3.5 w-3.5" />
+                      </ActionButton>
                       {user.role !== "admin" && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(user.id, user.name);
-                          }}
-                          className="text-red-400 hover:text-red-300 transition-colors"
-                          title="Delete user"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <>
+                          <span className="mx-0.5 h-4 w-px bg-gray-700" />
+                          <ActionButton
+                            title="Delete user"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(user.id, user.name);
+                            }}
+                            className="text-red-400/80 hover:bg-red-500/10 hover:text-red-300"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </ActionButton>
+                        </>
                       )}
                     </div>
                   </td>
@@ -631,29 +661,35 @@ export function UsersTab({ token }: UsersTabProps) {
       </div>
 
       {users.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
+        <div className="py-12 text-center text-sm text-gray-500">
           {searchQuery
             ? "No users found matching your search"
             : "No users found"}
         </div>
       )}
 
-      {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-1">
-          <div className="text-sm text-gray-400">
-            Page <span className="text-white font-medium">{currentPage}</span> of{" "}
-            <span className="text-white font-medium">{totalPages}</span>
+        <div className="flex flex-col items-center justify-between gap-4 px-1 sm:flex-row">
+          <div className="text-sm text-gray-500">
+            Page{" "}
+            <span className="font-medium tabular-nums text-gray-300">
+              {currentPage}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium tabular-nums text-gray-300">
+              {totalPages}
+            </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1 || fetching}
-              className={`p-2 rounded-md border text-sm transition-all ${
+              className={`rounded-lg border p-2 text-sm transition-colors ${
                 currentPage === 1 || fetching
-                  ? "bg-[#1a0f2e] border-gray-800 text-gray-600 cursor-not-allowed opacity-50"
-                  : "bg-[#1a0f2e] border-gray-700 text-gray-300 hover:bg-[#2D1B4E] hover:text-white"
+                  ? "cursor-not-allowed border-gray-800 bg-[#1a0f2e]/50 text-gray-600 opacity-50"
+                  : "border-gray-700/80 bg-[#1a0f2e]/80 text-gray-300 hover:border-gray-600 hover:bg-[#2D1B4E] hover:text-white"
               }`}
               title="Previous Page"
             >
@@ -665,9 +701,9 @@ export function UsersTab({ token }: UsersTabProps) {
                 return (
                   <span
                     key={`ellipsis-${idx}`}
-                    className="px-3 py-1.5 text-gray-500 text-sm"
+                    className="px-2 py-1.5 text-sm text-gray-600"
                   >
-                    ...
+                    …
                   </span>
                 );
               }
@@ -676,12 +712,13 @@ export function UsersTab({ token }: UsersTabProps) {
               return (
                 <button
                   key={`page-${pageNum}`}
+                  type="button"
                   onClick={() => handlePageChange(pageNum as number)}
                   disabled={fetching}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  className={`min-w-[2.25rem] rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
                     isCurrent
-                      ? "bg-purple-600 text-white shadow-[0_0_8px_rgba(147,51,234,0.4)]"
-                      : "bg-[#1a0f2e] border border-gray-700 text-gray-300 hover:bg-[#2D1B4E] hover:text-white"
+                      ? "bg-pink-500 text-white shadow-sm shadow-pink-500/25"
+                      : "border border-gray-700/80 bg-[#1a0f2e]/80 text-gray-300 hover:bg-[#2D1B4E] hover:text-white"
                   }`}
                 >
                   {pageNum}
@@ -690,12 +727,13 @@ export function UsersTab({ token }: UsersTabProps) {
             })}
 
             <button
+              type="button"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages || fetching}
-              className={`p-2 rounded-md border text-sm transition-all ${
+              className={`rounded-lg border p-2 text-sm transition-colors ${
                 currentPage === totalPages || fetching
-                  ? "bg-[#1a0f2e] border-gray-800 text-gray-600 cursor-not-allowed opacity-50"
-                  : "bg-[#1a0f2e] border-gray-700 text-gray-300 hover:bg-[#2D1B4E] hover:text-white"
+                  ? "cursor-not-allowed border-gray-800 bg-[#1a0f2e]/50 text-gray-600 opacity-50"
+                  : "border-gray-700/80 bg-[#1a0f2e]/80 text-gray-300 hover:border-gray-600 hover:bg-[#2D1B4E] hover:text-white"
               }`}
               title="Next Page"
             >

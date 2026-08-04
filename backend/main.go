@@ -23,6 +23,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// ci cd check
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
