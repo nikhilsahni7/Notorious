@@ -46,6 +46,8 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -euo pipefail
+
             # Create app directory if not exists
             mkdir -p ~/notorious/backend
             cd ~/notorious/backend
@@ -70,8 +72,8 @@ jobs:
             PORT=8080
             EOF
 
-            # Login to GHCR using PAT
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            # Package is public: pull anonymously (clear any stale credentials)
+            docker logout ghcr.io >/dev/null 2>&1 || true
 
             # Stop existing container if it exists
             docker rm -f notorious-backend || true
