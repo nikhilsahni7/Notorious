@@ -145,7 +145,7 @@ func (s *OpenSearchService) CreateIndex() error {
 	indexSettings := `{
 		"settings": {
 			"number_of_shards": 6,
-			"number_of_replicas": 0,
+			"number_of_replicas": 2,
 			"refresh_interval": "-1"
 		}
 	}`
@@ -808,10 +808,10 @@ func (s *OpenSearchService) Search(req SearchRequest) (*SearchResponse, error) {
 }
 
 func (s *OpenSearchService) FinalizeIndex() error {
-	// Re-enable refresh but keep replicas at 0 for performance
+	// Re-enable refresh and keep one copy in each of the three availability zones.
 	settings := `{
 		"settings": {
-			"number_of_replicas": 0,
+			"number_of_replicas": 2,
 			"refresh_interval": "1s"
 		}
 	}`
