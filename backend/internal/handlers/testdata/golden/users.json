@@ -229,7 +229,7 @@
     },
     {
       "created_at": "\u003cMASKED\u003e",
-      "daily_search_limit": 10,
+      "daily_search_limit": 100,
       "device_limit": 1,
       "email": "delhi@gmail.com",
       "id": "f8584d2d-51c2-4c2f-865f-1d25cca8d07e",
@@ -240,7 +240,7 @@
       "phone": "9899992345",
       "region": "delhi-ncr",
       "role": "user",
-      "searches_used_today": 0,
+      "searches_used_today": 1,
       "total_searches": 3,
       "updated_at": "\u003cMASKED\u003e"
     },

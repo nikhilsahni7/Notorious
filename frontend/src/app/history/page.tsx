@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { NotificationBell } from "@/components/NotificationBell";
 import { LogOut, ArrowLeft, Clock, Search } from "lucide-react";
 import { searchService } from "@/services/search.service";
 
@@ -80,18 +79,15 @@ export default function HistoryPage() {
               <p className="text-sm text-gray-400 truncate">{user?.name} • {history.length} searches</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <Button
-              onClick={logout}
-              variant="outline"
-              size="sm"
-              className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E] flex-shrink-0"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+          <Button
+            onClick={logout}
+            variant="outline"
+            size="sm"
+            className="bg-transparent border-gray-600 text-white hover:bg-[#2D1B4E] self-start sm:self-auto flex-shrink-0"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
         </div>
 
         {/* History List */}

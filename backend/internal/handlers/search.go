@@ -97,7 +97,6 @@ func (h *SearchHandler) Search(c *gin.Context) {
 			"searches_used_today": user.SearchesUsedToday,
 			"daily_search_limit":  user.DailySearchLimit,
 			"searches_remaining":  0,
-			"notify_opt_in":       user.QuotaResetOptIn(),
 		})
 		return
 	}

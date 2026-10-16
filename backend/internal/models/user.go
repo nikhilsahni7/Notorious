@@ -29,8 +29,6 @@ type User struct {
 	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 	LastResetDate     time.Time `json:"last_reset_date" db:"last_reset_date"`
 	LastSearchQuery   string    `json:"last_search_query" db:"last_search_query"`
-	// NotificationPrefs stored as JSONB (migration 015), e.g. {"quota_reset": true}
-	NotificationPrefs map[string]bool `json:"notification_prefs,omitempty" db:"notification_prefs"`
 }
 
 type UserRequest struct {

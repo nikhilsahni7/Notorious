@@ -5,9 +5,7 @@ interface ApiOptions extends RequestInit {
 }
 
 export class ApiError extends Error {
-  // `data` carries the backend error payload; the daily-limit 429 response
-  // includes extra fields like notify_opt_in.
-  constructor(message: string, public status: number, public data?: Record<string, unknown> & { code?: string; error?: string }) {
+  constructor(message: string, public status: number, public data?: { code?: string; error?: string }) {
     super(message);
     this.name = "ApiError";
   }

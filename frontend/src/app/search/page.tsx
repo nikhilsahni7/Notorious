@@ -1,7 +1,6 @@
 "use client";
 
 import { FestiveHeader, MobileDisclaimer, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
-import { NotificationBell } from "@/components/NotificationBell";
 import { Pagination } from "@/components/Pagination";
 import { RefineSearch } from "@/components/RefineSearch";
 import { ResultsStats } from "@/components/ResultsStats";
@@ -10,12 +9,8 @@ import { SearchForm } from "@/components/SearchForm";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIstCountdown } from "@/hooks/useIstCountdown";
 import { useSearch } from "@/hooks/useSearch";
-import { notificationService } from "@/services/notification.service";
 import { searchService } from "@/services/search.service";
-import { optInToPush } from "@/lib/push";
-import { ApiError } from "@/lib/api-client";
 import {
   Person,
   Refinement,
@@ -29,7 +24,6 @@ import {
 } from "@/utils/clipboard";
 import {
   AlertCircle,
-  Bell,
   Download,
   History,
   LogOut,
@@ -66,7 +60,6 @@ export default function SearchPage() {
   const { user, token, logout, isLoading, updateUser } = useAuth();
   const router = useRouter();
   const { performSearch, loading } = useSearch(token);
-  const istClock = useIstCountdown();
 
   const [searchFields, setSearchFields] = useState<SearchFields>({
     ...DEFAULT_SEARCH_FIELDS,
@@ -81,8 +74,6 @@ export default function SearchPage() {
   const [searchesUsed, setSearchesUsed] = useState(0);
   const [searchLimit, setSearchLimit] = useState(0);
   const [isDuplicateSearch, setIsDuplicateSearch] = useState(false);
-  const [limitOptedIn, setLimitOptedIn] = useState<boolean | null>(null);
-  const [optInProcessing, setOptInProcessing] = useState(false);
 
   // Refinement state
   const [activeRefinements, setActiveRefinements] = useState<Refinement[]>([]);
@@ -126,37 +117,6 @@ export default function SearchPage() {
       setSearchLimit(user.daily_search_limit);
     }
   }, [user]);
-
-  // Load notification prefs once so the "Notify me on reset" state is accurate
-  // even before a 429 is returned.
-  useEffect(() => {
-    if (!token) return;
-    notificationService
-      .getPrefs(token)
-      .then((data) => setLimitOptedIn(data.prefs.quota_reset === true))
-      .catch(() => {
-        // unknown is fine — affordance just stays available
-      });
-  }, [token]);
-
-  // Explicit opt-in trigger point: permission is requested ONLY on this tap
-  // (per browser push permission UX rules), never on load or login.
-  const handleNotifyOptIn = async () => {
-    if (!token || optInProcessing) return;
-    setOptInProcessing(true);
-    try {
-      await notificationService.updatePrefs({ quota_reset: true }, token);
-      setLimitOptedIn(true);
-      // Browser-level push: degrades silently to in-app only on failure/denial
-      await optInToPush(token);
-    } catch (error) {
-      console.error("Failed to opt in to reset notification:", error);
-      // Prefs save failed — don't latch the checkmark
-      setLimitOptedIn(false);
-    } finally {
-      setOptInProcessing(false);
-    }
-  };
 
   const updateField = (field: keyof SearchFields, value: string) => {
     setSearchFields((prev) => ({
@@ -234,28 +194,6 @@ export default function SearchPage() {
       setCurrentPage(page);
     } catch (error) {
       console.error("Search failed:", error);
-      if (error instanceof ApiError && error.status === 429) {
-        // Distinguish the daily-limit 429 (carries daily_search_limit) from
-        // the per-minute SearchRateLimiter 429 (no limit fields) — only the
-        // former should latch the "Daily limit reached!" state.
-        const data = error.data as Record<string, unknown> | undefined;
-        if (typeof data?.daily_search_limit === "number") {
-          setSearchLimit(data.daily_search_limit);
-          if (typeof data.searches_used_today === "number") {
-            setSearchesUsed(data.searches_used_today);
-          }
-          // Only latch the opt-in when unknown — never clobber an opt-in
-          // state already managed locally (e.g. from the profile page).
-          const notifyOptIn = data.notify_opt_in;
-          if (typeof notifyOptIn === "boolean" && limitOptedIn === null) {
-            setLimitOptedIn(notifyOptIn);
-          }
-          alert(data.error as string || "Daily search limit exceeded");
-          return;
-        }
-        alert(error.data?.error || "Search failed");
-        return;
-      }
       alert(error instanceof Error ? error.message : "Search failed");
     }
   };
@@ -390,7 +328,6 @@ export default function SearchPage() {
 
   const percentageUsed =
     searchLimit > 0 ? (searchesUsed / searchLimit) * 100 : 0;
-  const limitReached = searchLimit > 0 && searchesUsed >= searchLimit;
   const searchesRemaining = searchLimit - searchesUsed;
   const totalPages = Math.ceil(totalResults / PAGE_SIZE);
   const startIndex = (currentPage - 1) * PAGE_SIZE;
@@ -415,8 +352,6 @@ export default function SearchPage() {
           <FestiveHeader />
 
           <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
-            <NotificationBell />
-
             {/* Search Limit - Compact */}
             <div className="text-right mr-2">
               <div className="text-[10px] md:text-xs text-gray-400">
@@ -448,12 +383,6 @@ export default function SearchPage() {
                   style={{ width: `${Math.min(percentageUsed, 100)}%` }}
                 />
               </div>
-              {/* Live IST clock + reset countdown (locks to IST regardless of device timezone) */}
-              {istClock && (
-                <div className="text-[10px] text-gray-500 mt-0.5">
-                  Now {istClock.nowLabel} IST · Resets in {istClock.resetsIn}
-                </div>
-              )}
             </div>
 
             <Button
@@ -548,52 +477,9 @@ export default function SearchPage() {
         <MobileDisclaimer />
 
         {searchesUsed >= searchLimit && (
-          <div className="mb-3 bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-            <span>
-              <strong>Daily limit reached!</strong>{" "}
-              {/* searchLimit can be 0 (admins can set it); phrase accordingly */}
-              {searchLimit > 0
-                ? `You've used all ${searchLimit} searches.`
-                : "Your quota for today is 0."}{" "}
-              {istClock
-                ? `Resets at 12:00 AM IST — in ${istClock.resetsIn}.`
-                : "Resets at 12:00 AM IST."}
-            </span>
-            {limitOptedIn === false ? (
-              <Button
-                onClick={handleNotifyOptIn}
-                disabled={optInProcessing}
-                size="sm"
-                className="flex-shrink-0 h-8 bg-transparent border-yellow-500/50 text-yellow-300 hover:bg-yellow-500/20 hover:border-yellow-400 hover:text-yellow-200 transition-all"
-              >
-                {optInProcessing ? (
-                  <Spinner size="sm" className="mr-1" />
-                ) : (
-                  <Bell className="h-4 w-4 mr-1" />
-                )}
-                Notify me on reset
-              </Button>
-            ) : (
-              <span className="flex-shrink-0 text-green-400 font-semibold text-xs bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-1.5">
-                Notify on reset ✅{" "}
-                <span className="text-green-400/70 font-normal">
-                  {istClock
-                    ? `(delivered ~8:30 AM IST — in ${istClock.notifiesIn})`
-                    : "(delivered ~8:30 AM IST)"}
-                </span>
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* In-app-only quota heads-up banner (single, at ≥90% used) */}
-        {!limitReached && percentageUsed >= 90 && searchLimit > 0 && (
-          <div className="mb-3 bg-yellow-500/10 border border-yellow-500/50 text-yellow-300 p-3 rounded-lg text-sm">
-            <strong>Almost out!</strong> You&apos;ve used{" "}
-            {Math.round(percentageUsed)}% of today&apos;s search quota.{" "}
-            {istClock
-              ? `Resets at 12:00 AM IST — in ${istClock.resetsIn}.`
-              : "Resets at 12:00 AM IST."}
+          <div className="mb-3 bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm">
+            <strong>Daily limit reached!</strong> You&apos;ve used all{" "}
+            {searchLimit} searches. Resets at 12 AM IST.
           </div>
         )}
 

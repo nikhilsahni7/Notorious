@@ -6,6 +6,17 @@
       "device_name": "Chrome on Linux Desktop",
       "device_os": "Linux Desktop",
       "device_type": "Desktop",
+      "id": "362e5d84-aaf3-4fc8-ac56-2806d34e88c0",
+      "ip_address": "127.0.0.1",
+      "last_active": "2026-10-17T01:35:06.552656+05:30",
+      "location": "Local Network, Local",
+      "user_id": "c283052c-110c-4867-8b97-2bd226ba8523"
+    },
+    {
+      "created_at": "\u003cMASKED\u003e",
+      "device_name": "Chrome on Linux Desktop",
+      "device_os": "Linux Desktop",
+      "device_type": "Desktop",
       "id": "d863f7e0-983a-4749-acbf-4ee9a3362442",
       "ip_address": "127.0.0.1",
       "last_active": "2026-10-17T01:07:04.434694+05:30",
@@ -639,9 +650,6 @@
     "last_reset_date": "\u003cMASKED\u003e",
     "last_search_query": "mobile:8769044094",
     "name": "Knotorious Administrator",
-    "notification_prefs": {
-      "quota_reset": true
-    },
     "phone": "+919876543210",
     "region": "pan-india",
     "role": "admin",

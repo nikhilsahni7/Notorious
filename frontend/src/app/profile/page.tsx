@@ -1,17 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { NotificationBell } from "@/components/NotificationBell";
 import { Spinner } from "@/components/ui/spinner";
 import { API_CONFIG } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { notificationService, NotificationPrefs } from "@/services/notification.service";
-import { optInToPush, optOutFromPush, readPushStatus } from "@/lib/push";
 import { apiRequest } from "@/lib/api-client";
 import { format } from "date-fns";
 import {
   ArrowLeft,
-  Bell,
   Calendar,
   Globe,
   Mail,
@@ -22,7 +18,7 @@ import {
   User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface UserMetadata {
   ip_address?: string;
@@ -41,46 +37,11 @@ interface UserMetadata {
   created_at: string;
 }
 
-// Per-trigger switch rows. Types marked as such are deferred backend-side
-// (no trigger writes them yet) and shown disabled so users tune only real ones.
-const NOTIFICATION_TRIGGERS: { key: string; label: string; description: string; disabled: boolean }[] = [
-  {
-    key: "quota_reset",
-    label: "Daily quota reset",
-    description: "One notification at ~8:30 AM IST when your daily searches reset",
-    disabled: false,
-  },
-  {
-    key: "watchlist_match",
-    label: "Saved search matches",
-    description: "Coming soon — saved searches aren't in the app yet",
-    disabled: true,
-  },
-  {
-    key: "export_ready",
-    label: "Export ready",
-    description: "Coming soon — exports are downloadable immediately today",
-    disabled: true,
-  },
-];
-
 export default function ProfilePage() {
   const { user, token, isLoading } = useAuth();
   const router = useRouter();
   const [metadata, setMetadata] = useState<UserMetadata | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Notifications settings state
-  const [prefs, setPrefs] = useState<NotificationPrefs>({});
-  const [prefsLoading, setPrefsLoading] = useState(true);
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
-  const [subscribed, setSubscribed] = useState(false);
-
-  const refreshPermission = useCallback(async () => {
-    const status = await readPushStatus();
-    setPermission(status.permission);
-    setSubscribed(status.subscribed);
-  }, []);
 
   useEffect(() => {
     if (!isLoading && !token) {
@@ -90,46 +51,6 @@ export default function ProfilePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, token, user, router]);
-
-  useEffect(() => {
-    if (!token) return;
-    setPrefsLoading(true);
-    refreshPermission();
-    notificationService
-      .getPrefs(token)
-      .then((data) => setPrefs(data.prefs || {}))
-      .catch((error) => console.error("Failed to load notification prefs:", error))
-      .finally(() => setPrefsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  const setTriggerPref = async (key: string, value: boolean) => {
-    if (!token || NOTIFICATION_TRIGGERS.find((t) => t.key === key)?.disabled) return;
-    const previous = prefs;
-    setPrefs({ ...prefs, [key]: value });
-    try {
-      const data = await notificationService.updatePrefs({ [key]: value }, token);
-      setPrefs(data.prefs || {});
-    } catch (error) {
-      console.error("Failed to update notification prefs:", error);
-      setPrefs(previous); // revert silently
-    }
-  };
-
-  // Browser push opt-in/out from this explicit user gesture only
-  const handlePushToggle = async () => {
-    if (!token) return;
-    if (permission === "granted" && subscribed) {
-      await optOutFromPush(token);
-    } else {
-      const ok = await optInToPush(token); // degrades silently on denial
-      if (!ok) {
-        await refreshPermission();
-        return;
-      }
-    }
-    await refreshPermission();
-  };
 
   const loadMetadata = async () => {
     try {
@@ -176,85 +97,6 @@ export default function ProfilePage() {
               Back to Search
             </Button>
             <h1 className="text-xl font-bold text-white">My Profile</h1>
-          </div>
-          <NotificationBell />
-        </div>
-
-        {/* Notifications Settings Card */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-4 md:p-6 rounded-2xl shadow-xl mb-6">
-          <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2 border-b border-white/10 pb-3">
-            <Bell className="h-5 w-5 text-pink-400" />
-            Notifications
-          </h2>
-
-          <div className="space-y-2">
-            {prefsLoading ? (
-              <div className="py-4 text-center">
-                <Spinner size="sm" />
-              </div>
-            ) : (
-              NOTIFICATION_TRIGGERS.map((trigger) => {
-                const checked = prefs[trigger.key] === true;
-                return (
-                  <label
-                    key={trigger.key}
-                    className={`flex items-center justify-between gap-4 p-3 rounded-xl border transition-colors ${
-                      trigger.disabled
-                        ? "border-white/5 opacity-50 cursor-not-allowed"
-                        : "border-white/10 hover:bg-white/5 cursor-pointer"
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-white">{trigger.label}</p>
-                      <p className="text-xs text-gray-400 break-words">{trigger.description}</p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={checked}
-                      disabled={trigger.disabled}
-                      onClick={() => setTriggerPref(trigger.key, !checked)}
-                      className={`relative flex-shrink-0 w-10 h-6 rounded-full transition-colors ${
-                        checked ? "bg-pink-500" : "bg-white/15"
-                      } ${trigger.disabled ? "opacity-60" : ""}`}
-                    >
-                      <span
-                        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                          checked ? "left-[1.125rem]" : "left-0.5"
-                        }`}
-                      />
-                    </button>
-                  </label>
-                );
-              })
-            )}
-
-            {/* Browser-level push control (OS notifications) */}
-            <div className="flex items-center justify-between gap-4 p-3 rounded-xl border border-white/10">
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-white">Browser push (OS notifications)</p>
-                <p className="text-xs text-gray-400 break-words">
-                  {permission === "unsupported"
-                    ? "Not supported in this browser — in-app bell still works"
-                    : permission === "denied"
-                    ? "Blocked in your browser — in-app bell still works"
-                    : subscribed
-                    ? "Enrolled ✅ — OS notifications arrive while Knotorious tabs are closed"
-                    : permission === "granted"
-                    ? "Permission granted but not enrolled — tap Enable to subscribe"
-                    : "Off — get OS notifications even when the tab is closed"}
-                </p>
-              </div>
-              <Button
-                onClick={handlePushToggle}
-                variant="outline"
-                size="sm"
-                disabled={permission === "unsupported"}
-                className="flex-shrink-0 h-8 bg-transparent border-white/10 text-white hover:bg-white/10 hover:border-white/20"
-              >
-                {permission === "granted" && subscribed ? "Disable" : "Enable"}
-              </Button>
-            </div>
           </div>
         </div>
 

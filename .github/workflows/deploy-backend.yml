@@ -77,11 +77,6 @@ jobs:
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             INGEST_BATCH_SIZE=${{ secrets.INGEST_BATCH_SIZE }}
             INGEST_WORKER_MULTIPLIER=${{ secrets.INGEST_WORKER_MULTIPLIER }}
-            # Web push (VAPID). Unset/cleared secrets simply disable OS pushes;
-            # the in-app bell keeps working either way.
-            VAPID_PUBLIC_KEY=${{ secrets.VAPID_PUBLIC_KEY }}
-            VAPID_PRIVATE_KEY=${{ secrets.VAPID_PRIVATE_KEY }}
-            VAPID_SUBJECT=${{ secrets.VAPID_SUBJECT }}
             GIN_MODE=release
             PORT=8080
             EOF

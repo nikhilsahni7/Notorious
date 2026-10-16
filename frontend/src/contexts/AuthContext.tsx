@@ -23,9 +23,6 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isLoading: boolean;
   updateUser: (user: User) => void;
-  /** Unread notification count from the heartbeat payload (badge on the bell). */
-  unreadNotifications: number;
-  setUnreadNotifications: (countOrFn: number | ((prev: number) => number)) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,29 +35,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [unreadNotifications, setUnreadNotificationCount] = useState(0);
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Heartbeat function to update presence and refresh the unread badge
+  // Heartbeat function to update presence
   const sendHeartbeat = useCallback(async () => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
     if (!storedToken) return;
 
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.USER.HEARTBEAT}`, {
+      await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.USER.HEARTBEAT}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${storedToken}`,
           "Content-Type": "application/json",
         },
       });
-
-      if (response.ok) {
-        const data = await response.json().catch(() => null);
-        if (data && typeof data.unread_notifications === "number") {
-          setUnreadNotificationCount(data.unread_notifications);
-        }
-      }
     } catch (error) {
       // Silently fail - heartbeat should not block user experience
       console.debug("Heartbeat failed:", error);
@@ -150,7 +139,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setToken(null);
     setUser(null);
-    setUnreadNotificationCount(0);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   };
@@ -162,16 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        token,
-        login,
-        logout,
-        isLoading,
-        updateUser,
-        unreadNotifications,
-        setUnreadNotifications: setUnreadNotificationCount,
-      }}
+      value={{ user, token, login, logout, isLoading, updateUser }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,5 +1,4 @@
 import { FestiveCelebration } from "@/components/FestiveCelebration";
-import { PWARegistrar } from "@/components/PWARegistrar";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { AuthProvider } from "@/providers/AuthProvider";
 import type { Metadata } from "next";
@@ -11,7 +10,6 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Knotorious Search",
   description: "Advanced database search system",
-  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
@@ -24,7 +22,6 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <FestiveCelebration />
-          <PWARegistrar />
           {children}
           <WhatsAppButton />
         </AuthProvider>
