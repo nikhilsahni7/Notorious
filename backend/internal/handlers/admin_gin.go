@@ -859,16 +859,21 @@ func (h *AdminGinHandler) GenerateUserEOD(c *gin.Context) {
 		}
 
 		if needsQuotes {
-			// Escape existing quotes by doubling them
-			escaped := ""
+			// Escape existing quotes by doubling them, built in one pass —
+			// the previous char-by-char `escaped += ...` allocated a fresh
+			// string per character (quadratic copies for long values).
+			var b strings.Builder
+			b.Grow(len(value) + 2)
+			b.WriteByte('"')
 			for _, ch := range value {
 				if ch == '"' {
-					escaped += "\"\""
+					b.WriteString("\"\"")
 				} else {
-					escaped += string(ch)
+					b.WriteRune(ch)
 				}
 			}
-			return "\"" + escaped + "\""
+			b.WriteByte('"')
+			return b.String()
 		}
 		return value
 	}
