@@ -14,13 +14,15 @@ type UserGinHandler struct {
 	searchHistoryRepo *repository.SearchHistoryRepository
 	metadataRepo      *repository.MetadataRepository
 	sessionRepo       *repository.SessionRepository
+	notifRepo         *repository.NotificationRepository
 }
 
-func NewUserGinHandler(searchHistoryRepo *repository.SearchHistoryRepository, metadataRepo *repository.MetadataRepository, sessionRepo *repository.SessionRepository) *UserGinHandler {
+func NewUserGinHandler(searchHistoryRepo *repository.SearchHistoryRepository, metadataRepo *repository.MetadataRepository, sessionRepo *repository.SessionRepository, notifRepo *repository.NotificationRepository) *UserGinHandler {
 	return &UserGinHandler{
 		searchHistoryRepo: searchHistoryRepo,
 		metadataRepo:      metadataRepo,
 		sessionRepo:       sessionRepo,
+		notifRepo:         notifRepo,
 	}
 }
 
@@ -68,21 +70,42 @@ func (h *UserGinHandler) GetMetadata(c *gin.Context) {
 }
 
 // Heartbeat updates the user's last_active timestamp for presence tracking
+// and piggybacks the unread notification count (no separate polling endpoint).
 func (h *UserGinHandler) Heartbeat(c *gin.Context) {
+	unread := h.unreadCount(c)
+
 	tokenHash, exists := c.Get("token_hash")
 	if !exists {
 		// For admins or if token_hash wasn't set, just return success
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "unread_notifications": unread})
 		return
 	}
 
 	if h.sessionRepo != nil {
 		if err := h.sessionRepo.UpdateLastActive(c.Request.Context(), tokenHash.(string)); err != nil {
 			// Silently fail - heartbeat should not block user experience
-			c.JSON(http.StatusOK, gin.H{"status": "ok"})
+			c.JSON(http.StatusOK, gin.H{"status": "ok", "unread_notifications": unread})
 			return
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "unread_notifications": unread})
+}
+
+// unreadCount best-effort reads the unread notification count; failures
+// return 0 so the heartbeat never blocks the user experience.
+func (h *UserGinHandler) unreadCount(c *gin.Context) int {
+	if h.notifRepo == nil {
+		return 0
+	}
+	raw, exists := c.Get("user_id")
+	uid, ok := raw.(uuid.UUID)
+	if !exists || !ok {
+		return 0
+	}
+	count, err := h.notifRepo.CountUnread(c.Request.Context(), uid)
+	if err != nil {
+		return 0
+	}
+	return count
 }

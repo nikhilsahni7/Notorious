@@ -8,6 +8,9 @@
   "last_reset_date": "\u003cMASKED\u003e",
   "last_search_query": "mobile:8769044094",
   "name": "Knotorious Administrator",
+  "notification_prefs": {
+    "quota_reset": true
+  },
   "phone": "+919876543210",
   "region": "pan-india",
   "role": "admin",
