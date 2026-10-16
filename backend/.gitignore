@@ -110,7 +110,8 @@ tmp/
 # ─────────────────────────────
 # Testing
 # ─────────────────────────────
-testdata/
+testdata/*
+!testdata/golden
 coverage.txt
 profile.out
 

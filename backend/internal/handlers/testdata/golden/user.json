@@ -1,0 +1,16 @@
+{
+  "created_at": "\u003cMASKED\u003e",
+  "daily_search_limit": 1000000000,
+  "device_limit": 100,
+  "email": "admin.ops@knotorious.us",
+  "id": "c283052c-110c-4867-8b97-2bd226ba8523",
+  "is_active": true,
+  "last_reset_date": "\u003cMASKED\u003e",
+  "last_search_query": "mobile:8769044094",
+  "name": "Knotorious Administrator",
+  "phone": "+919876543210",
+  "region": "pan-india",
+  "role": "admin",
+  "searches_used_today": 0,
+  "updated_at": "\u003cMASKED\u003e"
+}
