@@ -144,6 +144,9 @@ func (r *ChatRepository) GetMessages(ctx context.Context, conversationID uuid.UU
 
 // GetConversations returns all conversations for a user with details.
 func (r *ChatRepository) GetConversations(ctx context.Context, userID uuid.UUID) ([]models.ConversationWithDetails, error) {
+	// Unread counts are pre-aggregated in one indexed pass over the user's
+	// unread messages (idx_chat_messages_receiver_unread) instead of a
+	// correlated COUNT(*) subquery per conversation row.
 	query := `
 		SELECT
 			c.id,
@@ -154,16 +157,17 @@ func (r *ChatRepository) GetConversations(ctx context.Context, userID uuid.UUID)
 			m.content AS last_message,
 			c.last_message_at,
 			m.sender_id AS last_sender_id,
-			COALESCE((
-				SELECT COUNT(*)
-				FROM chat_messages cm
-				WHERE cm.conversation_id = c.id
-				AND cm.receiver_id = $1
-				AND cm.status != 'read'
-			), 0) AS unread_count
+			COALESCE(unread.cnt, 0) AS unread_count
 		FROM chat_conversations c
 		JOIN users u ON u.id = CASE WHEN c.participant_a = $1 THEN c.participant_b ELSE c.participant_a END
 		LEFT JOIN chat_messages m ON m.id = c.last_message_id
+		LEFT JOIN (
+			SELECT cm.conversation_id, COUNT(*) AS cnt
+			FROM chat_messages cm
+			WHERE cm.receiver_id = $1
+			AND cm.status != 'read'
+			GROUP BY cm.conversation_id
+		) unread ON unread.conversation_id = c.id
 		WHERE c.participant_a = $1 OR c.participant_b = $1
 		ORDER BY c.last_message_at DESC
 	`
