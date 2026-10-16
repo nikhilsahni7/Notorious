@@ -7,6 +7,15 @@ on:
       - 'backend/**'
       - '.github/workflows/deploy-backend.yml'
 
+# Serialize deploys: back-to-back merges to main run one at a time so the
+# VPS never has two 'docker rm/pull/run' sequences interleaving (yesterday's
+# 'container name already in use' race). Single-commit pushes are unaffected.
+# cancel-in-progress is deliberately false: killing a job mid-SSH can leave the
+# container removed with nothing running; queueing is always safe.
+concurrency:
+  group: deploy-backend-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
