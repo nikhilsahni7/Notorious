@@ -15,6 +15,17 @@ export const API_CONFIG = {
       METADATA: "/api/user/metadata",
       HEARTBEAT: "/api/user/heartbeat",
     },
+    NOTIFICATIONS: {
+      BASE: "/api/notifications",
+      UNREAD_COUNT: "/api/notifications/unread-count",
+      READ_ALL: "/api/notifications/read-all",
+      PREFS: "/api/notifications/prefs",
+    },
+    PUSH: {
+      PUBLIC_KEY: "/api/push/public-key",
+      SUBSCRIBE: "/api/push/subscribe",
+      UNSUBSCRIBE: "/api/push/unsubscribe",
+    },
     ADMIN: {
       USERS: "/api/admin/users",
       BULK_UPDATE_USERS: "/api/admin/users/bulk-update",

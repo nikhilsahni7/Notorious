@@ -93,32 +93,36 @@ func setupEnv(t testing.TB) *testEnv {
 		adminSessionRepo := repository.NewAdminSessionRepository(db)
 		sessionRepo := repository.NewSessionRepository(db)
 		chatRepo := repository.NewChatRepository(db)
+		notificationRepo := repository.NewNotificationRepository(db)
 
 		adminHandler := NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo, sessionRepo)
-		userHandler := NewUserGinHandler(searchHistoryRepo, metadataRepo, sessionRepo)
+		userHandler := NewUserGinHandler(searchHistoryRepo, metadataRepo, sessionRepo, notificationRepo)
 		userPasswordHandler := NewUserPasswordGinHandler(passwordChangeRepo, userRepo)
 		statsHandler := NewStatsGinHandler(db)
 		chatHandler := NewChatHandler(chatRepo, chatws.NewHub(chatRepo, jwtManager))
+		notificationHandler := NewNotificationHandler(notificationRepo, userRepo)
 
 		authMiddleware := middleware.NewGinAuthMiddleware(jwtManager, sessionRepo)
 
 		env.router = buildRouter(ginRouterSpec{
-			authMiddleware: authMiddleware,
-			adminHandler:   adminHandler,
-			userHandler:    userHandler,
-			pwHandler:      userPasswordHandler,
-			statsHandler:   statsHandler,
-			chatHandler:    chatHandler,
-			withLimiters:   true,
+			authMiddleware:      authMiddleware,
+			adminHandler:        adminHandler,
+			userHandler:         userHandler,
+			pwHandler:           userPasswordHandler,
+			statsHandler:        statsHandler,
+			chatHandler:         chatHandler,
+			notificationHandler: notificationHandler,
+			withLimiters:        true,
 		})
 		env.benchRouter = buildRouter(ginRouterSpec{
-			authMiddleware: authMiddleware,
-			adminHandler:   adminHandler,
-			userHandler:    userHandler,
-			pwHandler:      userPasswordHandler,
-			statsHandler:   statsHandler,
-			chatHandler:    chatHandler,
-			withLimiters:   false,
+			authMiddleware:      authMiddleware,
+			adminHandler:        adminHandler,
+			userHandler:         userHandler,
+			pwHandler:           userPasswordHandler,
+			statsHandler:        statsHandler,
+			chatHandler:         chatHandler,
+			notificationHandler: notificationHandler,
+			withLimiters:        false,
 		})
 		env.pool = db.Pool
 	})
@@ -138,13 +142,14 @@ func TestMain(m *testing.M) {
 }
 
 type ginRouterSpec struct {
-	authMiddleware *middleware.GinAuthMiddleware
-	adminHandler   *AdminGinHandler
-	userHandler    *UserGinHandler
-	pwHandler      *UserPasswordGinHandler
-	statsHandler   *StatsGinHandler
-	chatHandler    *ChatHandler
-	withLimiters   bool
+	authMiddleware      *middleware.GinAuthMiddleware
+	adminHandler        *AdminGinHandler
+	userHandler         *UserGinHandler
+	pwHandler           *UserPasswordGinHandler
+	statsHandler        *StatsGinHandler
+	chatHandler         *ChatHandler
+	notificationHandler *NotificationHandler
+	withLimiters        bool
 }
 
 // buildRouter mirrors the route registration in main.go for the read-only
@@ -183,6 +188,21 @@ func buildRouter(s ginRouterSpec) *gin.Engine {
 		{
 			userRoutes.GET("/search-history", s.userHandler.GetSearchHistory)
 			userRoutes.GET("/metadata", s.userHandler.GetMetadata)
+			userRoutes.POST("/heartbeat", s.userHandler.Heartbeat)
+		}
+	}
+
+	if s.notificationHandler != nil {
+		notificationRoutes := r.Group("/api/notifications")
+		notificationRoutes.Use(s.authMiddleware.AuthRequired())
+		{
+			notificationRoutes.GET("", s.notificationHandler.List)
+			notificationRoutes.GET("/unread-count", s.notificationHandler.UnreadCount)
+			notificationRoutes.GET("/prefs", s.notificationHandler.GetPrefs)
+			// Write routes are not exercised by the golden/bench suites; only
+			// the param route is registered so path validation is testable
+			// (a non-UUID id rejects before any DB write).
+			notificationRoutes.POST("/:id/read", s.notificationHandler.MarkRead)
 		}
 	}
 
