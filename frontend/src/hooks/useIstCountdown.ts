@@ -11,7 +11,7 @@ interface ClockState {
   nowLabel: string;
   /** Time until the next IST midnight reset, e.g. "5h 17m". */
   resetsIn: string;
-  /** Same as resetsIn: the quota-reset push is delivered at midnight itself. */
+  /** Time until the next ~08:30 IST quota-reset push delivery. */
   notifiesIn: string;
 }
 
@@ -40,18 +40,17 @@ function formatCountdown(ms: number): string {
 function compute(): ClockState {
   const { h, m } = istWallclock(Date.now());
   const p2 = (n: number) => String(n).padStart(2, "0");
-  const resetsIn = formatCountdown(msUntilIst(0, 0));
   return {
     nowLabel: `${p2(h)}:${p2(m)}`,
-    resetsIn,
-    notifiesIn: resetsIn,
+    resetsIn: formatCountdown(msUntilIst(0, 0)),
+    notifiesIn: formatCountdown(msUntilIst(8, 30)),
   };
 }
 
 /**
- * Live IST clock + countdown to the midnight IST reset (limits reset AND the
- * opted-in notification are delivered at midnight). Null until mounted so
- * SSR markup and hydration never disagree; refreshed every 30 seconds.
+ * Live IST clock + countdowns for the two notification-relevant moments
+ * (midnight reset, 08:30 push). Null until mounted so SSR markup and
+ * hydration never disagree; refreshed every 30 seconds.
  */
 export function useIstCountdown(): ClockState | null {
   const [clock, setClock] = useState<ClockState | null>(null);
