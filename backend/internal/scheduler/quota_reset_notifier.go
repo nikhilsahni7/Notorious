@@ -10,7 +10,7 @@ import (
 )
 
 // QuotaResetNotifier informs opted-in users once per day about their reset
-// quota, at 08:30 IST (NOT at the 00:00 reset time itself).
+// quota, at midnight IST (00:00), the same window in which limits reset.
 type QuotaResetNotifier struct {
 	userRepo         *repository.UserRepository
 	notificationRepo *repository.NotificationRepository
@@ -33,13 +33,14 @@ func NewQuotaResetNotifier(userRepo *repository.UserRepository, notificationRepo
 }
 
 // Start ticks hourly like SearchLimitResetter and delivers at the first
-// tick after 08:30 IST each day. The loop runs in a goroutine so Start
-// returns immediately and never blocks main before the router binds.
+// tick after 00:00 IST each day, the same window in which the daily limits
+// are reset. The loop runs in a goroutine so Start returns immediately and
+// never blocks main before the router binds.
 func (n *QuotaResetNotifier) Start(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
-	log.Println("Quota reset notifier started (delivery at 08:30 IST)")
+	log.Println("Quota reset notifier started (delivery at midnight IST)")
 
 	go func() {
 		// First check immediately (covers restarts mid-window).
@@ -60,11 +61,11 @@ func (n *QuotaResetNotifier) Start(ctx context.Context) {
 func (n *QuotaResetNotifier) deliverIfDue() {
 	now := time.Now().In(n.istLocation)
 
-	// Fire anywhere in the 08:30-08:59 IST window. With an hourly ticker the
-	// exact offset depends on boot time, so do not pin to a 5-minute slice;
-	// HasTypeToday makes every tick within the window idempotent — delivery
-	// happens exactly once per IST day.
-	if now.Hour() != 8 || now.Minute() < 30 {
+	// Fire in the 00:00-00:05 IST window (same slice SearchLimitResetter
+	// uses for the limit reset). With an hourly ticker the exact offset
+	// depends on boot time; HasTypeToday makes every tick within the window
+	// idempotent — delivery happens exactly once per IST day.
+	if now.Hour() != 0 || now.Minute() >= 5 {
 		return
 	}
 
@@ -87,5 +88,5 @@ func (n *QuotaResetNotifier) deliverIfDue() {
 		return
 	}
 
-	log.Printf("Delivered quota-reset notifications to %d opt-in user(s) at %s IST", len(userIDs), now.Format("2006-01-02 15:04:05"))
+	log.Printf("Delivered quota-reset notifications to %d opt-in user(s) at %s IST (midnight reset)", len(userIDs), now.Format("2006-01-02 15:04:05"))
 }

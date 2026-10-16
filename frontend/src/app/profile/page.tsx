@@ -47,7 +47,7 @@ const NOTIFICATION_TRIGGERS: { key: string; label: string; description: string; 
   {
     key: "quota_reset",
     label: "Daily quota reset",
-    description: "One notification at ~8:30 AM IST when your daily searches reset",
+    description: "One notification at 12:00 AM IST when your daily searches reset",
     disabled: false,
   },
   {
