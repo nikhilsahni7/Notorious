@@ -102,7 +102,7 @@ export default function NotificationsPage() {
         setLoadingMore(false);
       }
     },
-    [token]
+    [token, setUnreadNotifications]
   );
 
   useEffect(() => {
