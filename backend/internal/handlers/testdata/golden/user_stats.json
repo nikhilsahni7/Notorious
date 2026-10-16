@@ -1,0 +1,126 @@
+{
+  "engagement": {
+    "first_search_at": "\u003cMASKED\u003e",
+    "last_search_at": "\u003cMASKED\u003e",
+    "longest_gap_days": 2
+  },
+  "identity": {
+    "created_at": "\u003cMASKED\u003e",
+    "daily_search_limit": 1000000000,
+    "device_limit": 100,
+    "email": "admin.ops@knotorious.us",
+    "id": "c283052c-110c-4867-8b97-2bd226ba8523",
+    "is_active": true,
+    "name": "Knotorious Administrator",
+    "region": "pan-india",
+    "searches_used_today": 0
+  },
+  "search_behavior": {
+    "avg_searches_per_day": "2.33",
+    "daily_volume": [
+      {
+        "count": 4,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 1,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 1,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 3,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 9,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 3,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 5,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 1,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 2,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 3,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 3,
+        "date": "\u003cMASKED\u003e"
+      }
+    ],
+    "first_search_at": "\u003cMASKED\u003e",
+    "last_search_at": "\u003cMASKED\u003e",
+    "peak_hour": 12,
+    "peak_hour_formatted": "12 PM",
+    "top_terms": [
+      {
+        "count": 4,
+        "query": "mobile:9990903075"
+      },
+      {
+        "count": 3,
+        "query": "mobile:9015861967"
+      },
+      {
+        "count": 2,
+        "query": "mobile:9953545717"
+      },
+      {
+        "count": 2,
+        "query": "mobile:9871393812"
+      },
+      {
+        "count": 1,
+        "query": "mobile:8218421201"
+      },
+      {
+        "count": 1,
+        "query": "mobile:8238316505"
+      },
+      {
+        "count": 1,
+        "query": "mobile:8076565748"
+      },
+      {
+        "count": 1,
+        "query": "mobile:8368383367"
+      },
+      {
+        "count": 1,
+        "query": "mobile:8081224773"
+      },
+      {
+        "count": 1,
+        "query": "mobile:8303613124"
+      }
+    ],
+    "total_searches": 35,
+    "zero_result_pct": "0.0",
+    "zero_result_searches": 0
+  },
+  "security": {
+    "device_limit": 100,
+    "devices_registered": 58,
+    "last_password_reset_at": null,
+    "total_password_reset_requests": 0
+  },
+  "sessions": {
+    "devices_registered": 58,
+    "last_login": "\u003cMASKED\u003e"
+  }
+}

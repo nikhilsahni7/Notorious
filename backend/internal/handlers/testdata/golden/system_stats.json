@@ -1,0 +1,427 @@
+{
+  "search_patterns": {
+    "top_terms": [
+      {
+        "count": 45,
+        "query": "mobile:v"
+      },
+      {
+        "count": 18,
+        "query": "address:Tundla, village gothua, post rajawali village gothua, Tundla"
+      },
+      {
+        "count": 16,
+        "query": "mobile:V"
+      },
+      {
+        "count": 11,
+        "query": "mobile:8748987550"
+      },
+      {
+        "count": 11,
+        "query": "address:Bettegowdanadoddi  562117"
+      },
+      {
+        "count": 10,
+        "query": "mobile:9901431238"
+      },
+      {
+        "count": 10,
+        "query": "mobile:8151800972"
+      },
+      {
+        "count": 10,
+        "query": "mobile:9717873484"
+      },
+      {
+        "count": 10,
+        "query": "name:RAJPUT AND address:Ayodhaya Nagar Huzur 462041"
+      },
+      {
+        "count": 10,
+        "query": "mobile:9917811007"
+      },
+      {
+        "count": 10,
+        "query": "mobile:9963893679"
+      },
+      {
+        "count": 10,
+        "query": "name:Shaikh Mohammad asif AND address:395003"
+      },
+      {
+        "count": 9,
+        "query": "mobile:9885320381"
+      },
+      {
+        "count": 9,
+        "query": "mobile:9980467220"
+      },
+      {
+        "count": 9,
+        "query": "mobile:9999210211"
+      },
+      {
+        "count": 9,
+        "query": "mobile:9891025444"
+      },
+      {
+        "count": 9,
+        "query": "mobile:8088678773"
+      },
+      {
+        "count": 9,
+        "query": "name:Patidar AND address:454660"
+      },
+      {
+        "count": 9,
+        "query": "mobile:8800991414"
+      },
+      {
+        "count": 9,
+        "query": "mobile:7827765395"
+      }
+    ],
+    "zero_result_count": 0,
+    "zero_result_pct": "0.0"
+  },
+  "search_volume": {
+    "avg_daily": "16228.7",
+    "avg_per_user_per_day": "167.31",
+    "daily_trend": [
+      {
+        "count": 30,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 7834,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 4757,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 12578,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 17100,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 23838,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 20933,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 29602,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 18214,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 3056,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 17932,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 20435,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 24927,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 21098,
+        "date": "\u003cMASKED\u003e"
+      },
+      {
+        "count": 21096,
+        "date": "\u003cMASKED\u003e"
+      }
+    ],
+    "peak_hour": 15,
+    "peak_hour_formatted": "3 PM",
+    "total_all_time": 243430,
+    "total_last_30_days": 243430
+  },
+  "security": {
+    "password_resets_last_30_days": 21,
+    "total_password_resets": 21,
+    "users_exceeding_device_limit": []
+  },
+  "time_distributions": {
+    "by_day_of_week": [
+      {
+        "count": 7813,
+        "day_name": "Sunday",
+        "dow": 0
+      },
+      {
+        "count": 30510,
+        "day_name": "Monday",
+        "dow": 1
+      },
+      {
+        "count": 37535,
+        "day_name": "Tuesday",
+        "dow": 2
+      },
+      {
+        "count": 48765,
+        "day_name": "Wednesday",
+        "dow": 3
+      },
+      {
+        "count": 42031,
+        "day_name": "Thursday",
+        "dow": 4
+      },
+      {
+        "count": 50728,
+        "day_name": "Friday",
+        "dow": 5
+      },
+      {
+        "count": 26048,
+        "day_name": "Saturday",
+        "dow": 6
+      }
+    ],
+    "by_hour": [
+      {
+        "count": 492,
+        "hour": 0,
+        "label": "12 AM"
+      },
+      {
+        "count": 148,
+        "hour": 1,
+        "label": "1 AM"
+      },
+      {
+        "count": 152,
+        "hour": 2,
+        "label": "2 AM"
+      },
+      {
+        "count": 36,
+        "hour": 3,
+        "label": "3 AM"
+      },
+      {
+        "count": 24,
+        "hour": 4,
+        "label": "4 AM"
+      },
+      {
+        "count": 259,
+        "hour": 5,
+        "label": "5 AM"
+      },
+      {
+        "count": 212,
+        "hour": 6,
+        "label": "6 AM"
+      },
+      {
+        "count": 201,
+        "hour": 7,
+        "label": "7 AM"
+      },
+      {
+        "count": 270,
+        "hour": 8,
+        "label": "8 AM"
+      },
+      {
+        "count": 2787,
+        "hour": 9,
+        "label": "9 AM"
+      },
+      {
+        "count": 16682,
+        "hour": 10,
+        "label": "10 AM"
+      },
+      {
+        "count": 25964,
+        "hour": 11,
+        "label": "11 AM"
+      },
+      {
+        "count": 31033,
+        "hour": 12,
+        "label": "12 PM"
+      },
+      {
+        "count": 20985,
+        "hour": 13,
+        "label": "1 PM"
+      },
+      {
+        "count": 23899,
+        "hour": 14,
+        "label": "2 PM"
+      },
+      {
+        "count": 34512,
+        "hour": 15,
+        "label": "3 PM"
+      },
+      {
+        "count": 32846,
+        "hour": 16,
+        "label": "4 PM"
+      },
+      {
+        "count": 30924,
+        "hour": 17,
+        "label": "5 PM"
+      },
+      {
+        "count": 14020,
+        "hour": 18,
+        "label": "6 PM"
+      },
+      {
+        "count": 2763,
+        "hour": 19,
+        "label": "7 PM"
+      },
+      {
+        "count": 1559,
+        "hour": 20,
+        "label": "8 PM"
+      },
+      {
+        "count": 918,
+        "hour": 21,
+        "label": "9 PM"
+      },
+      {
+        "count": 1763,
+        "hour": 22,
+        "label": "10 PM"
+      },
+      {
+        "count": 981,
+        "hour": 23,
+        "label": "11 PM"
+      }
+    ],
+    "by_month": [
+      {
+        "count": 243430,
+        "month": "Oct 2026"
+      }
+    ]
+  },
+  "user_patterns": {
+    "active_users_last_30d": 94,
+    "avg_searches_per_user": "2509.6",
+    "device_distribution": [
+      {
+        "device_count": 1,
+        "user_count": 46
+      },
+      {
+        "device_count": 2,
+        "user_count": 13
+      },
+      {
+        "device_count": 3,
+        "user_count": 10
+      },
+      {
+        "device_count": 4,
+        "user_count": 8
+      },
+      {
+        "device_count": 5,
+        "user_count": 8
+      },
+      {
+        "device_count": 7,
+        "user_count": 2
+      },
+      {
+        "device_count": 58,
+        "user_count": 1
+      }
+    ],
+    "most_active_users": [
+      {
+        "email": "samrat.joshi2580@gmail.com",
+        "id": "a0b0531c-a77a-4a0a-9369-4816f59bfc10",
+        "name": "ANIL",
+        "search_count": 54258
+      },
+      {
+        "email": "holydesk548@gmail.com",
+        "id": "d80d13f4-ee97-4149-a21e-4e9c986fd119",
+        "name": "DHANUSH",
+        "search_count": 29318
+      },
+      {
+        "email": "kdpexcore5@knotorious.com",
+        "id": "636b95ed-933b-4729-b253-99883f3fce21",
+        "name": "ARVIND",
+        "search_count": 10136
+      },
+      {
+        "email": "ironsentinel@gmail.com",
+        "id": "ff1c0faf-784c-422a-a2ec-a43a7d3ee73a",
+        "name": "RAHUL",
+        "search_count": 8879
+      },
+      {
+        "email": "titannova66@knotorious.com",
+        "id": "d0410bd4-2d29-44ae-b414-744dbfbf1306",
+        "name": "AVINASH CAPITAL",
+        "search_count": 7631
+      },
+      {
+        "email": "cybermatrix33@knotorious.com",
+        "id": "dd37fafc-f3ef-4909-a800-79c2928fa79b",
+        "name": "VIJAY",
+        "search_count": 6935
+      },
+      {
+        "email": "primevault@gmail.com",
+        "id": "72ccbce3-a24f-4518-90ae-6380dfeb8949",
+        "name": "ABHISHEK",
+        "search_count": 6623
+      },
+      {
+        "email": "titanwave29@knotorious.com",
+        "id": "b899d216-b57e-476d-87c9-a01faa24d45c",
+        "name": "Sougaat",
+        "search_count": 6618
+      },
+      {
+        "email": "titancore88@knotorious.com",
+        "id": "098703cb-6dfb-4a3d-b361-2d23aabcdc1e",
+        "name": "AVINASH CAPITAL",
+        "search_count": 6203
+      },
+      {
+        "email": "securecommand@gmail.com",
+        "id": "cc18a4cb-eb54-4b86-bf8f-e932395362a6",
+        "name": "Sougaat",
+        "search_count": 5629
+      }
+    ],
+    "total_users": 97
+  }
+}
