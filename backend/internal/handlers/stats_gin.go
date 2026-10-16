@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 )
 
 // StatsGinHandler handles analytics endpoints for per-user and system-wide stats.
@@ -77,13 +78,114 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 		return
 	}
 
-	// ── 2. Search summary ─────────────────────────────────────────────────
-	var totalSearches int
-	var firstSearchAt, lastSearchAt *time.Time
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*), MIN(searched_at), MAX(searched_at)
-		FROM search_history WHERE user_id = $1
-	`, userID).Scan(&totalSearches, &firstSearchAt, &lastSearchAt)
+	// ── 2. Search summary + concurrent metric blocks ─────────────────────
+	// The count/min/max and zero-result aggregates are merged into a single
+	// pass over the user's rows; the independent metric blocks below run
+	// concurrently instead of as a sequential chain of round trips. Every
+	// block keeps its original query and zero-on-error semantics.
+	type TermFreq struct {
+		Query string `json:"query"`
+		Count int    `json:"count"`
+	}
+	type DayVolume struct {
+		Date  string `json:"date"`
+		Count int    `json:"count"`
+	}
+
+	var (
+		totalSearches       int
+		firstSearchAt       *time.Time
+		lastSearchAt        *time.Time
+		zeroResultCount     int
+		topTerms            = make([]TermFreq, 0, 10)
+		dailyVolume         = make([]DayVolume, 0, 30)
+		peakHour            = -1
+		longestGapDays      int
+		totalPasswordResets int
+		lastPasswordResetAt *time.Time
+		devicesRegistered   int
+		lastLogin           *time.Time
+	)
+
+	group := new(errgroup.Group)
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("stats_search_summary", func() error {
+			h.db.Pool.QueryRow(ctx, `
+				SELECT COUNT(*), MIN(searched_at), MAX(searched_at),
+				       COUNT(*) FILTER (WHERE total_results = 0)
+				FROM search_history WHERE user_id = $1
+			`, userID).Scan(&totalSearches, &firstSearchAt, &lastSearchAt, &zeroResultCount)
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("stats_top_terms", func() error {
+			rows, _ := h.db.Pool.Query(ctx, `
+				SELECT query, COUNT(*) as freq
+				FROM search_history
+				WHERE user_id = $1
+				GROUP BY query
+				ORDER BY freq DESC
+				LIMIT 10
+			`, userID)
+			if rows != nil {
+				defer rows.Close()
+				for rows.Next() {
+					var t TermFreq
+					rows.Scan(&t.Query, &t.Count)
+					topTerms = append(topTerms, t)
+				}
+			}
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("stats_daily_volume", func() error {
+			rows, _ := h.db.Pool.Query(ctx, `
+				SELECT DATE((searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
+				FROM search_history
+				WHERE user_id = $1
+				  AND searched_at >= NOW() - INTERVAL '30 days'
+				GROUP BY d
+				ORDER BY d
+			`, userID)
+			if rows != nil {
+				defer rows.Close()
+				for rows.Next() {
+					var dv DayVolume
+					rows.Scan(&dv.Date, &dv.Count)
+					dailyVolume = append(dailyVolume, dv)
+				}
+			}
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("stats_password_resets", func() error {
+			h.db.Pool.QueryRow(ctx, `
+				SELECT COUNT(*), MAX(created_at) FROM password_change_requests WHERE user_id = $1
+			`, userID).Scan(&totalPasswordResets, &lastPasswordResetAt)
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("stats_sessions", func() error {
+			h.db.Pool.QueryRow(ctx, `
+				SELECT COUNT(*), MAX(last_active) FROM user_sessions WHERE user_id = $1
+			`, userID).Scan(&devicesRegistered, &lastLogin)
+			return nil
+		})
+	})
+
+	if err := group.Wait(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user stats"})
+		return
+	}
 
 	// avg searches per day = total / max(days since created_at, 1)
 	daysSinceCreation := int(time.Since(identity.CreatedAt).Hours()/24) + 1
@@ -92,54 +194,7 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 		avgSearchesPerDay = float64(totalSearches) / float64(daysSinceCreation)
 	}
 
-	// ── 3. Top 10 search terms ────────────────────────────────────────────
-	type TermFreq struct {
-		Query string `json:"query"`
-		Count int    `json:"count"`
-	}
-	topTerms := make([]TermFreq, 0, 10)
-	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT query, COUNT(*) as freq
-		FROM search_history
-		WHERE user_id = $1
-		GROUP BY query
-		ORDER BY freq DESC
-		LIMIT 10
-	`, userID)
-	if rows != nil {
-		for rows.Next() {
-			var t TermFreq
-			rows.Scan(&t.Query, &t.Count)
-			topTerms = append(topTerms, t)
-		}
-		rows.Close()
-	}
-
-	// ── 4. Daily volume – last 30 days ─────────────────────────────────────
-	type DayVolume struct {
-		Date  string `json:"date"`
-		Count int    `json:"count"`
-	}
-	dailyVolume := make([]DayVolume, 0, 30)
-	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT DATE((searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::text as d, COUNT(*) as cnt
-		FROM search_history
-		WHERE user_id = $1
-		  AND searched_at >= NOW() - INTERVAL '30 days'
-		GROUP BY d
-		ORDER BY d
-	`, userID)
-	if rows != nil {
-		for rows.Next() {
-			var dv DayVolume
-			rows.Scan(&dv.Date, &dv.Count)
-			dailyVolume = append(dailyVolume, dv)
-		}
-		rows.Close()
-	}
-
-	// ── 5. Peak hour ──────────────────────────────────────────────────────
-	peakHour := -1
+	// ── Peak hour (only matters if there are searches) ────────────────────
 	peakHourFormatted := "N/A"
 	if totalSearches > 0 {
 		h.db.Pool.QueryRow(ctx, `
@@ -155,19 +210,7 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 		}
 	}
 
-	// ── 6. Zero-result searches ───────────────────────────────────────────
-	var zeroResultCount int
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM search_history WHERE user_id = $1 AND total_results = 0
-	`, userID).Scan(&zeroResultCount)
-
-	zeroResultPct := 0.0
-	if totalSearches > 0 {
-		zeroResultPct = float64(zeroResultCount) / float64(totalSearches) * 100
-	}
-
-	// ── 7. Longest gap between searches (days) ───────────────────────────
-	longestGapDays := 0
+	// ── Longest gap between searches (days) ──────────────────────────────
 	if totalSearches > 1 {
 		h.db.Pool.QueryRow(ctx, `
 			SELECT COALESCE(MAX(gap_days), 0)::int FROM (
@@ -180,24 +223,10 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 		`, userID).Scan(&longestGapDays)
 	}
 
-	// ── 8. Password reset requests ────────────────────────────────────────
-	var totalPasswordResets int
-	var lastPasswordResetAt *time.Time
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*), MAX(created_at) FROM password_change_requests WHERE user_id = $1
-	`, userID).Scan(&totalPasswordResets, &lastPasswordResetAt)
-
-	// ── 9. Session / device count ─────────────────────────────────────────
-	var devicesRegistered int
-	h.db.Pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM user_sessions WHERE user_id = $1
-	`, userID).Scan(&devicesRegistered)
-
-	// ── 10. Last login (proxy: most recent session last_active) ──────────
-	var lastLogin *time.Time
-	h.db.Pool.QueryRow(ctx, `
-		SELECT MAX(last_active) FROM user_sessions WHERE user_id = $1
-	`, userID).Scan(&lastLogin)
+	zeroResultPct := 0.0
+	if totalSearches > 0 {
+		zeroResultPct = float64(zeroResultCount) / float64(totalSearches) * 100
+	}
 
 	// ── Assemble response ─────────────────────────────────────────────────
 	c.JSON(http.StatusOK, gin.H{
@@ -249,53 +278,21 @@ func (h *StatsGinHandler) GetUserStats(c *gin.Context) {
 func (h *StatsGinHandler) GetSystemStats(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// ── 1. Search volume ──────────────────────────────────────────────────
-	searchVolume := h.querySearchVolume(ctx)
+	// Shared aggregates: each full-table aggregate runs once per request and is
+	// passed to the helpers that previously re-ran identical queries.
+	var totalSearches int
+	var oldestSearch *time.Time
+	h.db.Pool.QueryRow(ctx, `
+		SELECT COUNT(*), MIN(searched_at) FROM search_history
+	`).Scan(&totalSearches, &oldestSearch)
 
-	// ── 2. User patterns ──────────────────────────────────────────────────
-	userPatterns := h.queryUserPatterns(ctx)
+	var totalUsers int
+	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE role = 'user'`).Scan(&totalUsers)
 
-	// ── 3. Top search terms (system-wide) ────────────────────────────────
 	type TermFreq struct {
 		Query string `json:"query"`
 		Count int    `json:"count"`
 	}
-	topTerms := make([]TermFreq, 0, 20)
-	rows, _ := h.db.Pool.Query(ctx, `
-		SELECT query, COUNT(*) as freq
-		FROM search_history
-		GROUP BY query
-		ORDER BY freq DESC
-		LIMIT 20
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var t TermFreq
-			rows.Scan(&t.Query, &t.Count)
-			topTerms = append(topTerms, t)
-		}
-		rows.Close()
-	}
-
-	// ── 4. Zero results ───────────────────────────────────────────────────
-	var totalSearchesForPct, zeroResultCount int
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history`).Scan(&totalSearchesForPct)
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history WHERE total_results = 0`).Scan(&zeroResultCount)
-	zeroResultPct := 0.0
-	if totalSearchesForPct > 0 {
-		zeroResultPct = float64(zeroResultCount) / float64(totalSearchesForPct) * 100
-	}
-
-	// ── 5. Password resets ────────────────────────────────────────────────
-	var totalPasswordResets, passwordResetsLast30d int
-	h.db.Pool.QueryRow(ctx, `
-		SELECT
-			COUNT(*),
-			COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')
-		FROM password_change_requests
-	`).Scan(&totalPasswordResets, &passwordResetsLast30d)
-
-	// ── 6. Users exceeding device limit ───────────────────────────────────
 	type DeviceExceeded struct {
 		ID           uuid.UUID `json:"id"`
 		Name         string    `json:"name"`
@@ -303,27 +300,119 @@ func (h *StatsGinHandler) GetSystemStats(c *gin.Context) {
 		DeviceLimit  int       `json:"device_limit"`
 		SessionCount int       `json:"session_count"`
 	}
-	usersExceedingLimit := make([]DeviceExceeded, 0)
-	rows, _ = h.db.Pool.Query(ctx, `
-		SELECT u.id, u.name, u.email, u.device_limit, COUNT(us.id) as session_count
-		FROM users u
-		JOIN user_sessions us ON u.id = us.user_id
-		GROUP BY u.id, u.name, u.email, u.device_limit
-		HAVING COUNT(us.id) > u.device_limit
-		ORDER BY session_count DESC
-		LIMIT 10
-	`)
-	if rows != nil {
-		for rows.Next() {
-			var d DeviceExceeded
-			rows.Scan(&d.ID, &d.Name, &d.Email, &d.DeviceLimit, &d.SessionCount)
-			usersExceedingLimit = append(usersExceedingLimit, d)
-		}
-		rows.Close()
+
+	var (
+		searchVolume          gin.H
+		userPatterns          gin.H
+		topTerms              = make([]TermFreq, 0, 20)
+		zeroResultCount       int
+		totalPasswordResets   int
+		passwordResetsLast30d int
+		usersExceedingLimit   = make([]DeviceExceeded, 0)
+		timeDistributions     gin.H
+	)
+
+	// Independent aggregation blocks run concurrently — this endpoint was
+	// previously a sequential chain of full-table GROUP BY scans over
+	// search_history, so wall-clock time equalled the sum of all of them.
+	// Each block keeps the same queries and the same ignore-error semantics
+	// (a failed metric stays zero) as the sequential version.
+	group := new(errgroup.Group)
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("system_search_volume", func() error {
+			searchVolume = h.querySearchVolume(ctx, totalSearches, oldestSearch, totalUsers)
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("system_user_patterns", func() error {
+			userPatterns = h.queryUserPatterns(ctx, totalSearches, totalUsers)
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("system_top_terms", func() error {
+			rows, _ := h.db.Pool.Query(ctx, `
+				SELECT query, COUNT(*) as freq
+				FROM search_history
+				GROUP BY query
+				ORDER BY freq DESC
+				LIMIT 20
+			`)
+			if rows != nil {
+				defer rows.Close()
+				for rows.Next() {
+					var t TermFreq
+					rows.Scan(&t.Query, &t.Count)
+					topTerms = append(topTerms, t)
+				}
+			}
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("system_zero_results", func() error {
+			h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history WHERE total_results = 0`).Scan(&zeroResultCount)
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("system_password_resets", func() error {
+			h.db.Pool.QueryRow(ctx, `
+				SELECT
+					COUNT(*),
+					COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')
+				FROM password_change_requests
+			`).Scan(&totalPasswordResets, &passwordResetsLast30d)
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("system_device_limit_users", func() error {
+			rows, _ := h.db.Pool.Query(ctx, `
+				SELECT u.id, u.name, u.email, u.device_limit, COUNT(us.id) as session_count
+				FROM users u
+				JOIN user_sessions us ON u.id = us.user_id
+				GROUP BY u.id, u.name, u.email, u.device_limit
+				HAVING COUNT(us.id) > u.device_limit
+				ORDER BY session_count DESC
+				LIMIT 10
+			`)
+			if rows != nil {
+				defer rows.Close()
+				for rows.Next() {
+					var d DeviceExceeded
+					rows.Scan(&d.ID, &d.Name, &d.Email, &d.DeviceLimit, &d.SessionCount)
+					usersExceedingLimit = append(usersExceedingLimit, d)
+				}
+			}
+			return nil
+		})
+	})
+
+	group.Go(func() error {
+		return recoverDashboardStatsPanic("system_time_distributions", func() error {
+			timeDistributions = h.queryTimeDistributions(ctx)
+			return nil
+		})
+	})
+
+	if err := group.Wait(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load system stats"})
+		return
 	}
 
-	// ── 7. Time distributions ─────────────────────────────────────────────
-	timeDistributions := h.queryTimeDistributions(ctx)
+	// ── 4. Zero results percentage ────────────────────────────────────────
+	zeroResultPct := 0.0
+	if totalSearches > 0 {
+		zeroResultPct = float64(zeroResultCount) / float64(totalSearches) * 100
+	}
 
 	// ── Assemble response ─────────────────────────────────────────────────
 	c.JSON(http.StatusOK, gin.H{
@@ -344,23 +433,18 @@ func (h *StatsGinHandler) GetSystemStats(c *gin.Context) {
 }
 
 // querySearchVolume runs all search volume related queries.
-func (h *StatsGinHandler) querySearchVolume(ctx context.Context) gin.H {
-	var totalAllTime, totalLast30d int
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history`).Scan(&totalAllTime)
+func (h *StatsGinHandler) querySearchVolume(ctx context.Context, totalAllTime int, oldestSearch *time.Time, totalUsers int) gin.H {
+	var totalLast30d int
 	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history WHERE searched_at >= NOW() - INTERVAL '30 days'`).Scan(&totalLast30d)
 
 	// avg daily = total / days since oldest search
 	avgDaily := 0.0
-	var oldestSearch *time.Time
-	h.db.Pool.QueryRow(ctx, `SELECT MIN(searched_at) FROM search_history`).Scan(&oldestSearch)
 	if oldestSearch != nil && totalAllTime > 0 {
 		days := int(time.Since(*oldestSearch).Hours()/24) + 1
 		avgDaily = float64(totalAllTime) / float64(days)
 	}
 
 	// avg per user per day
-	var totalUsers int
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE role = 'user'`).Scan(&totalUsers)
 	avgPerUserPerDay := 0.0
 	if totalUsers > 0 && avgDaily > 0 {
 		avgPerUserPerDay = avgDaily / float64(totalUsers)
@@ -380,12 +464,12 @@ func (h *StatsGinHandler) querySearchVolume(ctx context.Context) gin.H {
 		ORDER BY d
 	`)
 	if rows != nil {
+		defer rows.Close()
 		for rows.Next() {
 			var dv DayVolume
 			rows.Scan(&dv.Date, &dv.Count)
 			dailyTrend = append(dailyTrend, dv)
 		}
-		rows.Close()
 	}
 
 	// peak system hour
@@ -416,9 +500,10 @@ func (h *StatsGinHandler) querySearchVolume(ctx context.Context) gin.H {
 }
 
 // queryUserPatterns runs user engagement and activity queries.
-func (h *StatsGinHandler) queryUserPatterns(ctx context.Context) gin.H {
-	var totalUsers, activeUsersLast30d int
-	h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE role = 'user'`).Scan(&totalUsers)
+// Reuses the request-wide aggregates (totalUsers, totalSearches) computed in
+// GetSystemStats instead of re-running identical COUNT(*) queries.
+func (h *StatsGinHandler) queryUserPatterns(ctx context.Context, totalSearches, totalUsers int) gin.H {
+	var activeUsersLast30d int
 	h.db.Pool.QueryRow(ctx, `
 		SELECT COUNT(DISTINCT user_id) FROM search_history
 		WHERE searched_at >= NOW() - INTERVAL '30 days'
@@ -427,8 +512,6 @@ func (h *StatsGinHandler) queryUserPatterns(ctx context.Context) gin.H {
 	// avg searches per user (all time)
 	avgSearchesPerUser := 0.0
 	if totalUsers > 0 {
-		var totalSearches int
-		h.db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_history`).Scan(&totalSearches)
 		avgSearchesPerUser = float64(totalSearches) / float64(totalUsers)
 	}
 
@@ -449,12 +532,12 @@ func (h *StatsGinHandler) queryUserPatterns(ctx context.Context) gin.H {
 		LIMIT 10
 	`)
 	if rows != nil {
+		defer rows.Close()
 		for rows.Next() {
 			var au ActiveUser
 			rows.Scan(&au.ID, &au.Name, &au.Email, &au.SearchCount)
 			mostActive = append(mostActive, au)
 		}
-		rows.Close()
 	}
 
 	// device count distribution
@@ -473,12 +556,12 @@ func (h *StatsGinHandler) queryUserPatterns(ctx context.Context) gin.H {
 		ORDER BY device_count
 	`)
 	if rows != nil {
+		defer rows.Close()
 		for rows.Next() {
 			var db DeviceBucket
 			rows.Scan(&db.DeviceCount, &db.UserCount)
 			deviceDistribution = append(deviceDistribution, db)
 		}
-		rows.Close()
 	}
 
 	return gin.H{
@@ -506,13 +589,13 @@ func (h *StatsGinHandler) queryTimeDistributions(ctx context.Context) gin.H {
 		ORDER BY h
 	`)
 	if rows != nil {
+		defer rows.Close()
 		for rows.Next() {
 			var hb HourBucket
 			rows.Scan(&hb.Hour, &hb.Count)
 			hb.Label = formatHour(hb.Hour)
 			byHour = append(byHour, hb)
 		}
-		rows.Close()
 	}
 
 	// by day of week (0=Sunday … 6=Saturday)
@@ -530,6 +613,7 @@ func (h *StatsGinHandler) queryTimeDistributions(ctx context.Context) gin.H {
 		ORDER BY d
 	`)
 	if rows != nil {
+		defer rows.Close()
 		for rows.Next() {
 			var db DowBucket
 			rows.Scan(&db.Dow, &db.Count)
@@ -538,7 +622,6 @@ func (h *StatsGinHandler) queryTimeDistributions(ctx context.Context) gin.H {
 			}
 			byDow = append(byDow, db)
 		}
-		rows.Close()
 	}
 
 	// by month (last 12 months)
@@ -556,12 +639,12 @@ func (h *StatsGinHandler) queryTimeDistributions(ctx context.Context) gin.H {
 		ORDER BY DATE_TRUNC('month', (searched_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')
 	`)
 	if rows != nil {
+		defer rows.Close()
 		for rows.Next() {
 			var mb MonthBucket
 			rows.Scan(&mb.Month, &mb.Count)
 			byMonth = append(byMonth, mb)
 		}
-		rows.Close()
 	}
 
 	return gin.H{

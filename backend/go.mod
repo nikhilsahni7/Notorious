@@ -19,6 +19,7 @@ require (
 	github.com/opensearch-project/opensearch-go/v3 v3.0.0
 	github.com/oschwald/geoip2-golang v1.13.0
 	golang.org/x/crypto v0.43.0
+	golang.org/x/sync v0.17.0
 )
 
 require (
@@ -62,7 +63,6 @@ require (
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	golang.org/x/arch v0.18.0 // indirect
 	golang.org/x/net v0.45.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
