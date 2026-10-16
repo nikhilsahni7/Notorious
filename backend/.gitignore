@@ -137,3 +137,12 @@ yarn.lock
 .env.test.local
 
 .gograph/
+
+# Benchmark artifacts (benchstat before/after captures)
+old.txt
+new.txt
+benchstat.txt
+
+# Agent tooling scratch
+.agents/
+skills-lock.json
