@@ -51,6 +51,12 @@ const NOTIFICATION_TRIGGERS: { key: string; label: string; description: string; 
     disabled: false,
   },
   {
+    key: "quota_warning",
+    label: "Quota nearly used",
+    description: "Heads-up when you've used 90% of today's searches (max one per day)",
+    disabled: false,
+  },
+  {
     key: "watchlist_match",
     label: "Saved search matches",
     description: "Coming soon — saved searches aren't in the app yet",

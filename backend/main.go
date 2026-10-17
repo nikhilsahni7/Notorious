@@ -83,16 +83,17 @@ func main() {
 			jwtManager := auth.NewJWTManager(jwtSecret, 6*time.Hour)
 			authMiddleware = middleware.NewGinAuthMiddleware(jwtManager, sessionRepo)
 
+			// Notifications (in-app bell + web push) — created before the
+			// search handler, which fires near-limit warnings through it.
+			notificationSvc := services.NewNotificationService(notificationRepo, pushSubRepo, sessionRepo, pushSender)
+			notificationHandler = handlers.NewNotificationHandler(notificationRepo, userRepo)
+			pushHandler = handlers.NewPushHandler(pushSubRepo, pushSender)
+
 			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, sessionRepo, jwtManager)
 			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo, sessionRepo)
 			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo, sessionRepo, notificationRepo)
 			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo, userRepo)
-			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
-
-			// Notifications (in-app bell + web push)
-			notificationSvc := services.NewNotificationService(notificationRepo, pushSubRepo, sessionRepo, pushSender)
-			notificationHandler = handlers.NewNotificationHandler(notificationRepo, userRepo)
-			pushHandler = handlers.NewPushHandler(pushSubRepo, pushSender)
+			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo, notificationSvc)
 
 			// Initialize chat system
 			chatRepo := repository.NewChatRepository(db)
