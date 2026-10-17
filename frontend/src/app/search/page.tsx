@@ -578,8 +578,8 @@ export default function SearchPage() {
                 Notify on reset ✅{" "}
                 <span className="text-green-400/70 font-normal">
                   {istClock
-                    ? `(delivered ~8:30 AM IST — in ${istClock.notifiesIn})`
-                    : "(delivered ~8:30 AM IST)"}
+                    ? `(delivered 12:00 AM IST — in ${istClock.notifiesIn})`
+                    : "(delivered 12:00 AM IST)"}
                 </span>
               </span>
             )}
