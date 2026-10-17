@@ -227,9 +227,9 @@ export function UsersTab({ token }: UsersTabProps) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${userName}_EOD_${
-        new Date().toISOString().split("T")[0]
-      }.csv`;
+      a.download = `${userName}_EOD_${new Date().toLocaleDateString("en-CA", {
+        timeZone: "Asia/Kolkata",
+      })}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

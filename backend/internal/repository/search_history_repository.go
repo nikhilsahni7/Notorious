@@ -172,12 +172,13 @@ func (r *SearchHistoryRepository) CountByUserIDs(ctx context.Context, userIDs []
 func (r *SearchHistoryRepository) GetTodaySearches(ctx context.Context) ([]*models.SearchHistory, error) {
 	histories := make([]*models.SearchHistory, 0)
 
-	// IST is UTC+5:30
+	// searched_at is timestamptz (migration 017): render each instant in IST
+	// and compare calendar days so "today" is the IST day, not the UTC day.
 	query := `
 		SELECT id, user_id, query, total_results, top_results, searched_at
 		FROM search_history
-		WHERE searched_at >= (CURRENT_DATE AT TIME ZONE 'Asia/Kolkata')
-		  AND searched_at < (CURRENT_DATE AT TIME ZONE 'Asia/Kolkata' + INTERVAL '1 day')
+		WHERE (searched_at AT TIME ZONE 'Asia/Kolkata')::date
+		      = (now() AT TIME ZONE 'Asia/Kolkata')::date
 		ORDER BY searched_at ASC
 	`
 
@@ -232,7 +233,12 @@ func (r *SearchHistoryRepository) GetTodaySearchesByUserID(ctx context.Context, 
 		ORDER BY searched_at ASC
 	`
 
-	rows, err := r.db.Pool.Query(ctx, query, userID, start, end)
+	// Pass the bounds in UTC. Against the old timestamp-without-time-zone
+	// column the driver dropped the +05:30 offset, so an IST-midnight bound
+	// landed 05:30 late and early-morning IST searches fell outside the day's
+	// window (empty report before 05:30 IST). UTC keeps the same instant and is
+	// also correct now that the column is timestamptz.
+	rows, err := r.db.Pool.Query(ctx, query, userID, start.UTC(), end.UTC())
 	if err != nil {
 		return histories, err
 	}
