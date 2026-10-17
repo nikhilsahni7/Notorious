@@ -151,30 +151,21 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	req.UserRegion = user.Region
 	log.Printf("🔐 User %s searching with region: %s", user.Email, user.Region)
 
-	// Duplicate detection must run before the counter is consumed, because
-	// consuming records this query as the user's last search.
-	isDuplicate := user.LastSearchQuery == req.Query
-
-	// Atomically reset (if the IST day rolled over), enforce the limit and count
-	// this search in one statement so parallel requests cannot slip past the
-	// limit between a separate check and increment.
-	usedToday, dailyLimit, err := h.userRepo.ConsumeSearchCredit(c.Request.Context(), uid, req.Query)
-	if errors.Is(err, repository.ErrSearchLimitExceeded) {
+	// Read-only limit check for the current IST day. The counter is only
+	// incremented later, and only for searches that count (results found and not
+	// a repeat), so zero-result and duplicate searches stay free.
+	usedToday := user.EffectiveSearchesUsedToday(time.Now(), h.istLocation)
+	if usedToday >= user.DailySearchLimit {
 		c.JSON(http.StatusTooManyRequests, gin.H{
 			"error":               "daily search limit exceeded",
-			"searches_used_today": user.SearchesUsedToday,
+			"searches_used_today": usedToday,
 			"daily_search_limit":  user.DailySearchLimit,
 			"searches_remaining":  0,
 			"notify_opt_in":       user.QuotaResetOptIn(),
 		})
 		return
 	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check user limits"})
-		return
-	}
 	user.SearchesUsedToday = usedToday
-	user.DailySearchLimit = dailyLimit
 
 	// Check if this is a mobile number search
 	// Supports both raw numbers (9876543210) and field syntax (mobile:9876543210)
@@ -203,14 +194,38 @@ func (h *SearchHandler) Search(c *gin.Context) {
 
 	totalResults := response.Hits.Total.Value
 
+	// A search is a duplicate when it repeats the query the user searched last.
+	isDuplicate := user.LastSearchQuery == req.Query
+
 	if totalResults > 0 && !isDuplicate {
+		// Counted search: atomically roll the day over if needed, re-check the
+		// limit and increment the counter while recording the query. No row is
+		// returned when a concurrent request consumed the last slot.
+		used, limit, err := h.userRepo.ConsumeSearchCredit(c.Request.Context(), uid, req.Query)
+		if errors.Is(err, repository.ErrSearchLimitExceeded) {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":               "daily search limit exceeded",
+				"searches_used_today": user.SearchesUsedToday,
+				"daily_search_limit":  user.DailySearchLimit,
+				"searches_remaining":  0,
+				"notify_opt_in":       user.QuotaResetOptIn(),
+			})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check user limits"})
+			return
+		}
+		user.SearchesUsedToday = used
+		user.DailySearchLimit = limit
+
 		topResults := make([]map[string]interface{}, 0)
-		limit := 25
-		if len(response.Hits.Hits) < limit {
-			limit = len(response.Hits.Hits)
+		topLimit := 25
+		if len(response.Hits.Hits) < topLimit {
+			topLimit = len(response.Hits.Hits)
 		}
 
-		for i := 0; i < limit; i++ {
+		for i := 0; i < topLimit; i++ {
 			hit := response.Hits.Hits[i]
 			topResults = append(topResults, map[string]interface{}{
 				"oid":                  hit.Source.OID,
@@ -241,9 +256,6 @@ func (h *SearchHandler) Search(c *gin.Context) {
 			}
 		}()
 
-		// The usage counter and last_search_query were already persisted by
-		// ConsumeSearchCredit, so no further write is needed here.
-
 		// Near-limit warning (in-app + OS push, deduped per IST day). Async
 		// with its own budget so it never delays the search response.
 		if h.notificationSvc != nil {
@@ -255,9 +267,13 @@ func (h *SearchHandler) Search(c *gin.Context) {
 				}
 			}(user.ID, user.SearchesUsedToday, user.DailySearchLimit)
 		}
+	} else {
+		// Zero-result or duplicate search: free of charge, so only record the
+		// query (keeping repeat detection working) without touching the counter.
+		if err := h.userRepo.UpdateLastSearchQuery(c.Request.Context(), uid, req.Query); err != nil {
+			log.Printf("failed to record last search query for user %s: %v", uid, err)
+		}
 	}
-	// Duplicate and zero-result searches were counted and had their query
-	// recorded by ConsumeSearchCredit, so there is nothing left to persist.
 
 	results := make([]map[string]interface{}, 0, len(response.Hits.Hits))
 	for _, hit := range response.Hits.Hits {

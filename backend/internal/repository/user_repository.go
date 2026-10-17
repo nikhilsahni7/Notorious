@@ -297,7 +297,11 @@ const todayISTExpr = `(now() AT TIME ZONE 'Asia/Kolkata')::date`
 
 // ConsumeSearchCredit atomically rolls the daily counter over to the current
 // IST day when the stored reset date is stale, verifies the daily limit, and
-// records the search by incrementing the counter and storing the query.
+// counts the search by incrementing the counter and storing the query.
+//
+// It is called only for searches that count towards the quota — searches that
+// returned results and are not a repeat of the previous query. Zero-result and
+// duplicate searches are free and use UpdateLastSearchQuery instead.
 //
 // Reset, limit check and increment live in a single UPDATE so concurrent
 // searches cannot both observe the same usage and overshoot the limit. When no
@@ -323,6 +327,19 @@ func (r *UserRepository) ConsumeSearchCredit(ctx context.Context, userID uuid.UU
 		return 0, 0, ErrSearchLimitExceeded
 	}
 	return used, limit, err
+}
+
+// UpdateLastSearchQuery records the user's most recent query for duplicate
+// detection without touching the usage counter. Used by searches that do not
+// count towards the quota (zero results, or a repeat of the previous query).
+func (r *UserRepository) UpdateLastSearchQuery(ctx context.Context, userID uuid.UUID, query string) error {
+	sql := `
+		UPDATE users
+		SET last_search_query = $1
+		WHERE id = $2
+	`
+	_, err := r.db.Pool.Exec(ctx, sql, query, userID)
+	return err
 }
 
 // ResetAllDailyLimits zeroes every counter that belongs to an earlier IST day.
