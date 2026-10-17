@@ -45,6 +45,8 @@ func main() {
 	var chatHandler *handlers.ChatHandler
 	var wsHub *chatws.Hub
 	var statsHandler *handlers.StatsGinHandler
+	var notificationHandler *handlers.NotificationHandler
+	var pushHandler *handlers.PushHandler
 
 	if databaseURL != "" && jwtSecret != "" {
 		var err error
@@ -67,6 +69,9 @@ func main() {
 			metadataRepo := repository.NewMetadataRepository(db)
 			adminSessionRepo := repository.NewAdminSessionRepository(db)
 			sessionRepo := repository.NewSessionRepository(db)
+			notificationRepo := repository.NewNotificationRepository(db)
+			pushSubRepo := repository.NewPushSubscriptionRepository(db)
+			pushSender := services.NewPushSender()
 
 			// Initialize GeoIP (optional - falls back to API if not available)
 			geoipPath := os.Getenv("GEOIP_DB_PATH")
@@ -80,9 +85,14 @@ func main() {
 
 			authHandler = handlers.NewAuthGinHandler(userRepo, userRequestRepo, metadataRepo, adminSessionRepo, sessionRepo, jwtManager)
 			adminHandler = handlers.NewAdminGinHandler(userRepo, userRequestRepo, searchHistoryRepo, passwordChangeRepo, metadataRepo, adminSessionRepo, sessionRepo)
-			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo, sessionRepo)
+			userHandler = handlers.NewUserGinHandler(searchHistoryRepo, metadataRepo, sessionRepo, notificationRepo)
 			userPasswordHandler = handlers.NewUserPasswordGinHandler(passwordChangeRepo, userRepo)
 			searchHandler = handlers.NewSearchHandler(services.NewOpenSearchService(cfg), userRepo, searchHistoryRepo)
+
+			// Notifications (in-app bell + web push)
+			notificationSvc := services.NewNotificationService(notificationRepo, pushSubRepo, sessionRepo, pushSender)
+			notificationHandler = handlers.NewNotificationHandler(notificationRepo, userRepo)
+			pushHandler = handlers.NewPushHandler(pushSubRepo, pushSender)
 
 			// Initialize chat system
 			chatRepo := repository.NewChatRepository(db)
@@ -97,6 +107,9 @@ func main() {
 			resetter := scheduler.NewSearchLimitResetter(userRepo)
 			ctx := context.Background()
 			resetter.Start(ctx)
+
+			quotaResetNotifier := scheduler.NewQuotaResetNotifier(userRepo, notificationRepo, notificationSvc)
+			quotaResetNotifier.Start(ctx)
 		}
 	}
 
@@ -104,7 +117,6 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(uploadService)
 
 	r := gin.Default()
-
 
 	// CORS configuration - allow frontend origins and common headers
 
@@ -230,6 +242,30 @@ func main() {
 		}
 	}
 
+	// Notification routes (authenticated)
+	if authMiddleware != nil && notificationHandler != nil {
+		notificationRoutes := r.Group("/api/notifications")
+		notificationRoutes.Use(authMiddleware.AuthRequired())
+		{
+			notificationRoutes.GET("", notificationHandler.List)
+			notificationRoutes.GET("/unread-count", notificationHandler.UnreadCount)
+			notificationRoutes.GET("/prefs", notificationHandler.GetPrefs)
+			notificationRoutes.PUT("/prefs", notificationHandler.UpdatePrefs)
+			notificationRoutes.POST("/read-all", notificationHandler.MarkAllRead)
+			notificationRoutes.POST("/:id/read", notificationHandler.MarkRead)
+		}
+	}
+
+	// Web push subscription routes (authenticated)
+	if authMiddleware != nil && pushHandler != nil {
+		pushRoutes := r.Group("/api/push")
+		pushRoutes.Use(authMiddleware.AuthRequired())
+		{
+			pushRoutes.GET("/public-key", pushHandler.PublicKey)
+			pushRoutes.POST("/subscribe", pushHandler.Subscribe)
+			pushRoutes.POST("/unsubscribe", pushHandler.Unsubscribe)
+		}
+	}
 
 	uploadGroup := r.Group("/upload")
 	uploadGroup.POST("/init", uploadHandler.InitUpload)

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -90,7 +91,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 		SELECT id, email, password_hash, name, COALESCE(phone, '') as phone, role, daily_search_limit,
 		       searches_used_today, is_active, created_at, updated_at, last_reset_date,
 		       COALESCE(last_search_query, '') as last_search_query,
-		       COALESCE(region, 'pan-india') as region, device_limit
+		       COALESCE(region, 'pan-india') as region, device_limit,
+		       notification_prefs
 		FROM users
 		WHERE id = $1
 	`
@@ -111,6 +113,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 		&user.LastSearchQuery,
 		&user.Region,
 		&user.DeviceLimit,
+		&user.NotificationPrefs,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -352,6 +355,68 @@ func (r *UserRepository) ResetAllDailyLimits(ctx context.Context) error {
 	`
 	_, err := r.db.Pool.Exec(ctx, query)
 	return err
+}
+
+// GetNotificationPrefs returns the user's stored notification preference map.
+func (r *UserRepository) GetNotificationPrefs(ctx context.Context, userID uuid.UUID) (map[string]bool, error) {
+	query := `SELECT notification_prefs FROM users WHERE id = $1`
+	var prefs map[string]bool
+	err := r.db.Pool.QueryRow(ctx, query, userID).Scan(&prefs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get notification prefs: %w", err)
+	}
+	if prefs == nil {
+		prefs = map[string]bool{}
+	}
+	return prefs, nil
+}
+
+// UpdateNotificationPrefs atomically merges partial preferences with what is
+// already stored (jsonb || with the overlapping-key merge in SQL, so
+// concurrent updates cannot lose keys).
+func (r *UserRepository) UpdateNotificationPrefs(ctx context.Context, userID uuid.UUID, update map[string]bool) (map[string]bool, error) {
+	marshaled, err := json.Marshal(update)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal notification prefs: %w", err)
+	}
+	query := `
+		UPDATE users
+		SET notification_prefs = COALESCE(notification_prefs, '{}'::jsonb) || $1::jsonb,
+		    updated_at = NOW()
+		WHERE id = $2
+		RETURNING notification_prefs
+	`
+	var prefs map[string]bool
+	err = r.db.Pool.QueryRow(ctx, query, marshaled, userID).Scan(&prefs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update notification prefs: %w", err)
+	}
+	return prefs, nil
+}
+
+// GetQuotaResetOptInIDs returns active users who explicitly opted in to the
+// scheduled quota-reset notification (notification_prefs.'quota_reset' = true).
+func (r *UserRepository) GetQuotaResetOptInIDs(ctx context.Context) ([]uuid.UUID, error) {
+	query := `
+		SELECT id FROM users
+		WHERE is_active = TRUE
+		AND notification_prefs->>'quota_reset' = 'true'
+	`
+	rows, err := r.db.Pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list quota-reset opt-ins: %w", err)
+	}
+	defer rows.Close()
+
+	ids := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan user id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 // BulkUpdateStatus updates the is_active status for multiple users at once
