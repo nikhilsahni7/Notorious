@@ -33,6 +33,20 @@ type User struct {
 	NotificationPrefs map[string]bool `json:"notification_prefs,omitempty" db:"notification_prefs"`
 }
 
+// EffectiveSearchesUsedToday reports the searches_used_today that should be
+// shown for the current day in loc. A counter written on an earlier day reads
+// as 0 because it will be reset by the next search or the midnight scheduler.
+//
+// It is read-only: callers that must not mutate quota (login, suggestions) use
+// it instead of the previous write-on-read reset, which persisted a UTC date
+// and re-reset the counter on every call between 00:00 and 05:30 IST.
+func (u *User) EffectiveSearchesUsedToday(now time.Time, loc *time.Location) int {
+	if u.LastResetDate.In(loc).Format("2006-01-02") != now.In(loc).Format("2006-01-02") {
+		return 0
+	}
+	return u.SearchesUsedToday
+}
+
 type UserRequest struct {
 	ID                      uuid.UUID  `json:"id" db:"id"`
 	Email                   string     `json:"email" db:"email"`

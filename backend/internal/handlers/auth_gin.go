@@ -112,8 +112,11 @@ func (h *AuthGinHandler) Login(c *gin.Context) {
 		return
 	}
 
-	istLocation, _ := time.LoadLocation("Asia/Kolkata")
-	user, _ = h.userRepo.CheckAndResetDailyLimit(c.Request.Context(), user.ID, istLocation)
+	// Read-only: login must never reset or consume quota, but the response
+	// should still report usage for the current IST day.
+	if istLocation, err := time.LoadLocation("Asia/Kolkata"); err == nil {
+		user.SearchesUsedToday = user.EffectiveSearchesUsedToday(time.Now(), istLocation)
+	}
 
 	// Create User Session
 	if h.sessionRepo != nil {

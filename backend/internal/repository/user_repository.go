@@ -285,73 +285,54 @@ func (r *UserRepository) CountByRegion(ctx context.Context, role, search string)
 	return counts, rows.Err()
 }
 
-func (r *UserRepository) IncrementSearchUsage(ctx context.Context, userID uuid.UUID) error {
-	query := `
+// ErrSearchLimitExceeded is returned by ConsumeSearchCredit when the user has
+// already used their full daily search quota for the current IST day.
+var ErrSearchLimitExceeded = errors.New("daily search limit exceeded")
+
+// todayISTExpr is the SQL expression for the current calendar day in IST.
+// The backend runs with no TZ configured (so the DB session is UTC), therefore
+// every daily-limit decision must resolve "today" against Asia/Kolkata
+// explicitly instead of the session date.
+const todayISTExpr = `(now() AT TIME ZONE 'Asia/Kolkata')::date`
+
+// ConsumeSearchCredit atomically rolls the daily counter over to the current
+// IST day when the stored reset date is stale, verifies the daily limit, and
+// records the search by incrementing the counter and storing the query.
+//
+// Reset, limit check and increment live in a single UPDATE so concurrent
+// searches cannot both observe the same usage and overshoot the limit. When no
+// row is returned the limit has already been reached and no state changed; the
+// caller maps ErrSearchLimitExceeded to HTTP 429.
+func (r *UserRepository) ConsumeSearchCredit(ctx context.Context, userID uuid.UUID, query string) (used, limit int, err error) {
+	sql := `
 		UPDATE users
-		SET searches_used_today = searches_used_today + 1
+		SET searches_used_today = CASE
+		        WHEN last_reset_date < ` + todayISTExpr + ` THEN 1
+		        ELSE searches_used_today + 1
+		    END,
+		    last_reset_date = ` + todayISTExpr + `,
+		    last_search_query = $2,
+		    updated_at = NOW()
 		WHERE id = $1
+		  AND (last_reset_date < ` + todayISTExpr + `
+		       OR searches_used_today < daily_search_limit)
+		RETURNING searches_used_today, daily_search_limit
 	`
-	_, err := r.db.Pool.Exec(ctx, query, userID)
-	return err
-}
-
-func (r *UserRepository) UpdateLastSearchQuery(ctx context.Context, userID uuid.UUID, query string) error {
-	sql := `
-		UPDATE users
-		SET last_search_query = $1
-		WHERE id = $2
-	`
-	_, err := r.db.Pool.Exec(ctx, sql, query, userID)
-	return err
-}
-
-// IncrementSearchAndSetLastQuery combines IncrementSearchUsage and UpdateLastSearchQuery
-// into a single SQL statement, eliminating one DB roundtrip per search request.
-func (r *UserRepository) IncrementSearchAndSetLastQuery(ctx context.Context, userID uuid.UUID, query string) error {
-	sql := `
-		UPDATE users
-		SET searches_used_today = searches_used_today + 1,
-		    last_search_query = $1
-		WHERE id = $2
-	`
-	_, err := r.db.Pool.Exec(ctx, sql, query, userID)
-	return err
-}
-
-func (r *UserRepository) CheckAndResetDailyLimit(ctx context.Context, userID uuid.UUID, istLocation *time.Location) (*models.User, error) {
-	user, err := r.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
+	err = r.db.Pool.QueryRow(ctx, sql, userID, query).Scan(&used, &limit)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, 0, ErrSearchLimitExceeded
 	}
-
-	currentDateIST := time.Now().In(istLocation).Format("2006-01-02")
-	lastResetDateIST := user.LastResetDate.In(istLocation).Format("2006-01-02")
-
-	if currentDateIST != lastResetDateIST {
-		query := `
-			UPDATE users
-			SET searches_used_today = 0, last_reset_date = $1
-			WHERE id = $2
-			RETURNING searches_used_today, last_reset_date
-		`
-
-		err := r.db.Pool.QueryRow(ctx, query, time.Now(), userID).Scan(
-			&user.SearchesUsedToday,
-			&user.LastResetDate,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return user, nil
+	return used, limit, err
 }
 
+// ResetAllDailyLimits zeroes every counter that belongs to an earlier IST day.
+// The comparison is done against the IST date so a UTC session date no longer
+// triggers (or misses) the reset around the 00:00–05:30 IST window.
 func (r *UserRepository) ResetAllDailyLimits(ctx context.Context) error {
 	query := `
 		UPDATE users
-		SET searches_used_today = 0, last_reset_date = CURRENT_DATE
-		WHERE last_reset_date < CURRENT_DATE
+		SET searches_used_today = 0, last_reset_date = ` + todayISTExpr + `
+		WHERE last_reset_date < ` + todayISTExpr + `
 	`
 	_, err := r.db.Pool.Exec(ctx, query)
 	return err
