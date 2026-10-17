@@ -55,6 +55,7 @@ type SearchHandler struct {
 	openSearchService *services.OpenSearchService
 	userRepo          *repository.UserRepository
 	searchHistoryRepo *repository.SearchHistoryRepository
+	notificationSvc   *services.NotificationService
 	istLocation       *time.Location
 }
 
@@ -62,12 +63,14 @@ func NewSearchHandler(
 	openSearchService *services.OpenSearchService,
 	userRepo *repository.UserRepository,
 	searchHistoryRepo *repository.SearchHistoryRepository,
+	notificationSvc *services.NotificationService,
 ) *SearchHandler {
 	ist, _ := time.LoadLocation("Asia/Kolkata")
 	return &SearchHandler{
 		openSearchService: openSearchService,
 		userRepo:          userRepo,
 		searchHistoryRepo: searchHistoryRepo,
+		notificationSvc:   notificationSvc,
 		istLocation:       ist,
 	}
 }
@@ -229,6 +232,18 @@ func (h *SearchHandler) Search(c *gin.Context) {
 
 		// Update user's searches_used_today counter for the response
 		user.SearchesUsedToday++
+
+		// Near-limit warning (in-app + OS push, deduped per IST day). Async
+		// with its own budget so it never delays the search response.
+		if h.notificationSvc != nil {
+			go func(userID uuid.UUID, used, limit int) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := h.notificationSvc.NotifyQuotaWarning(ctx, userID, used, limit); err != nil {
+					log.Printf("quota warning notification failed for user %s: %v", userID, err)
+				}
+			}(user.ID, user.SearchesUsedToday, user.DailySearchLimit)
+		}
 	} else {
 		// For duplicate or zero-result searches, only update last search query
 		h.userRepo.UpdateLastSearchQuery(c.Request.Context(), user.ID, req.Query)

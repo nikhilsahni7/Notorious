@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"notorious-backend/internal/models"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type NotificationRepository struct {
@@ -38,6 +40,45 @@ func (r *NotificationRepository) Create(ctx context.Context, n *models.Notificat
 	return r.db.Pool.QueryRow(ctx, query,
 		n.UserID, n.Type, n.Title, n.Body, payload,
 	).Scan(&n.ID, &n.CreatedAt)
+}
+
+// CreateOncePerDay inserts a notification row only if the user has no
+// notification of the same type today (IST). Used by trigger checks that run
+// on hot paths (e.g. near-limit quota warnings) — the conditional insert
+// keeps the day-dedupe in one statement.
+func (r *NotificationRepository) CreateOncePerDay(ctx context.Context, n *models.Notification, ist *time.Location) (bool, error) {
+	now := time.Now().In(ist)
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, ist)
+
+	var payload []byte
+	if n.Payload != nil {
+		var err error
+		payload, err = json.Marshal(n.Payload)
+		if err != nil {
+			return false, fmt.Errorf("failed to marshal payload: %w", err)
+		}
+	}
+
+	query := `
+		INSERT INTO notifications (user_id, type, title, body, payload)
+		SELECT $1, $2, $3, $4, $5
+		WHERE NOT EXISTS (
+			SELECT 1 FROM notifications
+			WHERE user_id = $1 AND type = $2
+			AND created_at >= $6 AND created_at < $7
+		)
+		RETURNING id
+	`
+	err := r.db.Pool.QueryRow(ctx, query,
+		n.UserID, n.Type, n.Title, n.Body, payload, dayStart, dayStart.Add(24*time.Hour),
+	).Scan(&n.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil // already notified today
+		}
+		return false, fmt.Errorf("failed to create notification: %w", err)
+	}
+	return true, nil
 }
 
 // GetByID returns a single notification owned by userID.

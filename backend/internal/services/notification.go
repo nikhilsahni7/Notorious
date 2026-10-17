@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -20,6 +21,9 @@ const (
 	lastSeenThresholdSeconds = 5 * 60
 	// perUserTimeout bounds a single user's delivery (row write + pushes).
 	perUserTimeout = 20 * time.Second
+	// quotaWarningThreshold is the % of the daily search limit at which the
+	// user gets one (deduped per IST day) near-limit notification.
+	quotaWarningThreshold = 90
 )
 
 // NotificationService writes in-app notification rows and, when appropriate,
@@ -85,6 +89,42 @@ func deepLink(payload map[string]interface{}) string {
 	return "/search"
 }
 
+// NotifyQuotaWarning fires (once per IST day) when a user crosses the
+// quotaWarningThreshold of their daily search limit — checked after each
+// successful search. Writes the in-app row and delivers an OS push through
+// the standard pipeline (daily push cap + in-session suppression + prefs).
+// Prefs semantics: absent 'quota_warning' key counts as enabled (like other
+// non-quota_reset types); the profile toggle turns it off.
+func (s *NotificationService) NotifyQuotaWarning(ctx context.Context, userID uuid.UUID, usedToday, dailyLimit int) error {
+	if dailyLimit <= 0 || usedToday <= 0 {
+		return nil
+	}
+	usedPct := (usedToday * 100) / dailyLimit
+	if usedPct < quotaWarningThreshold {
+		return nil
+	}
+
+	n := &models.Notification{
+		UserID: userID,
+		Type:   models.NotificationTypeQuotaWarning,
+		Title:  "Search quota almost out",
+		Body:   fmt.Sprintf("You've used %d of %d daily searches (%d%%). Resets at 12:00 AM IST.", usedToday, dailyLimit, usedPct),
+		Payload: map[string]interface{}{
+			"url": "/search",
+		},
+	}
+
+	written, err := s.notificationRepo.CreateOncePerDay(ctx, n, s.istLocation)
+	if err != nil {
+		return err
+	}
+	if !written {
+		return nil // already warned today
+	}
+
+	return s.deliver(ctx, n, false, false, s.onlineSet(ctx))
+}
+
 // NotifyQuotaReset delivers a quota-reset notification to a single user.
 // Used for ad-hoc drives; the scheduler uses NotifyQuotaResetBatch.
 // It is exempt from the daily push cap (single scheduled push) but still
@@ -122,7 +162,7 @@ func (s *NotificationService) NotifyQuotaResetBatch(ctx context.Context, userIDs
 			},
 		}
 		// Presence suppression: skip the OS push when the user is online.
-		if err := s.deliver(userCtx, n, true, online); err != nil {
+		if err := s.deliver(userCtx, n, true, false, online); err != nil {
 			log.Printf("Failed to deliver quota-reset notification for user %s: %v", userID, err)
 		}
 		cancel()
@@ -130,15 +170,17 @@ func (s *NotificationService) NotifyQuotaResetBatch(ctx context.Context, userIDs
 	return nil
 }
 
-// deliver writes the row and evaluates OS push eligibility. `online` is the
-// pre-resolved presence set (nil = no presence data; push allowed).
-func (s *NotificationService) deliver(ctx context.Context, n *models.Notification, pushExempt bool, online map[uuid.UUID]bool) error {
+// deliver writes the row and evaluates OS push eligibility.
+// pushExempt=true skips the daily push cap (scheduled single pushes);
+// pushDisabled=true never sends an OS push (in-app-only notifications).
+// `online` is the pre-resolved presence set (nil = no presence data; push allowed).
+func (s *NotificationService) deliver(ctx context.Context, n *models.Notification, pushExempt bool, pushDisabled bool, online map[uuid.UUID]bool) error {
 	// Always write the in-app row first — the bell is the fallback channel.
 	if err := s.notificationRepo.Create(ctx, n); err != nil {
 		return err
 	}
 
-	if !s.pushSender.Enabled() {
+	if !s.pushSender.Enabled() || pushDisabled {
 		return nil
 	}
 
