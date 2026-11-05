@@ -16,8 +16,17 @@ mkdir -p "$APP_DIR" /opt/notorious /data
 chown -R ubuntu:ubuntu /home/ubuntu/notorious /opt/notorious
 
 # --- Packages -------------------------------------------------------------
+# PostgreSQL must match the source instance's major version (18) or
+# pg_restore rejects the dump ("unsupported version in file header").
+# Ubuntu's default is older, so use the PostgreSQL Global Development
+# Group (PGDG) apt repository and pin the major version here.
+install -d /usr/share/postgresql-common/pgdg
+curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+CODENAME=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)
+echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $CODENAME-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+
 apt-get update -y
-apt-get install -y curl unzip jq nginx certbot python3-certbot-nginx postgresql postgresql-contrib docker.io
+apt-get install -y curl unzip jq nginx certbot python3-certbot-nginx postgresql-18 docker.io
 
 # AWS CLI v2 (used for S3 downloads / secret fetch via the instance IAM role)
 if ! command -v aws >/dev/null 2>&1; then

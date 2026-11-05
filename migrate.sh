@@ -40,10 +40,13 @@ die()  { echo "ERROR: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing tool: $1"; }
 
 tf()  { AWS_PROFILE="$NEW_PROFILE" "$TF_BIN" -chdir=infra "$@"; }
-tf_out() { tf output -raw "$1" 2>/dev/null; }
+tf_out() { tf output -raw "$1" 2>/dev/null || true; }
 
 NEW_IP=""; NEW_BUCKET_NAME=""
 load_outputs() {
+  # `terraform output` fails silently without init (e.g. fresh checkout);
+  # init once instead of dying with no message.
+  [[ -d infra/.terraform ]] || tf init -input=false >/dev/null
   NEW_IP="$(tf_out ec2_public_ip)";        [[ -n "$NEW_IP" ]] || die "no terraform outputs - run provision first"
   NEW_BUCKET_NAME="$(tf_out bucket)"
   # Region/domain live in BOTH migrate.env and terraform.tfvars; drift

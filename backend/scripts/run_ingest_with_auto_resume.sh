@@ -91,10 +91,10 @@ if [[ "$MODE" == "csv" && -n "$INGEST_CSV_BIN" && ! -x "$INGEST_CSV_BIN" ]]; the
   exit 1
 fi
 
-set +H
-set -a
-source ./.env
-set +a
+# Do NOT `source ./.env`: passwords may contain shell metacharacters
+# (spaces, $, ;, parens) which the shell would execute as commands.
+# The ingest binaries load .env themselves via godotenv (safe parsing),
+# and systemd WorkingDirectory points them at this directory.
 
 timestamp="$(date +%Y%m%d_%H%M%S)"
 log_file="ingest_${MODE}_${timestamp}.log"
