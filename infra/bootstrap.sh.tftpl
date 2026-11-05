@@ -10,6 +10,7 @@ BUCKET="${bucket}"
 OS_HOST="${opensearch_host}"
 OS_INDEX="${opensearch_index}"
 SECRET_ID="${secret_id}"
+CSV_INDEX="${csv_index}"
 
 APP_DIR="/home/ubuntu/notorious/backend"
 mkdir -p "$APP_DIR" /opt/notorious /data
@@ -166,6 +167,10 @@ Type=simple
 User=ubuntu
 WorkingDirectory=$APP_DIR
 Environment=INGEST_CSV_BIN=/opt/notorious/ingest_csv
+# BulkIndex writes to OPENSEARCH_INDEX; systemd Environment wins over .env
+# (godotenv never overrides), so CSV docs land in the Delhi-NCR index, not
+# the pan-India one.
+Environment=OPENSEARCH_INDEX=$CSV_INDEX
 ExecStart=/opt/notorious/run_ingest_with_auto_resume.sh --mode=csv --file=/data/CSV_FILE_NAME --region=delhi-ncr
 Restart=on-failure
 RestartSec=30

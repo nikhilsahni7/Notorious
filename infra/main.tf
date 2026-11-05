@@ -310,6 +310,7 @@ resource "aws_instance" "app" {
     bucket           = aws_s3_bucket.data.bucket
     opensearch_host  = aws_opensearch_domain.main.endpoint
     opensearch_index = var.opensearch_index
+    csv_index        = var.opensearch_csv_index
     secret_id        = aws_secretsmanager_secret.app.name
   })
 

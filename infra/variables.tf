@@ -91,8 +91,15 @@ variable "opensearch_volume_gb" {
 }
 
 variable "opensearch_index" {
-  type    = string
-  default = "people-dev-0001"
+  description = "Pan-India index: the 479GB JSON file lands here."
+  type        = string
+  default     = "people-dev-0001"
+}
+
+variable "opensearch_csv_index" {
+  description = "Delhi-NCR index: the CSV lands here (documents also carry region=delhi-ncr)."
+  type        = string
+  default     = "people-delhi-ncr-0001"
 }
 
 variable "opensearch_master_user" {
