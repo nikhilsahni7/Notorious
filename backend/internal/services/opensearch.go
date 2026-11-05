@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,8 +13,6 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -114,13 +113,14 @@ func NewOpenSearchService(cfg *config.Config) *OpenSearchService {
 	}
 }
 
-func (s *OpenSearchService) ApplyIndexTemplate() error {
-	templatePath := filepath.Join("templates", "people_v1.json")
+// Embedded so the ingest binaries work from any working directory
+// (systemd on EC2 has no repo checkout - a relative file read fataled there).
+//
+//go:embed templates/people_v1.json
+var indexTemplateJSON []byte
 
-	templateJSON, err := os.ReadFile(templatePath)
-	if err != nil {
-		return fmt.Errorf("failed to read index template %s: %w", templatePath, err)
-	}
+func (s *OpenSearchService) ApplyIndexTemplate() error {
+	templateJSON := indexTemplateJSON
 
 	req := opensearchapi.IndexTemplateCreateReq{
 		IndexTemplate: "people_v1",

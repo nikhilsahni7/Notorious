@@ -29,10 +29,9 @@ WORKDIR /root/
 # Copy the binary from the builder stage
 COPY --from=builder /app/main .
 
-# Copy migrations and templates (if any)
-# Note: migrations are handled by the app on startup
+# Copy migrations (handled by the app on startup). The OpenSearch index
+# template is embedded in the binary (internal/services), no files needed.
 COPY --from=builder /app/migrations ./migrations
-# COPY --from=builder /app/templates ./templates
 
 # Expose the application port
 EXPOSE 8080
