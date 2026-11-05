@@ -67,8 +67,27 @@ if [[ ! -f "$INPUT_FILE" ]]; then
   exit 1
 fi
 
-if [[ ! -f "./go.mod" || ! -d "./cmd" ]]; then
-  echo "ERROR: run this script from backend directory (where go.mod exists)" >&2
+# With INGEST_BIN set, a prebuilt binary is used and no Go toolchain / repo
+# checkout is needed (this is how the systemd unit on EC2 runs it).
+INGEST_BIN="${INGEST_BIN:-}"
+INGEST_CSV_BIN="${INGEST_CSV_BIN:-}"
+
+# The repo checkout is only required when THIS mode has no prebuilt binary.
+if { [[ "$MODE" == "json" && -z "$INGEST_BIN" ]] || [[ "$MODE" == "csv" && -z "$INGEST_CSV_BIN" ]]; }; then
+  if [[ ! -f "./go.mod" || ! -d "./cmd" ]]; then
+    echo "ERROR: run this script from backend directory (where go.mod exists), or set the binary for mode $MODE" >&2
+    exit 1
+  fi
+fi
+
+# A missing binary must fail fast - the retry loop below would otherwise
+# retry exit 127 forever and look like a running ingestion.
+if [[ "$MODE" == "json" && -n "$INGEST_BIN" && ! -x "$INGEST_BIN" ]]; then
+  echo "ERROR: INGEST_BIN is not executable: $INGEST_BIN" >&2
+  exit 1
+fi
+if [[ "$MODE" == "csv" && -n "$INGEST_CSV_BIN" && ! -x "$INGEST_CSV_BIN" ]]; then
+  echo "ERROR: INGEST_CSV_BIN is not executable: $INGEST_CSV_BIN" >&2
   exit 1
 fi
 
@@ -116,12 +135,20 @@ while true; do
 
   if [[ "$MODE" == "json" ]]; then
     set +e
-    go run ./cmd/ingest/main.go --resume="$resume" "$INPUT_FILE" 2>&1 | tee -a "$log_file"
+    if [[ -n "$INGEST_BIN" ]]; then
+      "$INGEST_BIN" --resume="$resume" "$INPUT_FILE" 2>&1 | tee -a "$log_file"
+    else
+      go run ./cmd/ingest/main.go --resume="$resume" "$INPUT_FILE" 2>&1 | tee -a "$log_file"
+    fi
     exit_code=${PIPESTATUS[0]}
     set -e
   else
     set +e
-    go run ./cmd/ingest_csv/main.go -file="$INPUT_FILE" -region="$REGION" -batch="$BATCH" -resume="$resume" 2>&1 | tee -a "$log_file"
+    if [[ -n "$INGEST_CSV_BIN" ]]; then
+      "$INGEST_CSV_BIN" -file="$INPUT_FILE" -region="$REGION" -batch="$BATCH" -resume="$resume" 2>&1 | tee -a "$log_file"
+    else
+      go run ./cmd/ingest_csv/main.go -file="$INPUT_FILE" -region="$REGION" -batch="$BATCH" -resume="$resume" 2>&1 | tee -a "$log_file"
+    fi
     exit_code=${PIPESTATUS[0]}
     set -e
   fi

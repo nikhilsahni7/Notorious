@@ -1,0 +1,37 @@
+# Copy to terraform.tfvars (gitignored) and fill in the secrets.
+# Sizing below was verified against the live production setup (2026-11-05).
+
+aws_region = "us-east-2"
+domain     = "api.knotorious.us"
+
+# EC2 (current: t3.large with a single ~1TB disk; here split as 80GB root +
+# a dedicated data volume so the 479GB JSON file never touches the root disk)
+ec2_instance_type  = "t3.large"
+ec2_data_volume_gb = 700
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+ssh_cidr            = "YOUR_IP/32"
+
+# S3 - must be globally unique in the new account
+bucket_name = "notorious-data-CHANGE-ME"
+
+# OpenSearch (current production: OpenSearch_3.7, 3x r8g.2xlarge data nodes,
+# 3x m7g.large dedicated masters, 1500GB gp3 per data node)
+opensearch_engine_version       = "OpenSearch_3.7"
+opensearch_instance_type        = "r8g.2xlarge.search"
+opensearch_node_count           = 3
+opensearch_master_instance_type = "m7g.large.search"
+opensearch_master_count         = 3
+opensearch_volume_gb            = 1500
+opensearch_index                = "people-dev-0001"
+opensearch_master_user          = "notorious-admin"
+
+# Secrets - copy these from the OLD EC2's ~/notorious/backend/.env so user
+# logins/sessions and the app's OpenSearch access survive the move.
+opensearch_master_password = "CHANGE-ME-copy-OPENSEARCH_MASTER_PASSWORD"
+database_password          = "CHANGE-ME-copy-from-old-DATABASE_URL"
+jwt_secret                 = "CHANGE-ME-copy-JWT_SECRET-min-32-chars"
+
+# Optional (copy from old .env if web push is enabled)
+# vapid_public_key  = ""
+# vapid_private_key = ""
+# vapid_subject     = "mailto:admin@knotorious.us"

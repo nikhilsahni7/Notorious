@@ -1,0 +1,19 @@
+# Monthly-rotation automation: secrets, state, dumps. Never commit these.
+*.pem
+*.pem.*
+*.key
+*.key.*
+/id_*
+!/id_*.pub
+rotation.env
+migrate.env*
+!migrate.env.example
+infra/*.tfvars*
+!infra/*.example
+infra/.terraform/
+infra/*.tfstate*
+infra/*.tfplan
+infra/crash.log
+infra/state-archive/
+*.dump
+*.sql.gz
