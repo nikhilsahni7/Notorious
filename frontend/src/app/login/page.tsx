@@ -87,58 +87,20 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#05070d] p-3 md:p-5">
-      <div
-        className="relative min-h-[calc(100vh-1.5rem)] md:min-h-[calc(100vh-2.5rem)] rounded-2xl border border-cyan-300/25 shadow-[0_0_40px_rgba(34,211,238,0.18)] overflow-hidden"
-        style={{
-          backgroundImage: 'url("/third_eye_login_hero.png")',
-          backgroundSize: "cover",
-          backgroundPosition: "35% center",
-          backgroundRepeat: "no-repeat",
-          backgroundColor: "#070d1d",
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-[#080e1f]/40 via-[#070c1a]/20 to-[#050812]/78 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_30%,rgba(56,189,248,0.18),transparent_45%),radial-gradient(circle_at_8%_10%,rgba(236,72,153,0.12),transparent_30%)] pointer-events-none" />
-
-        <div className="absolute left-3 right-3 top-3 md:left-[6%] md:right-auto lg:left-[10%] md:top-[6%] z-20 md:w-[min(46vw,30rem)]">
-          <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-amber-400/25 shadow-[0_0_30px_rgba(245,158,11,0.12)] p-3.5 md:p-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 mb-2.5">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400/60 animate-ping" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
-              </span>
-              <MapPin className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-amber-400 font-bold uppercase tracking-wider text-[0.7rem]">
-                System Notice
-              </span>
-            </div>
-            <p className="flex items-start gap-1.5 text-white font-bold leading-snug text-[clamp(0.85rem,1.4vw,1.4rem)] drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">
-              <MapPin className="h-4 w-4 md:h-5 md:w-5 mt-0.5 flex-shrink-0 text-amber-300" />
-              <span>
-                Disclaimer: for Maharashtra and Rajasthan data upcoming with live
-                tracking process
-              </span>
-            </p>
+    <div className="login-page">
+      <div className="login-art" aria-hidden="true" />
+      <main className="login-layout">
+        <div className="login-notice">
+          <div className="login-notice-title"><MapPin size={16} /> System notice</div>
+          <p>Maharashtra and Rajasthan data is upcoming with live tracking.</p>
+        </div>
+        <section className="login-panel" aria-labelledby="login-title">
+          <div className="login-heading">
+            <span className="login-eyebrow">SEARCH DASHBOARD</span>
+            <h1 id="login-title">Welcome back</h1>
+            <p>Sign in to access your search dashboard</p>
           </div>
-        </div>
-
-        <div className="w-full min-h-full flex items-center justify-center md:justify-end px-4 md:px-10 pt-40 pb-8 md:py-12 overflow-y-auto">
-          <div className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-right-10 duration-1000 flex-shrink-0">
-        <div className="text-center mb-10 relative">
-          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">
-            Welcome
-          </h1>
-          <p className="text-white/60 font-medium text-sm tracking-wide">
-            Sign in to access your search dashboard
-          </p>
-        </div>
-
-        <div className="bg-white/5 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 p-10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] relative overflow-hidden">
-          {/* Internal festive glows - Navratri themed */}
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/20 blur-[60px] pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/20 blur-[60px] pointer-events-none" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-pink-500/10 blur-[80px] pointer-events-none" />
+          <div className="login-card">
           {/* Session Expired Warning */}
           {sessionExpired && !deviceLimitData && (
             <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-400 p-4 rounded-lg mb-6">
@@ -211,14 +173,16 @@ function LoginContent() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="login-email" className="block text-sm text-slate-200 mb-2">
                   Email
                 </label>
                 <Input
+                  id="login-email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-[#2D1B4E] border-gray-600 text-white"
+                  className="login-input"
                   placeholder="your@email.com"
                   required
                   disabled={loading}
@@ -226,14 +190,16 @@ function LoginContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="login-password" className="block text-sm text-slate-200 mb-2">
                   Password
                 </label>
                 <Input
+                  id="login-password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-[#2D1B4E] border-gray-600 text-white"
+                  className="login-input"
                   placeholder="••••••••"
                   required
                   disabled={loading}
@@ -244,7 +210,7 @@ function LoginContent() {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-pink-500 to-blue-500 hover:from-pink-600 hover:to-blue-600 text-white h-11 border-none shadow-[0_0_15px_rgba(236,72,153,0.3)] transition-all duration-300"
+                className="login-submit"
                 disabled={loading || !captchaValid}
               >
                 {loading ? (
@@ -265,17 +231,16 @@ function LoginContent() {
                 Don&apos;t have an account?{" "}
                 <Link
                   href="/request-access"
-                  className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors"
+                  className="text-cyan-300 underline underline-offset-4 hover:text-cyan-100 transition-colors"
                 >
                   Request Access
                 </Link>
               </p>
             </div>
           )}
-        </div>
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }
