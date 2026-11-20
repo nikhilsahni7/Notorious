@@ -1,9 +1,16 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+
 const WHATSAPP_NUMBER = "918368216810";
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 export function WhatsAppButton() {
+  const pathname = usePathname();
+
+  // The in-app chat composer occupies the same corner on these pages.
+  if (pathname === "/chat" || pathname === "/admin/chat") return null;
+
   return (
     <a
       href={WHATSAPP_URL}

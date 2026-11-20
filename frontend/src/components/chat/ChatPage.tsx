@@ -876,7 +876,7 @@ export default function ChatPage() {
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-gray-800 bg-gray-900/50">
+            <div className="shrink-0 border-t border-gray-800 bg-gray-900/50 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div className="flex items-end gap-2">
                 <textarea
                   maxLength={4000}
@@ -891,7 +891,7 @@ export default function ChatPage() {
                   }}
                   placeholder="Type a message..."
                   rows={1}
-                  className="flex-1 bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-3 text-sm resize-none placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors max-h-32"
+                  className="min-w-0 flex-1 bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-3 text-sm resize-none placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors max-h-32"
                   style={{
                     height: "auto",
                     minHeight: "44px",
@@ -906,7 +906,7 @@ export default function ChatPage() {
                 <button
                   onClick={handleSend}
                   disabled={!inputValue.trim() || !isConnected} aria-label="Send message"
-                  className="p-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
+                  className="shrink-0 p-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
                 >
                   <Send size={18} />
                 </button>
