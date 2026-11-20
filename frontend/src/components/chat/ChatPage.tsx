@@ -11,7 +11,7 @@ import {
   chatService,
   Conversation,
 } from "@/services/chat.service";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Bell,
@@ -400,6 +400,7 @@ export default function ChatPage() {
 
   // Search on the server so the picker remains responsive with many users.
   const handleNewChat = useCallback(() => {
+    setLoadingUsers(true);
     setUserSearchQuery("");
     setShowNewChat(true);
   }, []);
@@ -938,19 +939,15 @@ export default function ChatPage() {
       </div>
 
       {/* New Chat Modal */}
-      <AnimatePresence>
         {showNewChat && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          <div
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
             onClick={() => setShowNewChat(false)}
           >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="New chat"
               onClick={(e) => e.stopPropagation()}
               className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl"
             >
@@ -984,7 +981,7 @@ export default function ChatPage() {
                   />
                 </div>
 
-                <div className="max-h-[55vh] min-h-48 overflow-y-auto space-y-1">
+                <div className="h-[min(55vh,24rem)] overflow-y-auto space-y-1">
                   {loadingUsers ? (
                     <div className="text-center py-8 text-gray-500 text-sm">
                       Loading users...
@@ -1028,25 +1025,20 @@ export default function ChatPage() {
                   )}
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
 
       {/* Broadcast Modal */}
-      <AnimatePresence>
         {showBroadcast && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          <div
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
             onClick={() => setShowBroadcast(false)}
           >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Broadcast to all users"
               onClick={(e) => e.stopPropagation()}
               className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
             >
@@ -1084,10 +1076,9 @@ export default function ChatPage() {
                   Send Broadcast
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
     </div>
   );
 }
