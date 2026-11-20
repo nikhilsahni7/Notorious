@@ -17,11 +17,11 @@ export function Pagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-3 bg-[#1a0f2e] p-3 rounded-lg">
+    <div className="flex flex-wrap items-center justify-center gap-3 bg-[#081a35] p-3 rounded-lg">
       <Button
         onClick={onPrevPage}
         disabled={currentPage === 1}
-        className="bg-pink-500 hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+        className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed text-white"
         size="sm"
       >
         <ChevronLeft className="h-4 w-4 mr-1" />
@@ -33,7 +33,7 @@ export function Pagination({
       <Button
         onClick={onNextPage}
         disabled={currentPage === totalPages}
-        className="bg-pink-500 hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+        className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed text-white"
         size="sm"
       >
         Next

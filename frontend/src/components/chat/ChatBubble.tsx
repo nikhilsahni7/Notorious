@@ -24,13 +24,13 @@ export function ChatBubble({ message, isOwn, showStatus = true }: ChatBubbleProp
       className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-2`}
     >
       <div
-        className={`min-w-[80px] max-w-[75%] rounded-2xl px-4 py-2.5 shadow-md ${
+        className={`min-w-[80px] max-w-[75%] rounded-2xl px-4 py-2.5 ${
           isOwn
-            ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-br-sm"
-            : "bg-gray-800/80 text-gray-100 rounded-bl-sm border border-gray-700/50"
+            ? "bg-[#14558b] text-white rounded-br-sm"
+            : "bg-[#102947] text-slate-100 rounded-bl-sm border border-sky-900/50"
         }`}
       >
-        <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
           {message.content}
         </p>
         <div
@@ -38,7 +38,7 @@ export function ChatBubble({ message, isOwn, showStatus = true }: ChatBubbleProp
             isOwn ? "justify-end" : "justify-start"
           }`}
         >
-          <span className={`text-[11px] ${isOwn ? "text-white/70" : "text-gray-400"}`}>{time}</span>
+          <span className={`text-xs ${isOwn ? "text-white/70" : "text-gray-400"}`}>{time}</span>
           {isOwn && showStatus && <MessageStatus status={message.status} />}
         </div>
       </div>

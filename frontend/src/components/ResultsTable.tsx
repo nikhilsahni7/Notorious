@@ -26,7 +26,7 @@ export function ResultsTable({
           <Button
             onClick={onCopyAll}
             disabled={isCopyingAll}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-sky-600 hover:bg-sky-700 text-white"
           >
             {isCopyingAll ? (
               <>

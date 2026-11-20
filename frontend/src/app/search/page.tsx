@@ -384,7 +384,7 @@ export default function SearchPage() {
 
   if (isLoading || !token) {
     return (
-      <div className="min-h-screen bg-[#2D1B4E] flex items-center justify-center">
+      <div className="min-h-screen bg-[#040f25] flex items-center justify-center">
         <Spinner size="lg" />
       </div>
     );
@@ -399,10 +399,10 @@ export default function SearchPage() {
   const endIndex = Math.min(startIndex + PAGE_SIZE, totalResults);
 
   return (
-    <div className="min-h-screen bg-[#2D1B4E] p-3 pb-24 md:pb-6">
+    <div className="min-h-screen bg-[#040f25] p-3 pb-24 md:pb-6">
       <div className="max-w-[1800px] mx-auto">
         {/* Compact Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3 bg-white/5 backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-2xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3 bg-[#0a1c38] p-4 rounded-2xl border border-sky-900/50">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-xl font-bold text-white">
@@ -462,7 +462,7 @@ export default function SearchPage() {
               onClick={() => router.push("/profile")}
               variant="outline"
               size="sm"
-              className="h-8 px-3 bg-transparent border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:border-purple-400 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
+              className="h-8 px-3 bg-transparent border-sky-800 text-sky-200 hover:bg-sky-900/50 hover:border-sky-500 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
             >
               <User className="h-4 w-4" />
               <span className="hidden md:inline ml-1">Profile</span>
@@ -522,7 +522,7 @@ export default function SearchPage() {
                 onClick={() => router.push("/admin")}
                 variant="outline"
                 size="sm"
-                className="h-8 px-3 bg-transparent border-pink-500/50 text-pink-300 hover:bg-pink-500/20 hover:border-pink-400 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
+                className="h-8 px-3 bg-transparent border-sky-800 text-sky-200 hover:bg-sky-900/50 hover:border-sky-500 hover:text-white transition-all duration-300 hover:-translate-y-[1px]"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -617,7 +617,7 @@ export default function SearchPage() {
         )}
 
         {/* Compact Search Form */}
-        <div className="bg-white/5 backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-xl mb-3">
+        <div className="bg-[#0a1c38] p-4 rounded-2xl border border-sky-900/50 mb-3">
           <SearchForm
             searchFields={searchFields}
             operator={operator}
@@ -630,7 +630,7 @@ export default function SearchPage() {
             <Button
               onClick={() => executeSearch(1)}
               disabled={loading || searchesUsed >= searchLimit}
-              className="flex-1 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-bold h-10 border-none shadow-[0_0_15px_rgba(236,72,153,0.35)] transition-all duration-300 hover:shadow-[0_0_20px_rgba(236,72,153,0.55)] hover:-translate-y-[1px]"
+              className="flex-1 bg-sky-600 hover:bg-sky-500 text-white h-10 border-none transition-colors"
             >
               {loading ? (
                 <>
@@ -711,7 +711,7 @@ export default function SearchPage() {
 
         {/* No Results Message */}
         {!loading && totalResults === 0 && (
-          <div className="bg-[#1a0f2e] p-12 rounded-lg border border-gray-700 text-center">
+          <div className="bg-[#081a35] p-12 rounded-lg border border-gray-700 text-center">
             <SearchIcon className="h-16 w-16 mx-auto mb-4 text-gray-600" />
             <h3 className="text-xl font-semibold text-white mb-2">
               No Results Found
