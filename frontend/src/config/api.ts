@@ -1,5 +1,6 @@
 export const API_CONFIG = {
   BASE_URL: (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080").replace(/^"|"$/g, ""),
+  WS_URL: (process.env.NEXT_PUBLIC_WS_URL || `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080").replace(/^"|"$/g, "").replace(/^http/, "ws").replace(/\/$/, "")}/ws`).replace(/^"|"$/g, ""),
   ENDPOINTS: {
     AUTH: {
       LOGIN: "/auth/login",
@@ -39,9 +40,22 @@ export const API_CONFIG = {
       USER_STATS: "/api/admin/stats/user",
       SYSTEM_STATS: "/api/admin/stats/system",
     },
+    CHAT: {
+      CONVERSATIONS: "/api/chat/conversations",
+      MESSAGES: "/api/chat/messages",
+      UNREAD: "/api/chat/unread",
+      READ: "/api/chat/read",
+      BROADCASTS: "/api/chat/broadcasts",
+      ONLINE: "/api/chat/online",
+      UNREAD_PER_USER: "/api/chat/unread-per-user",
+    },
   },
 } as const;
 
 export const getApiUrl = (endpoint: string): string => {
   return `${API_CONFIG.BASE_URL}${endpoint}`;
+};
+
+export const getWsUrl = (token: string): string => {
+  return `${API_CONFIG.WS_URL}?token=${token}`;
 };
