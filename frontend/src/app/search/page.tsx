@@ -2,6 +2,7 @@
 
 import { FestiveHeader, MobileDisclaimer, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ChatNotificationBadge } from "@/components/chat/ChatNotificationBadge";
 import { Pagination } from "@/components/Pagination";
 import { RefineSearch } from "@/components/RefineSearch";
 import { ResultsStats } from "@/components/ResultsStats";
@@ -17,15 +18,15 @@ import { searchService } from "@/services/search.service";
 import { optInToPush } from "@/lib/push";
 import { ApiError } from "@/lib/api-client";
 import {
-  Person,
-  Refinement,
-  SearchFields,
-  SearchOperator,
+    Person,
+    Refinement,
+    SearchFields,
+    SearchOperator,
 } from "@/types/person";
 import {
-  copyToClipboard,
-  formatPersonForClipboard,
-  formatPersonsForClipboard,
+    copyToClipboard,
+    formatPersonForClipboard,
+    formatPersonsForClipboard,
 } from "@/utils/clipboard";
 import {
   AlertCircle,
@@ -508,6 +509,12 @@ export default function SearchPage() {
               <Download className="h-4 w-4" />
               <span className="hidden md:inline ml-1">Export</span>
             </Button>
+
+            <ChatNotificationBadge
+              href="/chat"
+              size="sm"
+              className="h-8 px-2"
+            />
 
             {user?.role === "admin" && (
               <Button

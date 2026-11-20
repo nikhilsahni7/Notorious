@@ -1,5 +1,7 @@
 "use client";
 
+import { ChatNotificationBadge } from "@/components/chat/ChatNotificationBadge";
+
 import { PasswordRequestsTab } from "@/components/admin/PasswordRequestsTab";
 import { SearchHistoryTab } from "@/components/admin/SearchHistoryTab";
 import { SessionsTab } from "@/components/admin/SessionsTab";
@@ -17,6 +19,7 @@ import {
   History,
   Key,
   LogOut,
+  MessageCircle,
   Shield,
   UserPlus,
   Users,
@@ -31,7 +34,8 @@ type Tab =
   | "stats"
   | "password-requests"
   | "sessions"
-  | "system-stats";
+  | "system-stats"
+  | "messages";
 
 export default function AdminDashboard() {
   const { user, token, logout, isLoading } = useAuth();
@@ -94,6 +98,7 @@ export default function AdminDashboard() {
     { id: "sessions" as Tab, label: "Sessions", icon: Shield },
     { id: "history" as Tab, label: "Search History", icon: History },
     { id: "system-stats" as Tab, label: "System Stats", icon: Activity },
+    { id: "messages" as Tab, label: "Messages", icon: MessageCircle },
   ];
 
   return (
@@ -110,6 +115,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            <ChatNotificationBadge href="/admin/chat" size="md" />
             <Button
               onClick={() => router.push("/search")}
               variant="outline"
@@ -181,6 +187,20 @@ export default function AdminDashboard() {
             {activeTab === "sessions" && <SessionsTab token={token!} />}
             {activeTab === "history" && <SearchHistoryTab token={token!} />}
             {activeTab === "system-stats" && <SystemStatsTab token={token!} />}
+            {activeTab === "messages" && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <MessageCircle size={48} className="text-gray-500 mb-4" />
+                <h3 className="text-lg font-semibold text-white mb-2">Chat Messages</h3>
+                <p className="text-gray-400 text-sm mb-4">Open the full chat interface to manage conversations</p>
+                <Button
+                  onClick={() => router.push("/admin/chat")}
+                  className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Open Chat
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

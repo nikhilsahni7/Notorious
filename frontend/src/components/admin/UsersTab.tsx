@@ -11,6 +11,7 @@ import {
   Edit,
   History,
   Key,
+  MessageCircle,
   Plus,
   Power,
   Smartphone,
@@ -572,6 +573,16 @@ export function UsersTab({ token }: UsersTabProps) {
                   </td>
                   <td className="px-3 py-2.5 pr-4">
                     <div className="flex items-center gap-0.5">
+                      <ActionButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/admin/chat?user=${user.id}`);
+                        }}
+                        className="text-indigo-400 hover:text-indigo-300 transition-colors"
+                        title="Send message"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </ActionButton>
                       <ActionButton
                         title="View Active Sessions"
                         onClick={(e) => {

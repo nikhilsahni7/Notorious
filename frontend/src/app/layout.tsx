@@ -2,6 +2,7 @@ import { FestiveCelebration } from "@/components/FestiveCelebration";
 import { PWARegistrar } from "@/components/PWARegistrar";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { ChatProviderWrapper } from "@/providers/ChatProviderWrapper";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -23,10 +24,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <FestiveCelebration />
-          <PWARegistrar />
-          {children}
-          <WhatsAppButton />
+          <ChatProviderWrapper>
+            <FestiveCelebration />
+            <PWARegistrar />
+            {children}
+            <WhatsAppButton />
+          </ChatProviderWrapper>
         </AuthProvider>
       </body>
     </html>
