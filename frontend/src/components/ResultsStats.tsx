@@ -37,7 +37,7 @@ export function ResultsStats({
         placeholder="Filter results..."
         value={filterQuery}
         onChange={(e) => onFilterChange(e.target.value)}
-        className="w-full sm:w-64 bg-[#1a0f2e] border-gray-600 text-white placeholder:text-gray-400"
+        className="w-full sm:w-64 bg-[#081a35] border-gray-600 text-white placeholder:text-gray-400"
       />
     </div>
   );

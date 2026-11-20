@@ -30,14 +30,14 @@ export function LatestAnnouncement() {
   if (!latest || user?.role === "admin") return null;
   return (
     <Link href={`/chat?tab=announcements&announcement=${encodeURIComponent(latest.id)}`}
-      className="mb-3 flex items-center gap-3 rounded-lg border border-purple-400/30 bg-purple-950/40 px-4 py-3 text-white transition-colors hover:bg-purple-900/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-300">
-      <Megaphone className="h-5 w-5 shrink-0 text-purple-300" aria-hidden="true" />
+      className="mb-3 flex items-center gap-3 rounded-lg border border-sky-400/30 bg-sky-950/40 px-4 py-3 text-white transition-colors hover:bg-sky-900/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">
+      <Megaphone className="h-5 w-5 shrink-0 text-sky-300" aria-hidden="true" />
       <span className="min-w-0 flex-1">
-        <span className="block text-xs text-purple-200">Latest announcement {!latest.is_read && "· New"}</span>
+        <span className="block text-xs text-sky-200">Latest announcement {!latest.is_read && "· New"}</span>
         <span className="block truncate text-sm">{latest.content}</span>
       </span>
-      <span className="hidden text-xs text-purple-200 sm:inline">Read announcement</span>
-      <ArrowRight className="h-4 w-4 shrink-0 text-purple-200" aria-hidden="true" />
+      <span className="hidden text-xs text-sky-200 sm:inline">Read announcement</span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-sky-200" aria-hidden="true" />
     </Link>
   );
 }

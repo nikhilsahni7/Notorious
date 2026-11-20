@@ -53,9 +53,9 @@ export function RefineSearch({
   }
 
   return (
-    <div className="bg-[#1a0f2e] p-4 rounded-lg border border-purple-500/30 mb-3">
+    <div className="bg-[#081a35] p-4 rounded-lg border border-sky-500/30 mb-3">
       <div className="flex items-center gap-2 mb-3">
-        <Filter className="h-5 w-5 text-purple-400" />
+        <Filter className="h-5 w-5 text-sky-400" />
         <h3 className="text-lg font-semibold text-white">
           Refine Results
           <span className="text-sm text-gray-400 ml-2 font-normal">
@@ -65,7 +65,7 @@ export function RefineSearch({
       </div>
 
       <div className="text-sm text-gray-300 mb-3">
-        Found <span className="font-bold text-purple-400">{totalResults}</span>{" "}
+        Found <span className="font-bold text-sky-400">{totalResults}</span>{" "}
         results. Add filters to narrow down your search.
       </div>
 
@@ -74,7 +74,7 @@ export function RefineSearch({
         <select
           value={selectedField}
           onChange={(e) => setSelectedField(e.target.value)}
-          className="w-full sm:w-auto bg-[#2D1B4E] border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+          className="w-full sm:w-auto bg-[#102846] border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-sky-500"
         >
           {REFINEMENT_FIELDS.map((field) => (
             <option key={field.value} value={field.value}>
@@ -89,13 +89,13 @@ export function RefineSearch({
           onChange={(e) => setRefinementValue(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder={`Enter ${getFieldLabel(selectedField).toLowerCase()}...`}
-          className="flex-1 min-w-0 bg-[#2D1B4E] border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+          className="flex-1 min-w-0 bg-[#102846] border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-sky-500"
         />
 
         <Button
           onClick={handleAddRefinement}
           disabled={!refinementValue.trim()}
-          className="w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white"
+          className="w-full sm:w-auto bg-sky-500 hover:bg-sky-600 text-white"
         >
           <Plus className="h-4 w-4 mr-1" />
           Add
@@ -124,15 +124,15 @@ export function RefineSearch({
             {activeRefinements.map((refinement, index) => (
               <div
                 key={index}
-                className="bg-purple-500/20 border border-purple-500 rounded px-3 py-1 flex items-center gap-2 group"
+                className="bg-sky-500/20 border border-sky-500 rounded px-3 py-1 flex items-center gap-2 group"
               >
-                <span className="text-purple-300 text-sm font-medium">
+                <span className="text-sky-300 text-sm font-medium">
                   {getFieldLabel(refinement.field)}:
                 </span>
                 <span className="text-white text-sm">{refinement.value}</span>
                 <button
                   onClick={() => onRemoveRefinement(index)}
-                  className="text-purple-300 hover:text-red-400 transition-colors"
+                  className="text-sky-300 hover:text-red-400 transition-colors"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -147,7 +147,7 @@ export function RefineSearch({
         <Button
           onClick={onRefine}
           disabled={isRefining}
-          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold"
+          className="w-full bg-gradient-to-r from-sky-500 to-sky-500 hover:from-sky-600 hover:to-sky-600 text-white font-semibold"
         >
           <Filter className="h-4 w-4 mr-2" />
           {isRefining ? "Refining..." : "Apply Filters"}

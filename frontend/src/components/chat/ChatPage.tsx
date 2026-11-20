@@ -475,18 +475,13 @@ export default function ChatPage() {
 
 
   return (
-    <div className="flex h-[100dvh] bg-gray-950 text-white">
+    <div className="flex h-[100dvh] overflow-hidden bg-[#050f25] text-slate-100">
       {/* Sidebar */}
-      <AnimatePresence>
-        {showSidebar && (
-          <motion.div
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            className="w-full md:w-96 lg:w-[28rem] border-r border-gray-800 flex flex-col bg-gray-950 md:relative absolute z-20 h-full"
+      <div
+            className={`${showSidebar ? "flex" : "hidden md:flex"} absolute inset-y-0 left-0 z-20 h-full w-full flex-col border-r border-sky-900/50 bg-[#08162f] md:relative md:w-80 lg:w-96`}
           >
             {/* Header */}
-            <div className="p-4 border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
+            <div className="border-b border-sky-900/40 px-5 pb-4 pt-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <button
@@ -496,9 +491,10 @@ export default function ChatPage() {
                   >
                     <ArrowLeft size={18} />
                   </button>
-                  <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                    Messages
-                  </h1>
+                  <div>
+                    <h1 className="text-base text-white">Messages</h1>
+                    <p className="text-xs text-slate-400">Conversations and announcements</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {isConnected ? (
@@ -516,7 +512,7 @@ export default function ChatPage() {
               <div className="flex gap-2 mb-3">
                 <button
                   onClick={handleNewChat}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 text-xs font-medium hover:bg-indigo-500/30 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-sky-500 text-slate-950 text-sm hover:bg-sky-400 transition-colors"
                 >
                   <Plus size={14} />
                   New Chat
@@ -524,7 +520,7 @@ export default function ChatPage() {
                 {isAdmin && (
                   <button
                     onClick={() => setShowBroadcast(true)}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-purple-500/20 text-purple-400 text-xs font-medium hover:bg-purple-500/30 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-sky-800/70 bg-[#102342] text-sky-200 text-sm hover:bg-[#183359] transition-colors"
                   >
                     <Megaphone size={14} />
                     Broadcast
@@ -540,35 +536,35 @@ export default function ChatPage() {
                 />
                 <input
                   type="text"
-                  placeholder="Search conversations..."
+                  placeholder="Search conversations"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-gray-800/50 border border-gray-700/50 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                  className="w-full pl-9 pr-3 py-2 bg-[#102342] border border-sky-900/60 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:border-sky-400 transition-colors"
                 />
               </div>
             </div>
 
             {/* Sidebar Tab Toggle */}
-            <div className="flex border-b border-gray-800">
+            <div className="flex border-b border-sky-900/40 px-3">
               <button
                 onClick={() => { setSidebarTab("chats"); setSelectedBroadcast(null); }}
                 className={`flex-1 py-2.5 text-xs font-medium transition-colors relative ${
                   sidebarTab === "chats"
-                    ? "text-indigo-400"
-                    : "text-gray-500 hover:text-gray-300"
+                    ? "text-sky-300"
+                    : "text-slate-400 hover:text-slate-200"
                 }`}
               >
                 Chats
                 {sidebarTab === "chats" && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sky-400" />
                 )}
               </button>
               <button
                 onClick={() => { setSidebarTab("broadcasts"); setSelectedBroadcast(null); }}
                 className={`flex-1 py-2.5 text-xs font-medium transition-colors relative flex items-center justify-center gap-1.5 ${
                   sidebarTab === "broadcasts"
-                    ? "text-purple-400"
-                    : "text-gray-500 hover:text-gray-300"
+                    ? "text-sky-300"
+                    : "text-slate-400 hover:text-slate-200"
                 }`}
               >
                 <Bell size={12} />
@@ -579,7 +575,7 @@ export default function ChatPage() {
                   </span>
                 )}
                 {sidebarTab === "broadcasts" && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sky-400" />
                 )}
               </button>
             </div>
@@ -599,7 +595,7 @@ export default function ChatPage() {
                   filteredConversations.map((conv) => (
                     <motion.button
                       key={conv.id}
-                      whileHover={{ backgroundColor: "rgba(99,102,241,0.08)" }}
+                      whileHover={{ backgroundColor: "rgba(56,189,248,0.07)" }}
                       onClick={() => {
                         setSelectedConv(conv);
                         setDirectChatUser(null);
@@ -608,13 +604,13 @@ export default function ChatPage() {
                       }}
                       className={`w-full p-4 flex items-center gap-3 border-b border-gray-800/50 transition-colors ${
                         selectedConv?.id === conv.id
-                          ? "bg-indigo-500/10 border-l-2 border-l-indigo-500"
+                          ? "bg-sky-500/10 border-l-2 border-l-sky-400"
                           : ""
                       }`}
                     >
                       {/* Avatar */}
                       <div className="relative flex-shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold">
+                        <div className="w-10 h-10 rounded-full bg-[#174977] flex items-center justify-center text-sm font-bold">
                           {conv.other_user_name?.charAt(0)?.toUpperCase() || "?"}
                         </div>
                         <div
@@ -673,7 +669,7 @@ export default function ChatPage() {
                           : ""
                       } ${!b.is_read ? "bg-purple-500/5" : ""}`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-sm flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-[#174977] flex items-center justify-center text-sm flex-shrink-0">
                         <Megaphone size={18} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -701,23 +697,22 @@ export default function ChatPage() {
                 )
               )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col bg-[#07142b]">
         {selectedBroadcast ? (
           /* Broadcast Detail View */
           <>
-            <div className="px-4 py-3 border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm flex items-center gap-3">
+            <div className="flex items-center gap-3 border-b border-sky-900/40 bg-[#0a1a35] px-5 py-4">
               <button
                 onClick={() => { setSelectedBroadcast(null); setShowSidebar(true); }}
-                className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+                className="rounded-lg p-1.5 transition-colors hover:bg-sky-900/50 md:hidden"
+                aria-label="Back to conversations"
               >
                 <ChevronLeft size={20} />
               </button>
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-full bg-[#174977] flex items-center justify-center">
                 <Megaphone size={16} />
               </div>
               <div>
@@ -737,7 +732,7 @@ export default function ChatPage() {
               <div className="max-w-lg w-full">
                 <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-2xl p-6">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-[#174977] flex items-center justify-center">
                       <Megaphone size={14} />
                     </div>
                     <div>
@@ -761,19 +756,20 @@ export default function ChatPage() {
         ) : hasActiveChat ? (
           <>
             {/* Chat Header */}
-            <div className="px-4 py-3 border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm flex items-center gap-3">
+            <div className="flex items-center gap-3 border-b border-sky-900/40 bg-[#0a1a35] px-5 py-4">
               <button
                 onClick={() => {
                   setSelectedConv(null);
                   setDirectChatUser(null);
                   setShowSidebar(true);
                 }}
-                className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+                className="rounded-lg p-1.5 transition-colors hover:bg-sky-900/50 md:hidden"
+                aria-label="Back to conversations"
               >
                 <ChevronLeft size={20} />
               </button>
               <div className="relative">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold">
+                <div className="w-9 h-9 rounded-full bg-[#174977] flex items-center justify-center text-sm font-bold">
                   {activeChatUserName?.charAt(0)?.toUpperCase() || "?"}
                 </div>
                 <div
@@ -799,7 +795,7 @@ export default function ChatPage() {
             {/* Messages */}
             <div
               ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto p-4 space-y-1"
+              className="mx-auto w-full max-w-5xl flex-1 space-y-1 overflow-y-auto px-4 py-6 md:px-8"
               onScroll={(e) => {
                 const el = e.currentTarget;
                 if (el.scrollTop < 100 && hasMore && !isLoadingMessages) {
@@ -876,8 +872,8 @@ export default function ChatPage() {
             </div>
 
             {/* Input */}
-            <div className="shrink-0 border-t border-gray-800 bg-gray-900/50 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <div className="flex items-end gap-2">
+            <div className="shrink-0 border-t border-sky-900/40 bg-[#0a1a35] px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <div className="mx-auto flex max-w-5xl items-end gap-2">
                 <textarea
                   maxLength={4000}
                   ref={inputRef}
@@ -906,7 +902,7 @@ export default function ChatPage() {
                 <button
                   onClick={handleSend}
                   disabled={!inputValue.trim() || !isConnected} aria-label="Send message"
-                  className="shrink-0 p-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
+                  className="shrink-0 p-3 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
                 >
                   <Send size={18} />
                 </button>
@@ -915,16 +911,16 @@ export default function ChatPage() {
           </>
         ) : (
           /* Empty state */
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-            <div className="w-20 h-20 rounded-2xl bg-gray-800/50 flex items-center justify-center mb-4">
+          <div className="flex flex-1 flex-col items-center justify-center px-6 text-slate-400">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-sky-800/50 bg-[#102342] text-sky-300">
               <MessageCircle size={36} className="opacity-50" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-400 mb-1">
+            <h3 className="mb-2 text-base text-slate-200">
               {conversations.length === 0
                 ? "Start a conversation"
                 : "Select a conversation"}
             </h3>
-            <p className="text-sm text-center max-w-xs">
+            <p className="max-w-xs text-center text-sm leading-6 text-slate-400">
               {conversations.length === 0
                 ? 'Click "New Chat" in the sidebar to start messaging'
                 : "Choose from your existing conversations or start a new one"}
@@ -983,7 +979,7 @@ export default function ChatPage() {
                     placeholder={isAdmin ? "Search by name or email" : "Search administrators"}
                     value={userSearchQuery}
                     onChange={(e) => setUserSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-800/50 border border-gray-700/50 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500/50"
+                    className="w-full pl-9 pr-3 py-2 bg-[#102342] border border-sky-900/60 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:border-sky-400"
                     autoFocus
                   />
                 </div>
@@ -1005,7 +1001,7 @@ export default function ChatPage() {
                         className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-800/50 transition-colors text-left"
                       >
                         <div className="relative">
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold">
+                          <div className="w-9 h-9 rounded-full bg-[#174977] flex items-center justify-center text-xs font-bold">
                             {u.name.charAt(0).toUpperCase()}
                           </div>
                           <div
