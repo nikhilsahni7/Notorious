@@ -206,3 +206,13 @@ func (h *ChatHandler) GetUnreadPerUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"unread_per_user": result})
 }
+
+// GetChatAdmins lists administrators available for a direct conversation.
+func (h *ChatHandler) GetChatAdmins(c *gin.Context) {
+	contacts, err := h.chatRepo.GetChatAdmins(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load administrators"})
+		return
+	}
+	c.JSON(http.StatusOK, contacts)
+}

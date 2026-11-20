@@ -403,3 +403,21 @@ func (r *ChatRepository) GetUnreadCountPerUser(ctx context.Context, receiverID u
 	}
 	return counts, rows.Err()
 }
+
+// GetChatAdmins lists active administrators available to start a conversation.
+func (r *ChatRepository) GetChatAdmins(ctx context.Context) ([]models.ChatContact, error) {
+	rows, err := r.db.Pool.Query(ctx, `SELECT id, name FROM users WHERE role = 'admin' AND is_active = TRUE ORDER BY name, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	contacts := make([]models.ChatContact, 0)
+	for rows.Next() {
+		var contact models.ChatContact
+		if err := rows.Scan(&contact.ID, &contact.Name); err != nil {
+			return nil, err
+		}
+		contacts = append(contacts, contact)
+	}
+	return contacts, rows.Err()
+}

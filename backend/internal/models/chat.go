@@ -46,26 +46,26 @@ type ChatMessage struct {
 
 // ChatConversation represents a conversation between two users
 type ChatConversation struct {
-	ID            uuid.UUID    `json:"id"`
-	ParticipantA  uuid.UUID    `json:"participant_a"`
-	ParticipantB  uuid.UUID    `json:"participant_b"`
-	LastMessageID *uuid.UUID   `json:"last_message_id,omitempty"`
-	LastMessageAt time.Time    `json:"last_message_at"`
-	CreatedAt     time.Time    `json:"created_at"`
+	ID            uuid.UUID  `json:"id"`
+	ParticipantA  uuid.UUID  `json:"participant_a"`
+	ParticipantB  uuid.UUID  `json:"participant_b"`
+	LastMessageID *uuid.UUID `json:"last_message_id,omitempty"`
+	LastMessageAt time.Time  `json:"last_message_at"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // ConversationWithDetails is used for API responses with joined data
 type ConversationWithDetails struct {
-	ID            uuid.UUID    `json:"id"`
-	OtherUserID   uuid.UUID    `json:"other_user_id"`
-	OtherUserName string       `json:"other_user_name"`
-	OtherUserEmail string      `json:"other_user_email"`
-	OtherUserRole string       `json:"other_user_role"`
-	LastMessage   *string      `json:"last_message,omitempty"`
-	LastMessageAt time.Time    `json:"last_message_at"`
-	LastSenderID  *uuid.UUID   `json:"last_sender_id,omitempty"`
-	UnreadCount   int          `json:"unread_count"`
-	IsOnline      bool         `json:"is_online"`
+	ID             uuid.UUID  `json:"id"`
+	OtherUserID    uuid.UUID  `json:"other_user_id"`
+	OtherUserName  string     `json:"other_user_name"`
+	OtherUserEmail string     `json:"other_user_email"`
+	OtherUserRole  string     `json:"other_user_role"`
+	LastMessage    *string    `json:"last_message,omitempty"`
+	LastMessageAt  time.Time  `json:"last_message_at"`
+	LastSenderID   *uuid.UUID `json:"last_sender_id,omitempty"`
+	UnreadCount    int        `json:"unread_count"`
+	IsOnline       bool       `json:"is_online"`
 }
 
 // ChatBroadcast represents an admin broadcast message
@@ -159,4 +159,10 @@ type WSBroadcastReadReceipt struct {
 type WSError struct {
 	Message string `json:"message"`
 	Code    string `json:"code,omitempty"`
+}
+
+// ChatContact contains the minimum information needed to contact an administrator.
+type ChatContact struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 }

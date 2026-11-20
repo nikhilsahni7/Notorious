@@ -3,6 +3,7 @@
 import { FestiveHeader, MobileDisclaimer, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ChatNotificationBadge } from "@/components/chat/ChatNotificationBadge";
+import { LatestAnnouncement } from "@/components/chat/LatestAnnouncement";
 import { Pagination } from "@/components/Pagination";
 import { RefineSearch } from "@/components/RefineSearch";
 import { ResultsStats } from "@/components/ResultsStats";
@@ -552,6 +553,7 @@ export default function SearchPage() {
           </div>
         </div>
 
+        <LatestAnnouncement />
         <MobileDisclaimer />
 
         {searchesUsed >= searchLimit && (

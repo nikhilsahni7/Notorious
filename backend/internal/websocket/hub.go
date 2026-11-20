@@ -29,7 +29,7 @@ var upgrader = ws.Upgrader{
 // Hub manages all active WebSocket connections and routes messages.
 type Hub struct {
 	mu         sync.RWMutex
-	clients    map[uuid.UUID]*Client // userID -> active client
+	clients    map[uuid.UUID]map[*Client]struct{} // userID -> active connections
 	chatRepo   *repository.ChatRepository
 	jwtManager *auth.JWTManager
 }
@@ -37,7 +37,7 @@ type Hub struct {
 // NewHub creates a new Hub instance.
 func NewHub(chatRepo *repository.ChatRepository, jwtManager *auth.JWTManager) *Hub {
 	return &Hub{
-		clients:    make(map[uuid.UUID]*Client),
+		clients:    make(map[uuid.UUID]map[*Client]struct{}),
 		chatRepo:   chatRepo,
 		jwtManager: jwtManager,
 	}
@@ -57,49 +57,35 @@ func (h *Hub) Run() {
 	}
 }
 
-// Register adds a client to the hub. If the user already has an active connection,
-// the old one is closed (single-connection-per-user policy).
+// Register adds a connection without displacing other tabs or devices.
 func (h *Hub) Register(client *Client) {
 	h.mu.Lock()
-	if existing, ok := h.clients[client.userID]; ok {
-		// Close old connection gracefully
-		log.Printf("[Hub] Replacing existing connection for user %s", client.userID)
-		existing.closeOnce.Do(func() {
-			close(existing.done)
-			existing.conn.Close()
-		})
+	first := len(h.clients[client.userID]) == 0
+	if first {
+		h.clients[client.userID] = make(map[*Client]struct{})
 	}
-	h.clients[client.userID] = client
+	h.clients[client.userID][client] = struct{}{}
 	h.mu.Unlock()
-
-	log.Printf("[Hub] User %s (%s) connected", client.userID, client.userRole)
-
-	// Broadcast online status to all connected clients
-	h.broadcastOnlineStatus(client.userID, true)
-
-	// Mark pending messages as delivered
+	if first {
+		h.broadcastOnlineStatus(client.userID, true)
+	}
 	go h.deliverPendingMessages(client)
 }
 
-// Unregister removes a client from the hub.
-// Only removes if the current connection matches (prevents race with reconnect).
 func (h *Hub) Unregister(client *Client) {
 	h.mu.Lock()
-	if existing, ok := h.clients[client.userID]; ok && existing == client {
+	connections, exists := h.clients[client.userID]
+	if exists {
+		delete(connections, client)
+	}
+	offline := exists && len(connections) == 0
+	if offline {
 		delete(h.clients, client.userID)
-		log.Printf("[Hub] User %s disconnected", client.userID)
 	}
 	h.mu.Unlock()
-
-	// Broadcast offline status
-	h.broadcastOnlineStatus(client.userID, false)
-}
-
-// GetClient returns the active client for a user, if any.
-func (h *Hub) GetClient(userID uuid.UUID) *Client {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.clients[userID]
+	if offline {
+		h.broadcastOnlineStatus(client.userID, false)
+	}
 }
 
 // IsOnline checks if a user has an active WebSocket connection.
@@ -124,28 +110,26 @@ func (h *Hub) GetOnlineUserIDs() []uuid.UUID {
 // SendToUser sends a message to a specific user if they're online.
 // Returns true if the message was sent, false if user is offline.
 func (h *Hub) SendToUser(userID uuid.UUID, envelope *models.WSEnvelope) bool {
-	h.mu.RLock()
-	client, ok := h.clients[userID]
-	h.mu.RUnlock()
-
-	if !ok {
-		return false
-	}
-
 	data, err := json.Marshal(envelope)
 	if err != nil {
-		log.Printf("[Hub] Failed to marshal envelope for user %s: %v", userID, err)
 		return false
 	}
-
-	select {
-	case client.send <- data:
-		return true
-	default:
-		// Send buffer full, client is too slow
-		log.Printf("[Hub] Send buffer full for user %s, dropping message", userID)
-		return false
+	h.mu.RLock()
+	clients := make([]*Client, 0, len(h.clients[userID]))
+	for client := range h.clients[userID] {
+		clients = append(clients, client)
 	}
+	h.mu.RUnlock()
+	sent := false
+	for _, client := range clients {
+		select {
+		case client.send <- data:
+			sent = true
+		default:
+			log.Printf("[Hub] Send buffer full for user %s", userID)
+		}
+	}
+	return sent
 }
 
 // BroadcastToAll sends a message to all connected clients.
@@ -160,11 +144,13 @@ func (h *Hub) BroadcastToAll(envelope *models.WSEnvelope, excludeUserID *uuid.UU
 	// Snapshot clients under lock
 	h.mu.RLock()
 	clients := make([]*Client, 0, len(h.clients))
-	for userID, client := range h.clients {
+	for userID, connections := range h.clients {
 		if excludeUserID != nil && userID == *excludeUserID {
 			continue
 		}
-		clients = append(clients, client)
+		for client := range connections {
+			clients = append(clients, client)
+		}
 	}
 	h.mu.RUnlock()
 
@@ -224,7 +210,8 @@ func (h *Hub) deliverPendingMessages(client *Client) {
 		}
 	}
 }
-//new 
+
+// new
 // HandleUpgrade handles the WebSocket upgrade request with JWT authentication.
 func (h *Hub) HandleUpgrade(c *gin.Context) {
 	// Get token from query parameter (WebSocket can't set headers)

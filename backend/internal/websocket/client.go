@@ -276,6 +276,9 @@ func (c *Client) handleReadReceipt(payload json.RawMessage) {
 		return
 	}
 
+	// Refresh unread counts in every open tab after the database update.
+	c.hub.SendToUser(c.userID, &models.WSEnvelope{Type: models.WSTypeReadReceipt, Payload: json.RawMessage(`{}`)})
+
 	if affected > 0 {
 		// Notify the sender their messages were read
 		readUpdate, _ := json.Marshal(models.WSReadUpdate{
@@ -362,7 +365,9 @@ func (c *Client) handleBroadcastRead(payload json.RawMessage) {
 
 	if err := c.hub.chatRepo.MarkBroadcastRead(ctx, broadcastID, c.userID); err != nil {
 		log.Printf("[Client] Failed to mark broadcast as read: %v", err)
+		return
 	}
+	c.hub.SendToUser(c.userID, &models.WSEnvelope{Type: models.WSTypeBroadcastRead, Payload: payload})
 }
 
 // sendEnvelope sends a typed WebSocket message to this client.

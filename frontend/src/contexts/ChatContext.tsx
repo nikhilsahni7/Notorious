@@ -82,6 +82,7 @@ interface ChatContextType {
     callback: (update: { receiver_id: string }) => void
   ) => () => void;
   onBroadcast: (callback: (broadcast: Broadcast) => void) => () => void;
+  onBroadcastRead: (callback: (id: string) => void) => () => void;
   onTyping: (
     callback: (data: { userId: string; isTyping: boolean }) => void
   ) => () => void;
@@ -121,6 +122,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const broadcastListenersRef = useRef<Set<(broadcast: Broadcast) => void>>(
     new Set()
   );
+  const broadcastReadListenersRef = useRef<Set<(id: string) => void>>(new Set());
   const typingListenersRef = useRef<
     Set<(data: { userId: string; isTyping: boolean }) => void>
   >(new Set());
@@ -153,6 +155,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(true);
       reconnectAttemptRef.current = 0; // Reset backoff on success
 
+      // Reload conversations as well as counts after missed events.
+      chatService.getConversations(token).then(setConversations).catch(console.error);
       // Fetch latest unread count on connect
       if (token) {
         chatService.getUnreadCount(token).then((counts) => {
@@ -244,11 +248,27 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                   new Date(a.last_message_at).getTime()
               );
           }
-          // New conversation — will be populated on refresh
           return prev;
         });
+        // The event contains no sender details; fetch the persisted conversation,
+        // including first-time conversations and authoritative unread counts.
+        if (token) chatService.getConversations(token).then(setConversations).catch(console.error);
         break;
       }
+
+      case WS_TYPES.READ_RECEIPT:
+      case WS_TYPES.BROADCAST_READ:
+        if (token) {
+          chatService.getUnreadCount(token).then((counts) => {
+            setUnreadCount(counts.dm_unread);
+            setBroadcastUnread(counts.broadcast_unread);
+          }).catch(console.error);
+          chatService.getConversations(token).then(setConversations).catch(console.error);
+        }
+        if (envelope.type === WS_TYPES.BROADCAST_READ) {
+          broadcastReadListenersRef.current.forEach((cb) => cb(envelope.payload.broadcast_id));
+        }
+        break;
 
       case WS_TYPES.MESSAGE_ACK:
         ackListenersRef.current.forEach((cb) => cb(envelope.payload));
@@ -331,7 +351,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         console.error("[Chat] Server error:", envelope.payload);
         break;
     }
-  }, []);
+  }, [token]);
+
+  // Counts are useful even while the socket is reconnecting.
+  useEffect(() => {
+    if (!token) return;
+    chatService.getUnreadCount(token).then((counts) => {
+      setUnreadCount(counts.dm_unread);
+      setBroadcastUnread(counts.broadcast_unread);
+    }).catch(console.error);
+  }, [token]);
 
   // Connect on auth
   useEffect(() => {
@@ -412,12 +441,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const sendReadReceipt = useCallback(
     (senderId: string) => {
       sendWS(WS_TYPES.READ_RECEIPT, { sender_id: senderId });
-      // Optimistically update unread
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.other_user_id === senderId ? { ...c, unread_count: 0 } : c
-        )
-      );
     },
     [sendWS]
   );
@@ -446,7 +469,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const markBroadcastReadAction = useCallback(
     (broadcastId: string) => {
       sendWS(WS_TYPES.BROADCAST_READ, { broadcast_id: broadcastId });
-      setBroadcastUnread((prev) => Math.max(0, prev - 1));
+
     },
     [sendWS]
   );
@@ -526,6 +549,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const onBroadcastRead = useCallback((callback: (id: string) => void) => {
+    broadcastReadListenersRef.current.add(callback);
+    return () => { broadcastReadListenersRef.current.delete(callback); };
+  }, []);
+
   const onTyping = useCallback(
     (callback: (data: { userId: string; isTyping: boolean }) => void) => {
       typingListenersRef.current.add(callback);
@@ -558,6 +586,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         onReadUpdate,
         onDeliveryUpdate,
         onBroadcast,
+        onBroadcastRead,
         onTyping,
       }}
     >
@@ -589,6 +618,7 @@ const EMPTY_CONTEXT: ChatContextType = {
   onReadUpdate: NOOP_UNSUB,
   onDeliveryUpdate: NOOP_UNSUB,
   onBroadcast: NOOP_UNSUB,
+  onBroadcastRead: NOOP_UNSUB,
   onTyping: NOOP_UNSUB,
 };
 

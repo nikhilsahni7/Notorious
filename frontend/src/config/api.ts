@@ -42,6 +42,7 @@ export const API_CONFIG = {
     },
     CHAT: {
       CONVERSATIONS: "/api/chat/conversations",
+      ADMINS: "/api/chat/admins",
       MESSAGES: "/api/chat/messages",
       UNREAD: "/api/chat/unread",
       READ: "/api/chat/read",
