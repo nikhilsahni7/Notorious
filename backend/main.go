@@ -126,7 +126,7 @@ func main() {
 			"https://knotorious.us", "https://notorious-sigma.vercel.app",
 			"https://www.knotorious.us", "https://jobhuntworldknotorious.online", "https://www.jobhuntworldknotorious.online",
 			"https://knotorious.sbs", "https://www.knotorious.sbs", "https://knotoriousai.online",
-			"https://www.knotoriousai.online","https://notoriousapp.netlify.app/","https://www.notoriousapp.netlify.app/",
+			"https://www.knotoriousai.online", "https://notoriousapp.netlify.app/", "https://www.notoriousapp.netlify.app/",
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
@@ -233,6 +233,7 @@ func main() {
 		chatRoutes.Use(authMiddleware.AuthRequired())
 		{
 			chatRoutes.GET("/conversations", chatHandler.GetConversations)
+			chatRoutes.GET("/admins", chatHandler.GetChatAdmins)
 			chatRoutes.GET("/messages/:userId", chatHandler.GetMessages)
 			chatRoutes.GET("/unread", chatHandler.GetUnreadCount)
 			chatRoutes.POST("/read/:userId", chatHandler.MarkAsRead)

@@ -55,6 +55,10 @@ export interface UnreadPerUser {
 
 // Service
 export const chatService = {
+  getAdmins: async (token: string): Promise<{ id: string; name: string }[]> => {
+    return apiRequest(API_CONFIG.ENDPOINTS.CHAT.ADMINS, { method: "GET", token });
+  },
+
   getConversations: async (token: string): Promise<Conversation[]> => {
     return apiRequest(API_CONFIG.ENDPOINTS.CHAT.CONVERSATIONS, {
       method: "GET",

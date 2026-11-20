@@ -63,6 +63,7 @@ export default function ChatPage() {
     onReadUpdate,
     onDeliveryUpdate,
     onBroadcast,
+    onBroadcastRead,
   } = useChat();
 
   const router = useRouter();
@@ -92,7 +93,7 @@ export default function ChatPage() {
   const [broadcastContent, setBroadcastContent] = useState("");
 
   // Broadcasts view
-  const [sidebarTab, setSidebarTab] = useState<"chats" | "broadcasts">("chats");
+  const [sidebarTab, setSidebarTab] = useState<"chats" | "broadcasts">(searchParams.get("tab") === "announcements" ? "broadcasts" : "chats");
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [selectedBroadcast, setSelectedBroadcast] = useState<Broadcast | null>(null);
   const [loadingBroadcasts, setLoadingBroadcasts] = useState(false);
@@ -128,6 +129,26 @@ export default function ChatPage() {
     });
     return unsub;
   }, [onBroadcast]);
+
+  useEffect(() => onBroadcastRead((id) => {
+    setSelectedBroadcast((current) => current?.id === id ? { ...current, is_read: true } : current);
+    setBroadcasts((prev) => prev.map((b) => b.id === id ? { ...b, is_read: true } : b));
+  }), [onBroadcastRead]);
+
+  const announcementId = searchParams.get("announcement");
+  useEffect(() => {
+    if (!announcementId || !broadcasts.length) return;
+    const announcement = broadcasts.find((b) => b.id === announcementId);
+    if (!announcement) return;
+    setSelectedBroadcast(announcement);
+    setShowSidebar(false);
+  }, [announcementId, broadcasts]);
+
+  useEffect(() => {
+    if (isConnected && selectedBroadcast && !selectedBroadcast.is_read && selectedBroadcast.sender_id !== user?.id) {
+      markBroadcastRead(selectedBroadcast.id);
+    }
+  }, [isConnected, selectedBroadcast, user?.id, markBroadcastRead]);
 
   // Handle ?user=ID from URL — auto-create a direct chat target
   useEffect(() => {
@@ -181,21 +202,31 @@ export default function ChatPage() {
   useEffect(() => {
     if (!activeChatUserId || !token) return;
 
+    let cancelled = false;
+    setMessages([]);
     setIsLoadingMessages(true);
     chatService
       .getMessages(activeChatUserId, token)
       .then((res) => {
-        setMessages(res.messages || []);
+        if (cancelled) return;
+        setMessages((current) => {
+          const history = res.messages || [];
+          const seen = new Set(history.map((message) => message.id));
+          return [...history, ...current.filter((message) => !seen.has(message.id) && (message.sender_id === activeChatUserId || message.receiver_id === activeChatUserId))];
+        });
         setHasMore(res.has_more);
         setPendingMessages([]);
       })
       .catch(console.error)
-      .finally(() => setIsLoadingMessages(false));
+      .finally(() => { if (!cancelled) setIsLoadingMessages(false); });
 
-    // Send read receipt
-    sendReadReceipt(activeChatUserId);
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChatUserId, token]);
+
+  useEffect(() => {
+    if (activeChatUserId && isConnected) sendReadReceipt(activeChatUserId);
+  }, [activeChatUserId, isConnected, sendReadReceipt]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -222,6 +253,7 @@ export default function ChatPage() {
     });
 
     const unsubAck = onMessageAck((ack) => {
+      if (!ack.temp_id || !ack.message_id) return;
       // Use ref to avoid stale closure — pendingMessages state would be stale here
       const pendingContent =
         pendingMessagesRef.current.find((p) => p.tempId === ack.temp_id)?.content || "";
@@ -249,10 +281,7 @@ export default function ChatPage() {
 
       // After first message sent to a new user, refresh conversations
       if (directChatUser) {
-        refreshConversations().then(() => {
-          // Switch from directChatUser to the real conversation
-          setDirectChatUser(null);
-        });
+        refreshConversations();
       }
     });
 
@@ -302,7 +331,7 @@ export default function ChatPage() {
 
   // Handle send
   const handleSend = useCallback(() => {
-    if (!inputValue.trim() || !activeChatUserId) return;
+    if (!inputValue.trim() || !activeChatUserId || !isConnected) return;
 
     const content = inputValue.trim();
     const tempId = sendMessage(activeChatUserId, content);
@@ -326,7 +355,7 @@ export default function ChatPage() {
       clearTimeout(typingTimeoutRef.current);
       sendTypingStop(activeChatUserId);
     }
-  }, [inputValue, activeChatUserId, sendMessage, sendTypingStop]);
+  }, [inputValue, activeChatUserId, isConnected, sendMessage, sendTypingStop]);
 
   // Handle typing indicator
   const handleInputChange = useCallback(
@@ -369,38 +398,31 @@ export default function ChatPage() {
     }
   }, [activeChatUserId, token, hasMore, isLoadingMessages, messages]);
 
-  // Load all users for new chat picker (admin only)
-  const handleNewChat = useCallback(async () => {
-    if (!token) return;
+  // Search on the server so the picker remains responsive with many users.
+  const handleNewChat = useCallback(() => {
+    setUserSearchQuery("");
     setShowNewChat(true);
+  }, []);
+
+  useEffect(() => {
+    if (!showNewChat || !token) return;
+    let cancelled = false;
     setLoadingUsers(true);
-    try {
-      if (isAdmin) {
-        const users: SimpleUser[] = [];
-        let total = 0;
-        do {
-          const page = await adminService.listUsers(token, 200, users.length);
-          users.push(...page.users);
-          total = page.total;
-          if (page.users.length === 0) break;
-        } while (users.length < total);
-        setAllUsers(
-          users
-            .filter((u: SimpleUser) => u.id !== user?.id)
-            .map((u: SimpleUser) => ({
-              id: u.id,
-              name: u.name,
-              email: u.email,
-              role: u.role,
-            }))
-        );
+    const timer = setTimeout(async () => {
+      try {
+        const users = isAdmin
+          ? (await adminService.listUsers(token, 50, 0, userSearchQuery)).users
+          : (await chatService.getAdmins(token)).map((admin) => ({ ...admin, email: "", role: "admin" }));
+        if (!cancelled) setAllUsers(users.filter((u) => u.id !== user?.id));
+      } catch (err) {
+        console.error("Failed to load users:", err);
+        if (!cancelled) setAllUsers([]);
+      } finally {
+        if (!cancelled) setLoadingUsers(false);
       }
-    } catch (err) {
-      console.error("Failed to load users:", err);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, [token, isAdmin, user]);
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [showNewChat, token, isAdmin, user?.id, userSearchQuery]);
 
   // Start conversation with selected user
   const startChatWith = useCallback(
@@ -426,11 +448,11 @@ export default function ChatPage() {
 
   // Handle broadcast send
   const handleBroadcastSend = useCallback(() => {
-    if (!broadcastContent.trim()) return;
+    if (!broadcastContent.trim() || !isConnected) return;
     sendBroadcast(broadcastContent.trim());
     setBroadcastContent("");
     setShowBroadcast(false);
-  }, [broadcastContent, sendBroadcast]);
+  }, [broadcastContent, sendBroadcast, isConnected]);
 
   // Filter conversations
   const filteredConversations = conversations.filter(
@@ -450,10 +472,10 @@ export default function ChatPage() {
     activeChatUserId && typingUsers.get(activeChatUserId);
 
   const hasActiveChat = selectedConv || directChatUser;
-  const hasActiveView = hasActiveChat || selectedBroadcast;
+
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white">
+    <div className="flex h-[100dvh] bg-gray-950 text-white">
       {/* Sidebar */}
       <AnimatePresence>
         {showSidebar && (
@@ -461,14 +483,15 @@ export default function ChatPage() {
             initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
-            className="w-full md:w-80 lg:w-96 border-r border-gray-800 flex flex-col bg-gray-950 md:relative absolute z-20 h-full"
+            className="w-full md:w-96 lg:w-[28rem] border-r border-gray-800 flex flex-col bg-gray-950 md:relative absolute z-20 h-full"
           >
             {/* Header */}
             <div className="p-4 border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => router.push(isAdmin ? '/admin' : '/')}
+                    aria-label="Back to dashboard"
+                    onClick={() => router.push(isAdmin ? '/admin' : '/search')}
                     className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
                   >
                     <ArrowLeft size={18} />
@@ -569,7 +592,7 @@ export default function ChatPage() {
                     <MessageCircle size={32} className="mb-2 opacity-50" />
                     <p className="text-sm">No conversations yet</p>
                     <p className="text-xs mt-1 text-gray-600">
-                      Click &quot;New Chat&quot; to start one
+                      Choose New Chat to start one
                     </p>
                   </div>
                 ) : (
@@ -643,14 +666,6 @@ export default function ChatPage() {
                         setSelectedConv(null);
                         setDirectChatUser(null);
                         setShowSidebar(false);
-                        if (!b.is_read) {
-                          markBroadcastRead(b.id);
-                          setBroadcasts((prev) =>
-                            prev.map((br) =>
-                              br.id === b.id ? { ...br, is_read: true } : br
-                            )
-                          );
-                        }
                       }}
                       className={`w-full p-4 flex items-start gap-3 border-b border-gray-800/50 transition-colors text-left hover:bg-purple-500/5 ${
                         selectedBroadcast?.id === b.id
@@ -669,7 +684,7 @@ export default function ChatPage() {
                             ) : (
                               <span>Admin Announcement</span>
                             )}
-                            {!b.is_read && (
+                            {!b.is_read && b.sender_id !== user?.id && (
                               <span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />
                             )}
                           </span>
@@ -864,6 +879,7 @@ export default function ChatPage() {
             <div className="p-4 border-t border-gray-800 bg-gray-900/50">
               <div className="flex items-end gap-2">
                 <textarea
+                  maxLength={4000}
                   ref={inputRef}
                   value={inputValue}
                   onChange={(e) => handleInputChange(e.target.value)}
@@ -889,7 +905,7 @@ export default function ChatPage() {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!inputValue.trim()}
+                  disabled={!inputValue.trim() || !isConnected} aria-label="Send message"
                   className="p-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
                 >
                   <Send size={18} />
@@ -940,7 +956,7 @@ export default function ChatPage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+              className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl"
             >
               <div className="p-4 border-b border-gray-700 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -956,6 +972,7 @@ export default function ChatPage() {
               </div>
 
               <div className="p-4">
+                <p className="mb-3 text-sm text-gray-400">{isAdmin ? "Find a user by name or email to start a conversation." : "Choose an administrator to start a conversation."}</p>
                 <div className="relative mb-3">
                   <Search
                     size={14}
@@ -963,7 +980,7 @@ export default function ChatPage() {
                   />
                   <input
                     type="text"
-                    placeholder="Search users..."
+                    placeholder={isAdmin ? "Search by name or email" : "Search administrators"}
                     value={userSearchQuery}
                     onChange={(e) => setUserSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-gray-800/50 border border-gray-700/50 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500/50"
@@ -971,14 +988,14 @@ export default function ChatPage() {
                   />
                 </div>
 
-                <div className="max-h-72 overflow-y-auto space-y-1">
+                <div className="max-h-[55vh] min-h-48 overflow-y-auto space-y-1">
                   {loadingUsers ? (
                     <div className="text-center py-8 text-gray-500 text-sm">
                       Loading users...
                     </div>
                   ) : filteredUsers.length === 0 ? (
                     <div className="text-center py-8 text-gray-500 text-sm">
-                      No users found
+                      No matching users found
                     </div>
                   ) : (
                     filteredUsers.map((u) => (
@@ -1052,8 +1069,7 @@ export default function ChatPage() {
 
               <div className="p-4">
                 <p className="text-xs text-gray-400 mb-3">
-                  This message will be sent to all active users as an
-                  announcement.
+                  Everyone will see this announcement in their inbox.
                 </p>
                 <textarea
                   value={broadcastContent}
@@ -1065,7 +1081,7 @@ export default function ChatPage() {
                 />
                 <button
                   onClick={handleBroadcastSend}
-                  disabled={!broadcastContent.trim()}
+                  disabled={!broadcastContent.trim() || !isConnected}
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium transition-all flex items-center justify-center gap-2"
                 >
                   <Megaphone size={16} />

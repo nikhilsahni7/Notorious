@@ -30,7 +30,7 @@ export function ChatNotificationBadge({
   const s = sizeStyles[size];
 
   return (
-    <Link href={href} className={`relative inline-flex items-center ${className}`}>
+    <Link href={href} aria-label={`Messages${totalUnread > 0 ? `, ${totalUnread} unread` : ", no unread messages"}${isConnected ? ", connected" : ", reconnecting"}`} title={isConnected ? "Messages" : "Messages (reconnecting)"} className={`relative inline-flex items-center ${className}`}>
       {showIcon && (
         <div className="relative">
           <MessageCircle
