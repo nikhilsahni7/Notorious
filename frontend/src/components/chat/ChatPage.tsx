@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Bell,
   ChevronLeft,
+  Forward,
   Megaphone,
   MessageCircle,
   Plus,
@@ -87,6 +88,16 @@ export default function ChatPage() {
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Forwarding sends one direct message per selected recipient.
+  const [forwardContent, setForwardContent] = useState<string | null>(null);
+  const [forwardRecipients, setForwardRecipients] = useState<SimpleUser[]>([]);
+  const [forwardStatus, setForwardStatus] = useState("");
+  const [isForwarding, setIsForwarding] = useState(false);
+  const [forwardFinished, setForwardFinished] = useState(false);
+  const forwardPendingRef = useRef(new Map<string, { recipientId: string; content: string }>());
+  const forwardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const forwardTotalRef = useRef(0);
 
   // Broadcast modal
   const [showBroadcast, setShowBroadcast] = useState(false);
@@ -254,6 +265,27 @@ export default function ChatPage() {
 
     const unsubAck = onMessageAck((ack) => {
       if (!ack.temp_id || !ack.message_id) return;
+      const forwarded = forwardPendingRef.current.get(ack.temp_id);
+      if (forwarded) {
+        forwardPendingRef.current.delete(ack.temp_id);
+        if (forwarded.recipientId === activeChatUserId) {
+          setMessages((prev) => prev.some((m) => m.id === ack.message_id) ? prev : [...prev, {
+            id: ack.message_id, conversation_id: "", sender_id: user?.id || "",
+            receiver_id: forwarded.recipientId, content: forwarded.content,
+            sequence_num: ack.sequence_num, status: "sent", sent_at: ack.sent_at,
+          }]);
+        }
+        const remaining = forwardPendingRef.current.size;
+        setForwardStatus(remaining ? `Sent ${forwardTotalRef.current - remaining} of ${forwardTotalRef.current} messages…` : `Sent to ${forwardTotalRef.current} ${forwardTotalRef.current === 1 ? "person" : "people"}.`);
+        if (!remaining) {
+          if (forwardTimerRef.current) clearTimeout(forwardTimerRef.current);
+          setIsForwarding(false);
+          setForwardFinished(true);
+          refreshConversations();
+        }
+        return;
+      }
+      if (!pendingMessagesRef.current.some((p) => p.tempId === ack.temp_id)) return;
       // Use ref to avoid stale closure — pendingMessages state would be stale here
       const pendingContent =
         pendingMessagesRef.current.find((p) => p.tempId === ack.temp_id)?.content || "";
@@ -406,7 +438,7 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    if (!showNewChat || !token) return;
+    if ((!showNewChat && forwardContent === null) || !token) return;
     let cancelled = false;
     setLoadingUsers(true);
     const timer = setTimeout(async () => {
@@ -423,7 +455,43 @@ export default function ChatPage() {
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [showNewChat, token, isAdmin, user?.id, userSearchQuery]);
+  }, [showNewChat, forwardContent, token, isAdmin, user?.id, userSearchQuery]);
+
+  const openForward = useCallback((content: string) => {
+    setForwardContent(content);
+    setForwardRecipients([]);
+    setUserSearchQuery("");
+    setLoadingUsers(true);
+    setForwardStatus("");
+    setForwardFinished(false);
+  }, []);
+
+  const handleForward = useCallback(() => {
+    if (!forwardContent || !forwardRecipients.length || !isConnected || isForwarding || forwardFinished) return;
+    if (new TextEncoder().encode(forwardContent).length > 4000) {
+      setForwardStatus("This message is too long to forward.");
+      return;
+    }
+    forwardTotalRef.current = forwardRecipients.length;
+    setIsForwarding(true);
+    setForwardStatus(`Sending to ${forwardRecipients.length} ${forwardRecipients.length === 1 ? "person" : "people"}…`);
+    for (const recipient of forwardRecipients) {
+      const id = sendMessage(recipient.id, forwardContent);
+      forwardPendingRef.current.set(id, { recipientId: recipient.id, content: forwardContent });
+    }
+    forwardTimerRef.current = setTimeout(() => {
+      const remaining = forwardPendingRef.current.size;
+      if (!remaining) return;
+      forwardPendingRef.current.clear();
+      setIsForwarding(false);
+      setForwardFinished(true);
+      setForwardStatus(`Could not confirm ${remaining} ${remaining === 1 ? "message" : "messages"}. Check the conversations before sending again.`);
+    }, 15000);
+  }, [forwardContent, forwardRecipients, isConnected, isForwarding, forwardFinished, sendMessage]);
+
+  useEffect(() => () => {
+    if (forwardTimerRef.current) clearTimeout(forwardTimerRef.current);
+  }, []);
 
   // Start conversation with selected user
   const startChatWith = useCallback(
@@ -750,6 +818,7 @@ export default function ChatPage() {
                   <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-gray-200">
                     {selectedBroadcast.content}
                   </p>
+                  <button type="button" onClick={() => openForward(selectedBroadcast.content)} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-sky-800 px-3 py-2 text-sm text-sky-200 hover:bg-sky-900/40"><Forward size={16} /> Forward</button>
                 </div>
               </div>
             </div>
@@ -840,6 +909,7 @@ export default function ChatPage() {
                     <ChatBubble
                       message={msg}
                       isOwn={msg.sender_id === user?.id}
+                      onForward={(message) => openForward(message.content)}
                     />
                   </div>
                 );
@@ -1028,6 +1098,31 @@ export default function ChatPage() {
             </div>
           </div>
         )}
+
+      {/* Forward a message to selected people */}
+      {forwardContent !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { if (!isForwarding) setForwardContent(null); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="forward-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-xl overflow-hidden rounded-2xl border border-sky-900/60 bg-[#0a1c38] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-sky-900/50 p-4">
+              <div><h2 id="forward-title" className="text-base text-white">Forward message</h2><p className="text-xs text-slate-400">Choose who should receive a direct message.</p></div>
+              <button type="button" onClick={() => setForwardContent(null)} disabled={isForwarding} aria-label="Close forward dialog" className="rounded-lg p-2 text-slate-300 hover:bg-sky-900/50 disabled:opacity-40"><X size={18} /></button>
+            </div>
+            <div className="space-y-3 p-4">
+              <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-sky-900/50 bg-[#07162d] p-3 text-sm text-slate-200">{forwardContent}</div>
+              <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" aria-label="Search recipients" placeholder={isAdmin ? "Search by name or email" : "Search administrators"} value={userSearchQuery} onChange={(event) => setUserSearchQuery(event.target.value)} disabled={isForwarding || forwardFinished} className="w-full rounded-lg border border-sky-900/60 bg-[#102342] py-3 pl-10 pr-3 text-sm text-white placeholder-slate-400 focus:border-sky-400 focus:outline-none" autoFocus /></div>
+              <div className="h-60 space-y-1 overflow-y-auto" aria-busy={loadingUsers}>
+                {loadingUsers ? <p className="py-8 text-center text-sm text-slate-400">Loading people…</p> : filteredUsers.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">No matching people found.</p> : filteredUsers.map((person) => {
+                  const selected = forwardRecipients.some((entry) => entry.id === person.id);
+                  return <label key={person.id} className="flex cursor-pointer items-center gap-3 rounded-lg p-3 hover:bg-sky-900/30"><input type="checkbox" checked={selected} disabled={isForwarding || forwardFinished} onChange={() => setForwardRecipients((current) => selected ? current.filter((entry) => entry.id !== person.id) : [...current, person])} className="h-4 w-4 accent-sky-400" /><span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{person.name}</span>{person.email && <span className="block truncate text-xs text-slate-400">{person.email}</span>}</span></label>;
+                })}
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-sky-900/50 pt-3"><span className="text-xs text-slate-400">{forwardRecipients.length} selected</span><button type="button" onClick={handleForward} disabled={!forwardRecipients.length || !isConnected || isForwarding || forwardFinished} className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm text-slate-950 hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-40"><Forward size={16} />{isForwarding ? "Sending…" : "Forward"}</button></div>
+              {!isConnected && <p className="text-xs text-amber-300">Reconnecting. Forwarding will be available when connected.</p>}
+              {forwardStatus && <p role="status" className="text-sm text-slate-200">{forwardStatus}</p>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Broadcast Modal */}
         {showBroadcast && (

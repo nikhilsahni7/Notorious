@@ -2,15 +2,16 @@
 
 import { ChatMessage } from "@/services/chat.service";
 import { motion } from "framer-motion";
-import { Check, CheckCheck, Clock } from "lucide-react";
+import { Check, CheckCheck, Clock, Forward } from "lucide-react";
 
 interface ChatBubbleProps {
   message: ChatMessage;
   isOwn: boolean;
   showStatus?: boolean;
+  onForward?: (message: ChatMessage) => void;
 }
 
-export function ChatBubble({ message, isOwn, showStatus = true }: ChatBubbleProps) {
+export function ChatBubble({ message, isOwn, showStatus = true, onForward }: ChatBubbleProps) {
   const time = new Date(message.sent_at).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -23,6 +24,9 @@ export function ChatBubble({ message, isOwn, showStatus = true }: ChatBubbleProp
       transition={{ duration: 0.2 }}
       className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-2`}
     >
+      {isOwn && onForward && (
+        <button type="button" onClick={() => onForward(message)} aria-label="Forward message" title="Forward message" className="mr-2 self-center rounded-lg p-2 text-slate-400 hover:bg-sky-900/50 hover:text-sky-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"><Forward size={16} /></button>
+      )}
       <div
         className={`min-w-[80px] max-w-[75%] rounded-2xl px-4 py-2.5 ${
           isOwn
@@ -42,6 +46,9 @@ export function ChatBubble({ message, isOwn, showStatus = true }: ChatBubbleProp
           {isOwn && showStatus && <MessageStatus status={message.status} />}
         </div>
       </div>
+      {!isOwn && onForward && (
+        <button type="button" onClick={() => onForward(message)} aria-label="Forward message" title="Forward message" className="ml-2 self-center rounded-lg p-2 text-slate-400 hover:bg-sky-900/50 hover:text-sky-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"><Forward size={16} /></button>
+      )}
     </motion.div>
   );
 }
