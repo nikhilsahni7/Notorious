@@ -148,3 +148,9 @@ body {
   .login-heading { margin-bottom: 20px; }
   .login-card { padding: 24px; }
 }
+
+/* A restrained motion cue for the location entry point. */
+@keyframes location-pin {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}

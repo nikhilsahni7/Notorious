@@ -1,6 +1,6 @@
 "use client";
 
-import { FestiveHeader, MobileDisclaimer, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
+import { triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
 import { KnotoriousBrand } from "@/components/KnotoriousBrand";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ChatNotificationBadge } from "@/components/chat/ChatNotificationBadge";
@@ -36,10 +36,12 @@ import {
   Download,
   History,
   LogOut,
+  MapPin,
   RotateCcw,
   Search as SearchIcon,
   User,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -407,7 +409,12 @@ export default function SearchPage() {
           <KnotoriousBrand subtitle={user ? `${user.name} · ${user.email}` : "Search dashboard"} className="max-w-full shrink-0" />
           <h1 className="sr-only">Knotorious Search</h1>
 
-          <div className="hidden min-w-[12rem] flex-1 md:block"><FestiveHeader /></div>
+          <div className="flex flex-1 items-center justify-end md:justify-start">
+            <Link href="/find-my-location" className="inline-flex items-center gap-2 rounded-lg border border-sky-800/70 bg-[#102342] px-3 py-2 text-sm text-sky-200 transition-colors hover:border-sky-500 hover:bg-sky-900/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">
+              <MapPin className="h-4 w-4 text-red-400 motion-safe:animate-[location-pin_2.4s_ease-in-out_infinite]" aria-hidden="true" />
+              Find my location
+            </Link>
+          </div>
 
           <div className="flex w-full flex-wrap items-center justify-end gap-2 md:gap-3 xl:w-auto">
             <NotificationBell />
@@ -546,8 +553,11 @@ export default function SearchPage() {
           </div>
         </div>
 
+        <div className="mb-3 flex items-start gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+          <p><span className="text-amber-300">Data update:</span> 50% of Rajasthan and Maharashtra data has been uploaded.</p>
+        </div>
         <LatestAnnouncement />
-        <MobileDisclaimer />
 
         {searchesUsed >= searchLimit && (
           <div className="mb-3 bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-lg text-sm flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
