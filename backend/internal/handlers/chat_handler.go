@@ -39,6 +39,7 @@ func (h *ChatHandler) GetConversations(c *gin.Context) {
 		for i := range conversations {
 			conversations[i].IsOnline = h.hub.IsOnline(conversations[i].OtherUserID)
 		}
+		hideAdminEmails(conversations, c.GetString("user_role"))
 	}
 
 	if conversations == nil {
@@ -46,6 +47,18 @@ func (h *ChatHandler) GetConversations(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, conversations)
+}
+
+// Do not expose administrator email addresses to non-admin chat participants.
+func hideAdminEmails(conversations []models.ConversationWithDetails, viewerRole string) {
+	if viewerRole == "admin" {
+		return
+	}
+	for i := range conversations {
+		if conversations[i].OtherUserRole == "admin" {
+			conversations[i].OtherUserEmail = ""
+		}
+	}
 }
 
 // GetMessages returns paginated message history with a specific user.

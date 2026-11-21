@@ -626,7 +626,7 @@ export default function ChatPage() {
   const filteredConversations = conversations.filter(
     (c) =>
       c.other_user_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.other_user_email?.toLowerCase().includes(searchQuery.toLowerCase())
+      ((isAdmin || c.other_user_role !== "admin") && c.other_user_email?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Filter users for new chat picker
@@ -797,7 +797,7 @@ export default function ChatPage() {
                             {formatTime(conv.last_message_at)}
                           </span>
                         </div>
-                        {conv.other_user_email && (
+                        {conv.other_user_email && (isAdmin || conv.other_user_role !== "admin") && (
                           <p className="mt-0.5 truncate text-xs text-slate-400" title={conv.other_user_email}>
                             {conv.other_user_email}
                           </p>
