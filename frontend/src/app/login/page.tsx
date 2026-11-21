@@ -93,7 +93,7 @@ function LoginContent() {
       <main className="login-layout">
         <div className="login-notice">
           <div className="login-notice-title"><MapPin size={16} /> System notice</div>
-          <p>Maharashtra and Rajasthan data is upcoming with live tracking.</p>
+          <p>50% of Rajasthan and Maharashtra data has been uploaded.</p>
         </div>
         <section className="login-panel" aria-labelledby="login-title">
           <div className="mb-6 flex justify-center"><KnotoriousMark size={52} /></div>
