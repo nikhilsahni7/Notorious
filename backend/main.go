@@ -238,6 +238,7 @@ func main() {
 			chatRoutes.GET("/unread", chatHandler.GetUnreadCount)
 			chatRoutes.POST("/read/:userId", chatHandler.MarkAsRead)
 			chatRoutes.GET("/broadcasts", chatHandler.GetBroadcasts)
+			chatRoutes.GET("/broadcast-capabilities", chatHandler.GetBroadcastCapabilities)
 			chatRoutes.POST("/broadcasts/:broadcastId/read", chatHandler.MarkBroadcastRead)
 			chatRoutes.GET("/online", chatHandler.GetOnlineUsers)
 			chatRoutes.GET("/unread-per-user", chatHandler.GetUnreadPerUser)

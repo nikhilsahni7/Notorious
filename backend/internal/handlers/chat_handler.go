@@ -216,3 +216,8 @@ func (h *ChatHandler) GetChatAdmins(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, contacts)
 }
+
+// GetBroadcastCapabilities lets clients safely detect exclusion support.
+func (h *ChatHandler) GetBroadcastCapabilities(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"supports_exclusions": true})
+}

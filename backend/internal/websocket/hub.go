@@ -135,6 +135,15 @@ func (h *Hub) SendToUser(userID uuid.UUID, envelope *models.WSEnvelope) bool {
 // BroadcastToAll sends a message to all connected clients.
 // Snapshots client list under lock, then sends outside lock to avoid blocking.
 func (h *Hub) BroadcastToAll(envelope *models.WSEnvelope, excludeUserID *uuid.UUID) {
+	excluded := make(map[uuid.UUID]struct{})
+	if excludeUserID != nil {
+		excluded[*excludeUserID] = struct{}{}
+	}
+	h.BroadcastExcept(envelope, excluded)
+}
+
+// BroadcastExcept sends to every connected user except the specified recipients.
+func (h *Hub) BroadcastExcept(envelope *models.WSEnvelope, excluded map[uuid.UUID]struct{}) {
 	data, err := json.Marshal(envelope)
 	if err != nil {
 		log.Printf("[Hub] Failed to marshal broadcast: %v", err)
@@ -145,7 +154,7 @@ func (h *Hub) BroadcastToAll(envelope *models.WSEnvelope, excludeUserID *uuid.UU
 	h.mu.RLock()
 	clients := make([]*Client, 0, len(h.clients))
 	for userID, connections := range h.clients {
-		if excludeUserID != nil && userID == *excludeUserID {
+		if _, skip := excluded[userID]; skip {
 			continue
 		}
 		for client := range connections {

@@ -59,6 +59,10 @@ export const chatService = {
     return apiRequest(API_CONFIG.ENDPOINTS.CHAT.ADMINS, { method: "GET", token });
   },
 
+  getBroadcastCapabilities: async (token: string): Promise<{ supports_exclusions: boolean }> => {
+    return apiRequest("/api/chat/broadcast-capabilities", { method: "GET", token });
+  },
+
   getConversations: async (token: string): Promise<Conversation[]> => {
     return apiRequest(API_CONFIG.ENDPOINTS.CHAT.CONVERSATIONS, {
       method: "GET",

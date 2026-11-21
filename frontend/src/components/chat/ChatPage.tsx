@@ -2,6 +2,7 @@
 
 import { KnotoriousBrand } from "@/components/KnotoriousBrand";
 import { ChatBubble, TypingIndicator } from "@/components/chat/ChatBubble";
+import { loadAllRecipients } from "@/components/chat/recipientPagination";
 import { InlineUnreadBadge } from "@/components/chat/ChatNotificationBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChat } from "@/contexts/ChatContext";
@@ -66,6 +67,7 @@ export default function ChatPage() {
     onDeliveryUpdate,
     onBroadcast,
     onBroadcastRead,
+    onBroadcastSent,
   } = useChat();
 
   const router = useRouter();
@@ -89,11 +91,17 @@ export default function ChatPage() {
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingMoreUsers, setLoadingMoreUsers] = useState(false);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersOffset, setUsersOffset] = useState(0);
+  const currentUserSearchRef = useRef("");
+  currentUserSearchRef.current = userSearchQuery;
 
   // Forwarding sends one direct message per selected recipient.
   const [forwardContent, setForwardContent] = useState<string | null>(null);
   const [forwardRecipients, setForwardRecipients] = useState<SimpleUser[]>([]);
   const [forwardStatus, setForwardStatus] = useState("");
+  const [selectingAll, setSelectingAll] = useState(false);
   const [isForwarding, setIsForwarding] = useState(false);
   const [forwardFinished, setForwardFinished] = useState(false);
   const forwardPendingRef = useRef(new Map<string, { recipientId: string; content: string }>());
@@ -103,6 +111,13 @@ export default function ChatPage() {
   // Broadcast modal
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastContent, setBroadcastContent] = useState("");
+  const [broadcastExcluded, setBroadcastExcluded] = useState<SimpleUser[]>([]);
+  const [showBroadcastRecipients, setShowBroadcastRecipients] = useState(false);
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastStatus, setBroadcastStatus] = useState("");
+  const [broadcastFinished, setBroadcastFinished] = useState(false);
+  const broadcastPendingRef = useRef<string | null>(null);
+  const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Broadcasts view
   const [sidebarTab, setSidebarTab] = useState<"chats" | "broadcasts">(searchParams.get("tab") === "announcements" ? "broadcasts" : "chats");
@@ -439,24 +454,45 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    if ((!showNewChat && forwardContent === null) || !token) return;
+    if ((!showNewChat && forwardContent === null && !(showBroadcast && showBroadcastRecipients)) || !token) return;
     let cancelled = false;
     setLoadingUsers(true);
     const timer = setTimeout(async () => {
       try {
-        const users = isAdmin
-          ? (await adminService.listUsers(token, 50, 0, userSearchQuery)).users
-          : (await chatService.getAdmins(token)).map((admin) => ({ ...admin, email: "", role: "admin" }));
-        if (!cancelled) setAllUsers(users.filter((u) => u.id !== user?.id));
+        const page = isAdmin
+          ? await adminService.listUsers(token, 50, 0, userSearchQuery)
+          : { users: (await chatService.getAdmins(token)).map((admin) => ({ ...admin, email: "", role: "admin" })), total: 0 };
+        if (!cancelled) {
+          setAllUsers(page.users.filter((u) => u.id !== user?.id));
+          setUsersOffset(page.users.length);
+          setUsersTotal(isAdmin ? page.total : page.users.length);
+        }
       } catch (err) {
         console.error("Failed to load users:", err);
-        if (!cancelled) setAllUsers([]);
+        if (!cancelled) { setAllUsers([]); setUsersTotal(0); setUsersOffset(0); }
       } finally {
         if (!cancelled) setLoadingUsers(false);
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [showNewChat, forwardContent, token, isAdmin, user?.id, userSearchQuery]);
+  }, [showNewChat, forwardContent, showBroadcast, showBroadcastRecipients, token, isAdmin, user?.id, userSearchQuery]);
+
+  const loadMoreUsers = useCallback(async () => {
+    if (!token || !isAdmin || loadingMoreUsers || usersOffset >= usersTotal) return;
+    const query = userSearchQuery;
+    setLoadingMoreUsers(true);
+    try {
+      const page = await adminService.listUsers(token, 50, usersOffset, query);
+      if (currentUserSearchRef.current !== query) return;
+      setAllUsers((current) => [...new Map([...current, ...page.users.filter((person) => person.id !== user?.id)].map((person) => [person.id, person])).values()]);
+      setUsersOffset((offset) => offset + page.users.length);
+      setUsersTotal(page.total);
+    } catch (error) {
+      console.error("Could not load more users:", error);
+    } finally {
+      setLoadingMoreUsers(false);
+    }
+  }, [token, isAdmin, loadingMoreUsers, usersOffset, usersTotal, userSearchQuery, user?.id]);
 
   const openForward = useCallback((content: string) => {
     setForwardContent(content);
@@ -467,8 +503,29 @@ export default function ChatPage() {
     setForwardFinished(false);
   }, []);
 
+  const selectAllForwardRecipients = useCallback(async () => {
+    if (!token || selectingAll) return;
+    setSelectingAll(true);
+    setForwardStatus("");
+    try {
+      const people: SimpleUser[] = [];
+      if (isAdmin) {
+        people.push(...await loadAllRecipients((offset) => adminService.listUsers(token, 100, offset)));
+      } else {
+        const admins = await chatService.getAdmins(token);
+        people.push(...admins.map((person) => ({ ...person, email: "", role: "admin" })));
+      }
+      setForwardRecipients([...new Map(people.filter((person) => person.id !== user?.id).map((person) => [person.id, person])).values()]);
+    } catch (error) {
+      console.error("Could not load all recipients:", error);
+      setForwardStatus("Could not load everyone. Please try again; your selection was not changed.");
+    } finally {
+      setSelectingAll(false);
+    }
+  }, [token, selectingAll, isAdmin, user?.id]);
+
   const handleForward = useCallback(() => {
-    if (!forwardContent || !forwardRecipients.length || !isConnected || isForwarding || forwardFinished) return;
+    if (!forwardContent || !forwardRecipients.length || !isConnected || isForwarding || forwardFinished || selectingAll) return;
     if (new TextEncoder().encode(forwardContent).length > 4000) {
       setForwardStatus("This message is too long to forward.");
       return;
@@ -487,8 +544,8 @@ export default function ChatPage() {
       setIsForwarding(false);
       setForwardFinished(true);
       setForwardStatus(`Could not confirm ${remaining} ${remaining === 1 ? "message" : "messages"}. Check the conversations before sending again.`);
-    }, 15000);
-  }, [forwardContent, forwardRecipients, isConnected, isForwarding, forwardFinished, sendMessage]);
+    }, Math.max(15000, forwardRecipients.length * 500));
+  }, [forwardContent, forwardRecipients, isConnected, isForwarding, forwardFinished, selectingAll, sendMessage]);
 
   useEffect(() => () => {
     if (forwardTimerRef.current) clearTimeout(forwardTimerRef.current);
@@ -516,13 +573,54 @@ export default function ChatPage() {
     [conversations]
   );
 
-  // Handle broadcast send
-  const handleBroadcastSend = useCallback(() => {
-    if (!broadcastContent.trim() || !isConnected) return;
-    sendBroadcast(broadcastContent.trim());
+  const openBroadcast = useCallback(() => {
+    setBroadcastExcluded([]);
+    setShowBroadcastRecipients(false);
+    setBroadcastStatus("");
+    setBroadcastFinished(false);
+    setUserSearchQuery("");
+    setShowBroadcast(true);
+  }, []);
+
+  useEffect(() => onBroadcastSent((id) => {
+    if (!id || id !== broadcastPendingRef.current) return;
+    broadcastPendingRef.current = null;
+    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+    setBroadcastSending(false);
+    setBroadcastFinished(true);
     setBroadcastContent("");
-    setShowBroadcast(false);
-  }, [broadcastContent, sendBroadcast, isConnected]);
+    setBroadcastStatus("Announcement sent.");
+  }), [onBroadcastSent]);
+
+  useEffect(() => () => {
+    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+  }, []);
+
+  const handleBroadcastSend = useCallback(async () => {
+    if (!broadcastContent.trim() || !isConnected || !token || broadcastSending || broadcastFinished) return;
+    setBroadcastSending(true);
+    setBroadcastStatus("");
+    if (broadcastExcluded.length) {
+      try {
+        const capabilities = await chatService.getBroadcastCapabilities(token);
+        if (!capabilities.supports_exclusions) throw new Error("Exclusions are unavailable");
+      } catch (error) {
+        console.error("Broadcast exclusion support unavailable:", error);
+        setBroadcastSending(false);
+        setBroadcastStatus("Excluded recipients are not supported by the connected server yet. Nothing was sent.");
+        return;
+      }
+    }
+    const tempId = sendBroadcast(broadcastContent.trim(), broadcastExcluded.map((person) => person.id));
+    broadcastPendingRef.current = tempId;
+    broadcastTimerRef.current = setTimeout(() => {
+      if (broadcastPendingRef.current !== tempId) return;
+      broadcastPendingRef.current = null;
+      setBroadcastSending(false);
+      setBroadcastFinished(true);
+      setBroadcastStatus("Could not confirm whether the announcement was sent. Check announcements before trying again.");
+    }, 15000);
+  }, [broadcastContent, broadcastExcluded, token, isConnected, broadcastSending, broadcastFinished, sendBroadcast]);
 
   // Filter conversations
   const filteredConversations = conversations.filter(
@@ -586,7 +684,7 @@ export default function ChatPage() {
                 </button>
                 {isAdmin && (
                   <button
-                    onClick={() => setShowBroadcast(true)}
+                    onClick={openBroadcast}
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-sky-800/70 bg-[#102342] text-sky-200 text-sm hover:bg-[#183359] transition-colors"
                   >
                     <Megaphone size={14} />
@@ -699,8 +797,13 @@ export default function ChatPage() {
                             {formatTime(conv.last_message_at)}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <p className="text-xs text-gray-400 truncate max-w-[180px]">
+                        {conv.other_user_email && (
+                          <p className="mt-0.5 truncate text-xs text-slate-400" title={conv.other_user_email}>
+                            {conv.other_user_email}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between mt-0.5 gap-2">
+                          <p className="min-w-0 flex-1 truncate text-xs text-gray-400">
                             {typingUsers.get(conv.other_user_id)
                               ? "typing..."
                               : conv.last_message || "Start a conversation"}
@@ -1099,22 +1202,28 @@ export default function ChatPage() {
 
       {/* Forward a message to selected people */}
       {forwardContent !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { if (!isForwarding) setForwardContent(null); }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="forward-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-xl overflow-hidden rounded-2xl border border-sky-900/60 bg-[#0a1c38] shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { if (!isForwarding && !selectingAll) setForwardContent(null); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="forward-title" onClick={(event) => event.stopPropagation()} className="max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-sky-900/60 bg-[#0a1c38] shadow-2xl">
             <div className="flex items-center justify-between border-b border-sky-900/50 p-4">
               <div><h2 id="forward-title" className="text-base text-white">Forward message</h2><p className="text-xs text-slate-400">Choose who should receive a direct message.</p></div>
-              <button type="button" onClick={() => setForwardContent(null)} disabled={isForwarding} aria-label="Close forward dialog" className="rounded-lg p-2 text-slate-300 hover:bg-sky-900/50 disabled:opacity-40"><X size={18} /></button>
+              <button type="button" onClick={() => setForwardContent(null)} disabled={isForwarding || selectingAll} aria-label="Close forward dialog" className="rounded-lg p-2 text-slate-300 hover:bg-sky-900/50 disabled:opacity-40"><X size={18} /></button>
             </div>
             <div className="space-y-3 p-4">
               <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-sky-900/50 bg-[#07162d] p-3 text-sm text-slate-200">{forwardContent}</div>
-              <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" aria-label="Search recipients" placeholder={isAdmin ? "Search by name or email" : "Search administrators"} value={userSearchQuery} onChange={(event) => setUserSearchQuery(event.target.value)} disabled={isForwarding || forwardFinished} className="w-full rounded-lg border border-sky-900/60 bg-[#102342] py-3 pl-10 pr-3 text-sm text-white placeholder-slate-400 focus:border-sky-400 focus:outline-none" autoFocus /></div>
+              <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" aria-label="Search recipients" placeholder={isAdmin ? "Search by name or email" : "Search administrators"} value={userSearchQuery} onChange={(event) => setUserSearchQuery(event.target.value)} disabled={isForwarding || forwardFinished || selectingAll} className="w-full rounded-lg border border-sky-900/60 bg-[#102342] py-3 pl-10 pr-3 text-sm text-white placeholder-slate-400 focus:border-sky-400 focus:outline-none" autoFocus /></div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="button" onClick={selectAllForwardRecipients} disabled={selectingAll || isForwarding || forwardFinished} className="rounded-lg border border-sky-700/60 px-3 py-2 text-sm text-sky-200 hover:bg-sky-900/40 disabled:opacity-40">{selectingAll ? "Loading everyone…" : "Select all users"}</button>
+                <button type="button" onClick={() => setForwardRecipients([])} disabled={!forwardRecipients.length || selectingAll || isForwarding || forwardFinished} className="rounded-lg px-2 py-2 text-sm text-slate-300 hover:text-white disabled:opacity-40">Clear selection</button>
+                <span className="text-xs text-slate-400">Includes users beyond the current search.</span>
+              </div>
               <div className="h-60 space-y-1 overflow-y-auto" aria-busy={loadingUsers}>
                 {loadingUsers ? <p className="py-8 text-center text-sm text-slate-400">Loading people…</p> : filteredUsers.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">No matching people found.</p> : filteredUsers.map((person) => {
                   const selected = forwardRecipients.some((entry) => entry.id === person.id);
-                  return <label key={person.id} className="flex cursor-pointer items-center gap-3 rounded-lg p-3 hover:bg-sky-900/30"><input type="checkbox" checked={selected} disabled={isForwarding || forwardFinished} onChange={() => setForwardRecipients((current) => selected ? current.filter((entry) => entry.id !== person.id) : [...current, person])} className="h-4 w-4 accent-sky-400" /><span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{person.name}</span>{person.email && <span className="block truncate text-xs text-slate-400">{person.email}</span>}</span></label>;
+                  return <label key={person.id} className="flex cursor-pointer items-center gap-3 rounded-lg p-3 hover:bg-sky-900/30"><input type="checkbox" checked={selected} disabled={isForwarding || forwardFinished || selectingAll} onChange={() => setForwardRecipients((current) => selected ? current.filter((entry) => entry.id !== person.id) : [...current, person])} className="h-4 w-4 accent-sky-400" /><span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{person.name}</span>{person.email && <span className="block truncate text-xs text-slate-400">{person.email}</span>}</span></label>;
                 })}
+                {isAdmin && !loadingUsers && usersOffset < usersTotal && <button type="button" onClick={loadMoreUsers} disabled={loadingMoreUsers} className="w-full rounded-lg px-3 py-2 text-sm text-sky-300 hover:bg-sky-900/30 disabled:opacity-40">{loadingMoreUsers ? "Loading…" : "Load more users"}</button>}
               </div>
-              <div className="flex items-center justify-between gap-3 border-t border-sky-900/50 pt-3"><span className="text-xs text-slate-400">{forwardRecipients.length} selected</span><button type="button" onClick={handleForward} disabled={!forwardRecipients.length || !isConnected || isForwarding || forwardFinished} className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm text-slate-950 hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-40"><Forward size={16} />{isForwarding ? "Sending…" : "Forward"}</button></div>
+              <div className="flex items-center justify-between gap-3 border-t border-sky-900/50 pt-3"><span className="text-xs text-slate-400">{forwardRecipients.length} selected</span><button type="button" onClick={handleForward} disabled={!forwardRecipients.length || !isConnected || isForwarding || forwardFinished || selectingAll} className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm text-slate-950 hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-40"><Forward size={16} />{isForwarding ? "Sending…" : "Forward"}</button></div>
               {!isConnected && <p className="text-xs text-amber-300">Reconnecting. Forwarding will be available when connected.</p>}
               {forwardStatus && <p role="status" className="text-sm text-slate-200">{forwardStatus}</p>}
             </div>
@@ -1126,14 +1235,14 @@ export default function ChatPage() {
         {showBroadcast && (
           <div
             className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowBroadcast(false)}
+            onClick={() => { if (!broadcastSending) setShowBroadcast(false); }}
           >
             <div
               role="dialog"
               aria-modal="true"
               aria-label="Broadcast to all users"
               onClick={(e) => e.stopPropagation()}
-              className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+              className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl"
             >
               <div className="p-4 border-b border-gray-700 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1142,7 +1251,9 @@ export default function ChatPage() {
                 </div>
                 <button
                   onClick={() => setShowBroadcast(false)}
-                  className="p-1 rounded-lg hover:bg-gray-800"
+                  disabled={broadcastSending}
+                  aria-label="Close broadcast dialog"
+                  className="p-1 rounded-lg hover:bg-gray-800 disabled:opacity-40"
                 >
                   <X size={18} />
                 </button>
@@ -1150,23 +1261,32 @@ export default function ChatPage() {
 
               <div className="p-4">
                 <p className="text-xs text-gray-400 mb-3">
-                  Everyone will see this announcement in their inbox.
+                  The announcement will reach everyone except the users you exclude.
                 </p>
                 <textarea
                   value={broadcastContent}
+                  disabled={broadcastSending || broadcastFinished}
                   onChange={(e) => setBroadcastContent(e.target.value)}
                   placeholder="Type your announcement..."
                   rows={4}
                   className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-3 text-sm resize-none placeholder-gray-500 focus:outline-none focus:border-purple-500/50 mb-3"
                   autoFocus
                 />
+                <div className="mb-3">
+                  <button type="button" disabled={broadcastSending || broadcastFinished} onClick={() => { setUserSearchQuery(""); setShowBroadcastRecipients((value) => !value); }} className="text-sm text-sky-300 hover:text-sky-200 disabled:opacity-40">
+                    {showBroadcastRecipients ? "Hide recipient list" : "Exclude recipients"} · {broadcastExcluded.length} excluded
+                  </button>
+                  {broadcastExcluded.length > 0 && <div className="mt-2 flex max-h-24 flex-wrap gap-2 overflow-y-auto" aria-label="Excluded users">{broadcastExcluded.map((person) => <button key={person.id} type="button" disabled={broadcastSending || broadcastFinished} onClick={() => setBroadcastExcluded((current) => current.filter((entry) => entry.id !== person.id))} className="rounded-full border border-sky-800 px-2 py-1 text-xs text-sky-200 hover:bg-sky-900/50 disabled:opacity-40" aria-label={`Include ${person.name}, ${person.email} again`}>{person.name} · {person.email} ×</button>)}</div>}
+                  {showBroadcastRecipients && <div className="mt-3 space-y-2"><input type="search" aria-label="Search users to exclude" value={userSearchQuery} onChange={(event) => setUserSearchQuery(event.target.value)} placeholder="Search by name or email" disabled={broadcastSending || broadcastFinished} className="w-full rounded-lg border border-sky-900/60 bg-[#102342] px-3 py-2 text-sm text-white placeholder-slate-400 focus:border-sky-400 focus:outline-none" /><div className="h-48 space-y-1 overflow-y-auto" aria-busy={loadingUsers}>{loadingUsers ? <p className="py-6 text-center text-sm text-slate-400">Loading users…</p> : filteredUsers.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">No matching users found.</p> : filteredUsers.map((person) => { const excluded = broadcastExcluded.some((entry) => entry.id === person.id); return <label key={person.id} className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-sky-900/30"><input type="checkbox" checked={excluded} disabled={broadcastSending || broadcastFinished} onChange={() => setBroadcastExcluded((current) => excluded ? current.filter((entry) => entry.id !== person.id) : [...current, person])} className="h-4 w-4 accent-sky-400" /><span className="min-w-0"><span className="block truncate text-sm text-white">{person.name}</span><span className="block truncate text-xs text-slate-400">{person.email}</span></span></label>; })}{isAdmin && !loadingUsers && usersOffset < usersTotal && <button type="button" onClick={loadMoreUsers} disabled={loadingMoreUsers} className="w-full rounded-lg px-3 py-2 text-sm text-sky-300 hover:bg-sky-900/30 disabled:opacity-40">{loadingMoreUsers ? "Loading…" : "Load more users"}</button>}</div><p className="text-xs text-slate-400">Checked users will not receive this announcement.</p></div>}
+                </div>
+                {broadcastStatus && <p role="status" className="mb-3 text-sm text-slate-200">{broadcastStatus}</p>}
                 <button
                   onClick={handleBroadcastSend}
-                  disabled={!broadcastContent.trim() || !isConnected}
+                  disabled={!broadcastContent.trim() || !isConnected || broadcastSending || broadcastFinished}
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium transition-all flex items-center justify-center gap-2"
                 >
                   <Megaphone size={16} />
-                  Send Broadcast
+                  {broadcastSending ? "Sending…" : "Send Broadcast"}
                 </button>
               </div>
             </div>

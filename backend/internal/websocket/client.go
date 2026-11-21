@@ -23,8 +23,8 @@ const (
 	// Send pings to peer with this period. Must be less than pongWait.
 	pingPeriod = 54 * time.Second
 
-	// Maximum message size allowed from peer (8KB).
-	maxMessageSize = 8192
+	// Maximum message size allowed from peer (256KB, including recipient exclusions).
+	maxMessageSize = 262144
 
 	// Size of the send channel buffer.
 	sendBufferSize = 256
@@ -314,7 +314,7 @@ func (c *Client) handleBroadcast(payload json.RawMessage) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	broadcast, err := c.hub.chatRepo.SaveBroadcast(ctx, c.userID, msg.Content)
+	broadcast, err := c.hub.chatRepo.SaveBroadcast(ctx, c.userID, msg.Content, msg.ExcludedUserIDs)
 	if err != nil {
 		log.Printf("[Client] Failed to save broadcast: %v", err)
 		c.sendError("failed to save broadcast", "SERVER_ERROR")
@@ -333,15 +333,21 @@ func (c *Client) handleBroadcast(payload json.RawMessage) {
 		},
 	}
 	notifPayload, _ := json.Marshal(notification)
-	c.hub.BroadcastToAll(&models.WSEnvelope{
+	excluded := make(map[uuid.UUID]struct{}, len(msg.ExcludedUserIDs)+1)
+	excluded[c.userID] = struct{}{}
+	for _, id := range msg.ExcludedUserIDs {
+		excluded[id] = struct{}{}
+	}
+	c.hub.BroadcastExcept(&models.WSEnvelope{
 		Type:    models.WSTypeBroadcast,
 		Payload: notifPayload,
-	}, &c.userID)
+	}, excluded)
 
 	// ACK to sender
 	ackPayload, _ := json.Marshal(map[string]interface{}{
 		"broadcast_id": broadcast.ID,
 		"sent_at":      broadcast.SentAt,
+		"temp_id":      msg.TempID,
 	})
 	c.sendEnvelope(models.WSTypeMessageAck, ackPayload)
 }

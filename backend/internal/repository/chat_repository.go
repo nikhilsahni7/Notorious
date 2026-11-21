@@ -212,6 +212,10 @@ func (r *ChatRepository) GetUnreadCount(ctx context.Context, userID uuid.UUID) (
 		FROM chat_broadcasts b
 		WHERE b.sender_id != $1
 		AND NOT EXISTS (
+			SELECT 1 FROM chat_broadcast_exclusions be
+			WHERE be.broadcast_id = b.id AND be.user_id = $1
+		)
+		AND NOT EXISTS (
 			SELECT 1 FROM chat_broadcast_reads br
 			WHERE br.broadcast_id = b.id AND br.user_id = $1
 		)
@@ -282,18 +286,25 @@ func (r *ChatRepository) GetConversationByUsers(ctx context.Context, userA, user
 }
 
 // SaveBroadcast persists an admin broadcast message.
-func (r *ChatRepository) SaveBroadcast(ctx context.Context, senderID uuid.UUID, content string) (*models.ChatBroadcast, error) {
+func (r *ChatRepository) SaveBroadcast(ctx context.Context, senderID uuid.UUID, content string, excludedUserIDs []uuid.UUID) (*models.ChatBroadcast, error) {
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin broadcast: %w", err)
+	}
+	defer tx.Rollback(ctx)
 	var bc models.ChatBroadcast
-	query := `
-		INSERT INTO chat_broadcasts (sender_id, content)
-		VALUES ($1, $2)
-		RETURNING id, sender_id, content, sent_at
-	`
-	err := r.db.Pool.QueryRow(ctx, query, senderID, content).Scan(
-		&bc.ID, &bc.SenderID, &bc.Content, &bc.SentAt,
-	)
+	err = tx.QueryRow(ctx, `INSERT INTO chat_broadcasts (sender_id, content) VALUES ($1, $2) RETURNING id, sender_id, content, sent_at`, senderID, content).Scan(&bc.ID, &bc.SenderID, &bc.Content, &bc.SentAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save broadcast: %w", err)
+	}
+	if len(excludedUserIDs) > 0 {
+		_, err = tx.Exec(ctx, `INSERT INTO chat_broadcast_exclusions (broadcast_id, user_id) SELECT $1, id FROM users WHERE id = ANY($2::uuid[]) ON CONFLICT DO NOTHING`, bc.ID, excludedUserIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save broadcast exclusions: %w", err)
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit broadcast: %w", err)
 	}
 	return &bc, nil
 }
@@ -308,6 +319,7 @@ func (r *ChatRepository) GetBroadcasts(ctx context.Context, userID uuid.UUID, li
 		FROM chat_broadcasts b
 		JOIN users u ON u.id = b.sender_id
 		LEFT JOIN chat_broadcast_reads br ON br.broadcast_id = b.id AND br.user_id = $1
+		WHERE NOT EXISTS (SELECT 1 FROM chat_broadcast_exclusions be WHERE be.broadcast_id = b.id AND be.user_id = $1)
 		ORDER BY b.sent_at DESC
 		LIMIT $2
 	`

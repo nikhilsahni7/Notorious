@@ -142,7 +142,9 @@ type WSOnlineStatus struct {
 
 // WSBroadcastMessage is sent by admin to broadcast to all users
 type WSBroadcastMessage struct {
-	Content string `json:"content"`
+	Content         string      `json:"content"`
+	ExcludedUserIDs []uuid.UUID `json:"excluded_user_ids,omitempty"`
+	TempID          string      `json:"temp_id,omitempty"`
 }
 
 // WSBroadcastNotification is sent to users when a broadcast arrives

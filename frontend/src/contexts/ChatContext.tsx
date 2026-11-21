@@ -60,7 +60,7 @@ interface ChatContextType {
   sendReadReceipt: (senderId: string) => void;
   sendTypingStart: (userId: string) => void;
   sendTypingStop: (userId: string) => void;
-  sendBroadcast: (content: string) => void;
+  sendBroadcast: (content: string, excludedUserIds?: string[]) => string;
   markBroadcastRead: (broadcastId: string) => void;
   refreshConversations: () => Promise<void>;
   refreshUnreadCount: () => Promise<void>;
@@ -83,6 +83,7 @@ interface ChatContextType {
   ) => () => void;
   onBroadcast: (callback: (broadcast: Broadcast) => void) => () => void;
   onBroadcastRead: (callback: (id: string) => void) => () => void;
+  onBroadcastSent: (callback: (tempId: string) => void) => () => void;
   onTyping: (
     callback: (data: { userId: string; isTyping: boolean }) => void
   ) => () => void;
@@ -122,6 +123,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const broadcastListenersRef = useRef<Set<(broadcast: Broadcast) => void>>(
     new Set()
   );
+  const broadcastSentListenersRef = useRef<Set<(id: string) => void>>(new Set());
   const broadcastReadListenersRef = useRef<Set<(id: string) => void>>(new Set());
   const typingListenersRef = useRef<
     Set<(data: { userId: string; isTyping: boolean }) => void>
@@ -271,7 +273,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         break;
 
       case WS_TYPES.MESSAGE_ACK:
-        ackListenersRef.current.forEach((cb) => cb(envelope.payload));
+        if (envelope.payload.broadcast_id) {
+          broadcastSentListenersRef.current.forEach((cb) => cb(envelope.payload.temp_id));
+        } else {
+          ackListenersRef.current.forEach((cb) => cb(envelope.payload));
+        }
         break;
 
       case WS_TYPES.READ_UPDATE:
@@ -460,8 +466,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   );
 
   const sendBroadcast = useCallback(
-    (content: string) => {
-      sendWS(WS_TYPES.BROADCAST, { content });
+    (content: string, excludedUserIds: string[] = []) => {
+      const tempId = `broadcast_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      sendWS(WS_TYPES.BROADCAST, { content, excluded_user_ids: excludedUserIds, temp_id: tempId });
+      return tempId;
     },
     [sendWS]
   );
@@ -549,6 +557,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const onBroadcastSent = useCallback((callback: (id: string) => void) => {
+    broadcastSentListenersRef.current.add(callback);
+    return () => { broadcastSentListenersRef.current.delete(callback); };
+  }, []);
+
   const onBroadcastRead = useCallback((callback: (id: string) => void) => {
     broadcastReadListenersRef.current.add(callback);
     return () => { broadcastReadListenersRef.current.delete(callback); };
@@ -587,6 +600,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         onDeliveryUpdate,
         onBroadcast,
         onBroadcastRead,
+        onBroadcastSent,
         onTyping,
       }}
     >
@@ -609,7 +623,7 @@ const EMPTY_CONTEXT: ChatContextType = {
   sendReadReceipt: NOOP,
   sendTypingStart: NOOP,
   sendTypingStop: NOOP,
-  sendBroadcast: NOOP,
+  sendBroadcast: () => "",
   markBroadcastRead: NOOP,
   refreshConversations: async () => {},
   refreshUnreadCount: async () => {},
@@ -619,6 +633,7 @@ const EMPTY_CONTEXT: ChatContextType = {
   onDeliveryUpdate: NOOP_UNSUB,
   onBroadcast: NOOP_UNSUB,
   onBroadcastRead: NOOP_UNSUB,
+  onBroadcastSent: NOOP_UNSUB,
   onTyping: NOOP_UNSUB,
 };
 

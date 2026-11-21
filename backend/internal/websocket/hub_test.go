@@ -40,3 +40,26 @@ func TestSendToEveryConnectionAndUnregister(t *testing.T) {
 		t.Fatal("delivered to an offline user")
 	}
 }
+
+func TestBroadcastExceptSkipsEveryConnectionOfExcludedUser(t *testing.T) {
+	included, excluded := uuid.New(), uuid.New()
+	receiver := &Client{userID: included, send: make(chan []byte, 1)}
+	excludedFirst := &Client{userID: excluded, send: make(chan []byte, 1)}
+	excludedSecond := &Client{userID: excluded, send: make(chan []byte, 1)}
+	hub := NewHub(nil, nil)
+	hub.clients[included] = map[*Client]struct{}{receiver: {}}
+	hub.clients[excluded] = map[*Client]struct{}{excludedFirst: {}, excludedSecond: {}}
+	hub.BroadcastExcept(&models.WSEnvelope{Type: models.WSTypeBroadcast, Payload: json.RawMessage(`{}`)}, map[uuid.UUID]struct{}{excluded: {}})
+	select {
+	case <-receiver.send:
+	default:
+		t.Fatal("included user did not receive broadcast")
+	}
+	for _, client := range []*Client{excludedFirst, excludedSecond} {
+		select {
+		case <-client.send:
+			t.Fatal("excluded user received broadcast")
+		default:
+		}
+	}
+}
