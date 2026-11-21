@@ -1,5 +1,6 @@
 "use client";
 
+import { KnotoriousBrand } from "@/components/KnotoriousBrand";
 import { Button } from "@/components/ui/button";
 import { Captcha } from "@/components/ui/captcha";
 import { Input } from "@/components/ui/input";
@@ -55,9 +56,7 @@ export default function AdminLogin() {
     <div className="min-h-screen bg-gradient-to-br from-[#1a0f2e] via-[#2D1B4E] to-[#1a0f2e] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-500/20 rounded-full mb-4">
-            <Shield className="w-8 h-8 text-purple-400" />
-          </div>
+          <KnotoriousBrand subtitle="Administrator portal" size="lg" className="mb-6 justify-center" />
           <h1 className="text-3xl font-bold text-white mb-2">Admin Access</h1>
           <p className="text-gray-400">
             Secure admin portal - Authorized personnel only

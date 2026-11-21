@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   title: "Knotorious Search",
   description: "Advanced database search system",
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/favicon.ico", apple: "/knotorious-apple-icon.png" },
 };
 
 export default function RootLayout({

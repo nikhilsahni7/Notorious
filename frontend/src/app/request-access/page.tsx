@@ -1,5 +1,6 @@
 "use client";
 
+import { KnotoriousBrand } from "@/components/KnotoriousBrand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
@@ -86,6 +87,7 @@ export default function RequestAccessPage() {
           {/* Internal Festive Glow */}
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-500/20 blur-[50px] pointer-events-none" />
 
+          <KnotoriousBrand subtitle="Account access" size="lg" className="mb-6 justify-center" />
           <h1 className="text-3xl font-black text-white mb-2 text-center tracking-tight">
             Request Access
           </h1>

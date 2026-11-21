@@ -1,5 +1,6 @@
 "use client";
 
+import { KnotoriousBrand } from "@/components/KnotoriousBrand";
 import { ChatBubble, TypingIndicator } from "@/components/chat/ChatBubble";
 import { InlineUnreadBadge } from "@/components/chat/ChatNotificationBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -560,10 +561,7 @@ export default function ChatPage() {
                   >
                     <ArrowLeft size={18} />
                   </button>
-                  <div>
-                    <h1 className="text-base text-white">Messages</h1>
-                    <p className="text-xs text-slate-400">Conversations and announcements</p>
-                  </div>
+                  <KnotoriousBrand subtitle="Messages" size="sm" /><h1 className="sr-only">Messages</h1>
                 </div>
                 <div className="flex items-center gap-2">
                   {isConnected ? (

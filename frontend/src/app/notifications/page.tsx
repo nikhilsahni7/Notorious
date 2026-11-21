@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { KnotoriousMark } from "@/components/KnotoriousBrand";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -197,7 +198,7 @@ export default function NotificationsPage() {
               Back
             </Button>
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-white">Notifications</h1>
+              <h1 className="text-xl font-bold text-white flex items-center gap-3"><KnotoriousMark size={36} />Notifications</h1>
               <p className="text-sm text-gray-400">
                 <span className="hidden sm:inline">{user?.name} • </span>
                 {unreadNotifications > 0 ? `${unreadNotifications} unread` : "All caught up"}

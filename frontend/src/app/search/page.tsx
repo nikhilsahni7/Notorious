@@ -1,6 +1,7 @@
 "use client";
 
 import { FestiveHeader, MobileDisclaimer, triggerFestiveQuickBlast } from "@/components/FestiveCelebration";
+import { KnotoriousBrand } from "@/components/KnotoriousBrand";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ChatNotificationBadge } from "@/components/chat/ChatNotificationBadge";
 import { LatestAnnouncement } from "@/components/chat/LatestAnnouncement";
@@ -401,22 +402,14 @@ export default function SearchPage() {
   return (
     <div className="min-h-screen bg-[#040f25] p-3 pb-24 md:pb-6">
       <div className="max-w-[1800px] mx-auto">
-        {/* Compact Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-3 bg-[#0a1c38] p-4 rounded-2xl border border-sky-900/50">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-white">
-                Knotorious Search
-              </h1>
-              <div className="text-xs text-gray-400 mt-0.5 hidden md:block">
-                {user?.name} • {user?.email}
-              </div>
-            </div>
-          </div>
+        {/* Product header */}
+        <div className="mb-3 flex flex-wrap items-center gap-4 rounded-2xl border border-sky-900/50 bg-[#0a1c38] px-4 py-4 md:px-5">
+          <KnotoriousBrand subtitle={user ? `${user.name} · ${user.email}` : "Search dashboard"} className="max-w-full shrink-0" />
+          <h1 className="sr-only">Knotorious Search</h1>
 
-          <FestiveHeader />
+          <div className="hidden min-w-[12rem] flex-1 md:block"><FestiveHeader /></div>
 
-          <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 md:gap-3 xl:w-auto">
             <NotificationBell />
 
             {/* Search Limit - Compact */}
@@ -617,7 +610,7 @@ export default function SearchPage() {
         )}
 
         {/* Compact Search Form */}
-        <div className="bg-[#0a1c38] p-4 rounded-2xl border border-sky-900/50 mb-3">
+        <div className="mb-3 rounded-2xl border border-sky-900/50 bg-[#0a1c38] p-4 md:p-6">
           <SearchForm
             searchFields={searchFields}
             operator={operator}
@@ -626,11 +619,11 @@ export default function SearchPage() {
             onSearch={() => executeSearch(1)}
           />
 
-          <div className="flex gap-2 mt-3">
+          <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-sky-900/50 pt-4">
             <Button
               onClick={() => executeSearch(1)}
               disabled={loading || searchesUsed >= searchLimit}
-              className="flex-1 bg-sky-600 hover:bg-sky-500 text-white h-10 border-none transition-colors"
+              className="h-11 flex-1 border-none bg-sky-500 px-8 text-slate-950 transition-colors hover:bg-sky-400 sm:flex-none"
             >
               {loading ? (
                 <>
@@ -647,7 +640,7 @@ export default function SearchPage() {
             <Button
               onClick={resetSearch}
               variant="outline"
-              className="bg-transparent border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 h-10"
+              className="h-11 border-sky-800/70 bg-transparent px-5 text-slate-200 transition-colors hover:border-sky-600 hover:bg-sky-900/40 hover:text-white"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
               Reset

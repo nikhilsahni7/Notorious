@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spinner } from "@/components/ui/spinner";
+import { KnotoriousMark } from "@/components/KnotoriousBrand";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
 import { LogOut, ArrowLeft, Clock, Search } from "lucide-react";
@@ -76,7 +77,7 @@ export default function HistoryPage() {
               Back
             </Button>
             <div className="min-w-0">
-              <h1 className="text-xl md:text-2xl font-bold text-white">Search History</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3"><KnotoriousMark size={36} />Search History</h1>
               <p className="text-sm text-gray-400 truncate">{user?.name} • {history.length} searches</p>
             </div>
           </div>

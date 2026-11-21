@@ -1,5 +1,6 @@
 "use client";
 
+import { KnotoriousBrand } from "@/components/KnotoriousBrand";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Spinner } from "@/components/ui/spinner";
@@ -177,7 +178,7 @@ export default function ProfilePage() {
               <ArrowLeft className="h-4 w-4 mr-1.5" />
               Back to Search
             </Button>
-            <div><h1 className="text-base text-white">My profile</h1><p className="text-xs text-slate-400">Account details and notification settings</p></div>
+            <KnotoriousBrand subtitle="Account and notification settings" size="sm" /><h1 className="sr-only">My profile</h1>
           </div>
           <NotificationBell />
         </div>

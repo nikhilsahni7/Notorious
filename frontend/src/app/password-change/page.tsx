@@ -1,5 +1,6 @@
 "use client";
 
+import { KnotoriousMark } from "@/components/KnotoriousBrand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
@@ -159,7 +160,7 @@ export default function PasswordChangePage() {
               Back
             </Button>
             <div className="min-w-0">
-              <h1 className="text-xl md:text-2xl font-bold text-white">Password Change</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3"><KnotoriousMark size={36} />Password Change</h1>
               <p className="text-sm text-gray-400 truncate">
                 {user?.name} • {user?.email}
               </p>

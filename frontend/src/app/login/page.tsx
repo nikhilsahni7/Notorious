@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { KnotoriousMark } from "@/components/KnotoriousBrand";
 import { Button } from "@/components/ui/button";
 import { Captcha } from "@/components/ui/captcha";
 import { Input } from "@/components/ui/input";
@@ -95,8 +96,8 @@ function LoginContent() {
           <p>Maharashtra and Rajasthan data is upcoming with live tracking.</p>
         </div>
         <section className="login-panel" aria-labelledby="login-title">
+          <div className="mb-6 flex justify-center"><KnotoriousMark size={52} /></div>
           <div className="login-heading">
-            <span className="login-eyebrow">SEARCH DASHBOARD</span>
             <h1 id="login-title">Welcome back</h1>
             <p>Sign in to access your search dashboard</p>
           </div>

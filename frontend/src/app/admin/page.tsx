@@ -1,5 +1,6 @@
 "use client";
 
+import { KnotoriousBrand } from "@/components/KnotoriousBrand";
 import { ChatNotificationBadge } from "@/components/chat/ChatNotificationBadge";
 
 import { PasswordRequestsTab } from "@/components/admin/PasswordRequestsTab";
@@ -106,6 +107,7 @@ export default function AdminDashboard() {
       <div className="max-w-[1800px] mx-auto">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6 md:mb-8">
           <div>
+            <KnotoriousBrand subtitle="Administrator portal" size="sm" className="mb-4" />
             <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
               Admin Dashboard
             </h1>

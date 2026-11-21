@@ -36,8 +36,8 @@ self.addEventListener("push", (event) => {
     tag: data.type || undefined, // same-type notifications replace each other
     renotify: false,
     requireInteraction: false,
-    icon: "/third_eye_emblem.png",
-    badge: "/third_eye_emblem.png",
+    icon: "/knotorious-icon-192.png",
+    badge: "/knotorious-icon-192.png",
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
