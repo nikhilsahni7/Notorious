@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import "./scout.css";
 import { KnotoriousMark } from "@/components/KnotoriousBrand";
 import { Button } from "@/components/ui/button";
 import { Captcha } from "@/components/ui/captcha";
@@ -89,7 +90,18 @@ function LoginContent() {
 
   return (
     <div className="login-page">
-      <div className="login-art" aria-hidden="true" />
+      <div className="login-art" aria-hidden="true">
+        <span className="login-scout">
+          <svg className="scout-orbit" viewBox="0 0 180 64" focusable="false">
+            <ellipse cx="90" cy="32" rx="85" ry="25" />
+          </svg>
+          <span className="scout-shell" />
+          <svg className="scout-orbit scout-orbit-front" viewBox="0 0 180 64" focusable="false">
+            <path d="M5 32a85 25 0 0 0 170 0" />
+            <path className="scout-tracer" pathLength="100" d="M5 32a85 25 0 0 0 170 0" />
+          </svg>
+        </span>
+      </div>
       <main className="login-layout">
         <div className="login-notice">
           <div className="login-notice-title"><MapPin size={16} /> System notice</div>
