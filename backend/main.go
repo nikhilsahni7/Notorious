@@ -4,6 +4,8 @@ package main
 import (
 	"context"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"time"
 
@@ -118,6 +120,9 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(uploadService)
 
 	r := gin.Default()
+	if err := r.SetTrustedProxies([]string{"127.0.0.1", "::1"}); err != nil {
+		log.Fatalf("invalid trusted proxy configuration: %v", err)
+	}
 
 	// CORS configuration - allow frontend origins and common headers
 
@@ -278,7 +283,22 @@ func main() {
 
 	if authMiddleware != nil && searchHandler != nil {
 		if secret := os.Getenv("TELEGRAM_SEARCH_SECRET"); len(secret) >= 32 {
-			r.POST("/internal/telegram/search", middleware.NewRateLimiter(120, time.Minute).Limit(), searchHandler.TelegramSearch(secret))
+			internal := gin.New()
+			if err := internal.SetTrustedProxies(nil); err != nil {
+				log.Fatalf("invalid internal proxy configuration: %v", err)
+			}
+			internal.Use(gin.Recovery())
+			internal.POST("/internal/telegram/search", middleware.NewRateLimiter(120, time.Minute).Limit(), searchHandler.TelegramSearch(secret))
+			listener, err := net.Listen("tcp", "127.0.0.1:8081")
+			if err != nil {
+				log.Fatalf("cannot start private search listener: %v", err)
+			}
+			server := &http.Server{Handler: internal, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 30 * time.Second}
+			go func() {
+				if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+					log.Printf("private search listener stopped: %v", err)
+				}
+			}()
 		}
 		searchRoutes := r.Group("/search")
 		// Rate limit search (100 per minute per IP)

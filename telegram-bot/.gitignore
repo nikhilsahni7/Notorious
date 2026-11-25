@@ -1,0 +1,6 @@
+.env
+
+# Local UPI QR and deployment mount
+upi-qr.png
+compose.override.yaml
+.env.production
