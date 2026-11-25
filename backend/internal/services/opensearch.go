@@ -74,7 +74,8 @@ type RefineRequest struct {
 }
 
 type SearchResponse struct {
-	Hits struct {
+	Partial bool `json:"partial,omitempty"`
+	Hits    struct {
 		Total struct {
 			Value int `json:"value"`
 		} `json:"total"`

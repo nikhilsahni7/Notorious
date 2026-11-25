@@ -61,8 +61,8 @@ func (h *SearchHandler) TelegramSearch(secret string) gin.HandlerFunc {
 		}
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 12*time.Second)
 		defer cancel()
-		// Only the authenticated bot service may choose the admin-assigned region.
-		if req.Region != "pan-india" && req.Region != "delhi-ncr" {
+		// The bot integration always uses the fixed search scope.
+		if req.Region != "pan-india" {
 			c.JSON(400, gin.H{"error": "invalid region"})
 			return
 		}

@@ -24,6 +24,7 @@ func TestTelegramSearchRejectsInvalidRequests(t *testing.T) {
 		{"bad email", strings.Repeat("x", 32), `{"type":"email","value":"bad@@address","region":"pan-india"}`, 400},
 		{"bad master id", strings.Repeat("x", 32), `{"type":"master_id","value":"*","region":"pan-india"}`, 400},
 		{"bad type", strings.Repeat("x", 32), `{"type":"name","value":"someone","region":"pan-india"}`, 400},
+		{"old region", strings.Repeat("x", 32), `{"type":"phone","value":"9876543210","region":"delhi-ncr"}`, 400},
 		{"bad region", strings.Repeat("x", 32), `{"type":"phone","value":"9876543210","region":"world"}`, 400},
 		{"malformed json", strings.Repeat("x", 32), `{`, 400},
 	} {

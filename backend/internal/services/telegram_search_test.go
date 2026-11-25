@@ -93,3 +93,65 @@ func TestTelegramSearchRejectsIncompleteOpenSearch(t *testing.T) {
 		}
 	}
 }
+
+func TestTelegramSearchHandlesLargeDirectMatches(t *testing.T) {
+	calls := 0
+	transport := mockTransport(func(r *http.Request) (*http.Response, error) {
+		calls++
+		var body map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if calls == 1 {
+			if body["size"] != float64(500) {
+				t.Fatalf("wrong scan size: %v", body["size"])
+			}
+			result := `{"hits":{"total":{"value":501,"relation":"eq"},"hits":[{"_score":1,"_source":{"id":"master123"}},{"_score":1,"_source":{"id":123}}]}}`
+			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(result))}, nil
+		}
+		if body["size"] != float64(3) {
+			t.Fatalf("wrong output size: %v", body["size"])
+		}
+		result := `{"hits":{"total":{"value":10,"relation":"eq"},"hits":[{"_score":1,"_source":{"id":"master123","name":"Test"}}]}}`
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(result))}, nil
+	})
+	client, err := opensearchapi.NewClient(opensearchapi.Config{Client: opensearch.Config{Addresses: []string{"http://localhost:9200"}, Transport: transport}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := &OpenSearchService{api: client, cfg: &config.Config{OpenSearchIndices: []string{"people"}}}
+	result, err := svc.TelegramSearch(context.Background(), "email", "test@example.com", "pan-india")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Partial || result.Hits.Total.Value != 10 || calls != 2 {
+		t.Fatalf("unexpected result %+v calls %d", result, calls)
+	}
+}
+
+func TestTelegramSearchMoreThanHundredMatchingRecords(t *testing.T) {
+	calls := 0
+	transport := mockTransport(func(r *http.Request) (*http.Response, error) {
+		calls++
+		var body string
+		if calls == 1 {
+			records := make([]string, 101)
+			for i := range records {
+				records[i] = `{"_score":1,"_source":{"id":"master123"}}`
+			}
+			body = `{"hits":{"total":{"value":101,"relation":"eq"},"hits":[` + strings.Join(records, ",") + `]}}`
+		} else {
+			body = `{"hits":{"total":{"value":2,"relation":"eq"},"hits":[{"_score":1,"_source":{"id":"master123"}}]}}`
+		}
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})
+	client, err := opensearchapi.NewClient(opensearchapi.Config{Client: opensearch.Config{Addresses: []string{"http://localhost:9200"}, Transport: transport}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := &OpenSearchService{api: client, cfg: &config.Config{OpenSearchIndices: []string{"people"}}}
+	result, err := svc.TelegramSearch(context.Background(), "email", "test@example.com", "pan-india")
+	if err != nil || result.Partial || result.Hits.Total.Value != 2 {
+		t.Fatalf("search over 100 failed: %+v, %v", result, err)
+	}
+}

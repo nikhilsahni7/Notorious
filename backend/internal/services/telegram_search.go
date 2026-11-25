@@ -33,8 +33,8 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 	default:
 		return nil, fmt.Errorf("invalid search type")
 	}
-	search := func(q map[string]interface{}, size int) (*opensearchapi.SearchResp, error) {
-		body, err := json.Marshal(map[string]interface{}{"query": addRegionFilter(q, region), "size": size, "track_total_hits": true, "timeout": "5s"})
+	search := func(q map[string]interface{}, size int, source interface{}) (*opensearchapi.SearchResp, error) {
+		body, err := json.Marshal(map[string]interface{}{"query": addRegionFilter(q, region), "size": size, "_source": source, "track_total_hits": true, "timeout": "5s"})
 		if err != nil {
 			return nil, err
 		}
@@ -47,32 +47,34 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 		}
 		return resp, nil
 	}
-	initial, err := search(query, 100)
+	const maxDirectMatches = 500
+	initial, err := search(query, maxDirectMatches, []string{"id"})
 	if err != nil {
 		return nil, err
 	}
-	// Refuse incomplete expansion: silently dropping master IDs would be misleading.
-	if initial.Hits.Total.Value > len(initial.Hits.Hits) {
-		return nil, ErrTelegramSearchTooManyMatches
-	}
+	// A bounded scan protects the cluster. Tell the caller if more direct
+	// matches exist, rather than claiming the resulting count is exhaustive.
+	partial := initial.Hits.Total.Value > len(initial.Hits.Hits) || initial.Hits.Total.Relation == "gte"
 	ids := make(map[string]bool)
 	for _, hit := range initial.Hits.Hits {
-		var doc Document
+		var doc struct {
+			ID string `json:"id"`
+		}
 		if err := json.Unmarshal(hit.Source, &doc); err != nil {
-			return nil, ErrTelegramSearchInvalidRecord
+			continue
 		}
 		if isValidMasterID(doc.ID) {
 			ids[strings.ToLower(doc.ID)] = true
 		}
 	}
 	if len(ids) == 0 {
-		return &SearchResponse{}, nil
+		return &SearchResponse{Partial: partial}, nil
 	}
 	values := make([]string, 0, len(ids))
 	for id := range ids {
 		values = append(values, id)
 	}
-	expanded, err := search(map[string]interface{}{"terms": map[string]interface{}{"id": values}}, 100)
+	expanded, err := search(map[string]interface{}{"terms": map[string]interface{}{"id": values}}, 3, true)
 	if err != nil {
 		return nil, err
 	}
@@ -80,5 +82,6 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 	if err != nil {
 		return nil, ErrTelegramSearchInvalidRecord
 	}
+	result.Partial = partial
 	return result, nil
 }
