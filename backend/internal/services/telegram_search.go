@@ -4,10 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/opensearch-project/opensearch-go/v3/opensearchapi"
+)
+
+var (
+	ErrTelegramSearchUpstream       = errors.New("upstream search failed")
+	ErrTelegramSearchIncomplete     = errors.New("search returned incomplete results")
+	ErrTelegramSearchTooManyMatches = errors.New("too many direct matches")
+	ErrTelegramSearchInvalidRecord  = errors.New("invalid search record")
 )
 
 // TelegramSearch only expands direct matches through exact, valid master IDs.
@@ -32,10 +40,10 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 		}
 		resp, err := s.api.Search(ctx, &opensearchapi.SearchReq{Indices: s.cfg.OpenSearchIndices, Body: bytes.NewReader(body)})
 		if err != nil {
-			return nil, err
+			return nil, ErrTelegramSearchUpstream
 		}
 		if resp.Timeout || resp.Shards.Failed > 0 {
-			return nil, fmt.Errorf("search returned incomplete results")
+			return nil, ErrTelegramSearchIncomplete
 		}
 		return resp, nil
 	}
@@ -45,13 +53,13 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 	}
 	// Refuse incomplete expansion: silently dropping master IDs would be misleading.
 	if initial.Hits.Total.Value > len(initial.Hits.Hits) {
-		return nil, fmt.Errorf("too many direct matches")
+		return nil, ErrTelegramSearchTooManyMatches
 	}
 	ids := make(map[string]bool)
 	for _, hit := range initial.Hits.Hits {
 		var doc Document
 		if err := json.Unmarshal(hit.Source, &doc); err != nil {
-			return nil, err
+			return nil, ErrTelegramSearchInvalidRecord
 		}
 		if isValidMasterID(doc.ID) {
 			ids[strings.ToLower(doc.ID)] = true
@@ -68,5 +76,9 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 	if err != nil {
 		return nil, err
 	}
-	return s.convertToSearchResponse(expanded)
+	result, err := s.convertToSearchResponse(expanded)
+	if err != nil {
+		return nil, ErrTelegramSearchInvalidRecord
+	}
+	return result, nil
 }

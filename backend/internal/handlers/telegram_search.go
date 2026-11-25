@@ -3,11 +3,14 @@ package handlers
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"net/http"
 	"net/mail"
 	"regexp"
 	"strings"
 	"time"
+
+	"notorious-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -66,7 +69,16 @@ func (h *SearchHandler) TelegramSearch(secret string) gin.HandlerFunc {
 		region := req.Region
 		result, err := h.openSearchService.TelegramSearch(ctx, req.Type, req.Value, region)
 		if err != nil {
-			c.JSON(503, gin.H{"error": "search unavailable"})
+			code := "upstream_error"
+			switch {
+			case errors.Is(err, services.ErrTelegramSearchTooManyMatches):
+				code = "too_many_matches"
+			case errors.Is(err, services.ErrTelegramSearchIncomplete):
+				code = "incomplete_search"
+			case errors.Is(err, services.ErrTelegramSearchInvalidRecord):
+				code = "invalid_record"
+			}
+			c.JSON(503, gin.H{"error": "search unavailable", "code": code})
 			return
 		}
 		c.JSON(200, result)
