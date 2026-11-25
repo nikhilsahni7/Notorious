@@ -277,6 +277,9 @@ func main() {
 	uploadGroup.POST("/abort", uploadHandler.AbortUpload)
 
 	if authMiddleware != nil && searchHandler != nil {
+		if secret := os.Getenv("TELEGRAM_SEARCH_SECRET"); len(secret) >= 32 {
+			r.POST("/internal/telegram/search", middleware.NewRateLimiter(120, time.Minute).Limit(), searchHandler.TelegramSearch(secret))
+		}
 		searchRoutes := r.Group("/search")
 		// Rate limit search (100 per minute per IP)
 		searchRoutes.Use(authMiddleware.AuthRequired(), middleware.SearchRateLimiter())
