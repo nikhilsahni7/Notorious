@@ -24,6 +24,8 @@ For deployment, set `BOT_MODE=webhook`; reverse-proxy HTTPS `/telegram/webhook` 
 
 Each account can have one search in progress, with default workload limits of 10 per rolling minute and 500 per rolling hour (`SEARCH_WORKLOAD_PER_MINUTE` and `SEARCH_WORKLOAD_PER_HOUR`). Repeats, empty results and failed searches count against workload limits even though they do not consume daily credits. Telegram does not reveal a user's device identity, so these controls cannot prevent sharing a Telegram account.
 
+Configured `ADMIN_IDS` are exempt from bot request throttles, daily search credits and the private backend workload limits; they do not need a paid plan to search. A blocked administrator remains unable to search. Telegram and upstream services may still enforce their own limits. Keep both the administrator IDs and the private search secret secure.
+
 Local testing does not deploy code to `api.knotoriousai.online`. Its existing search endpoint behaves differently; the new restricted integration endpoint must be deployed separately before the bot can call it. Migrating to Neon later requires transferring the database, not simply changing `DATABASE_URL`.
 
 ## Manual UPI orders

@@ -434,6 +434,31 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	if err != nil || limited != "rate_limited" {
 		t.Fatalf("unmetered workload not limited: %s %v", limited, err)
 	}
+	// Admins can search without a paid plan, credits, workload or in-flight limits.
+	if _, err = db.Exec(ctx, `INSERT INTO bot_users(telegram_id) VALUES(999)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{604, 605, 606} {
+		st, _, e := a.reserve(ctx, id, 999, "phone", "1111111111")
+		if e != nil || st != "admin" {
+			t.Fatalf("admin reservation %d: %s %v", id, st, e)
+		}
+	}
+	var adminResult searchResult
+	adminResult.Hits.Total.Value = 1
+	adminResult.Hits.Hits = append(adminResult.Hits.Hits, struct {
+		Source document `json:"_source"`
+	}{Source: document{Name: "Example"}})
+	if queued, e := a.queueSearchDelivery(ctx, 999, 604, "admin", adminResult); e != nil || !queued {
+		t.Fatalf("admin queue: %v %v", queued, e)
+	}
+	if e := a.deliverSearch(ctx, 604, 999); e != nil {
+		t.Fatal(e)
+	}
+	var adminState, adminOutcome string
+	if e := db.QueryRow(ctx, `SELECT state,outcome FROM search_requests WHERE update_id=604`).Scan(&adminState, &adminOutcome); e != nil || adminState != "released" || adminOutcome != "admin" {
+		t.Fatalf("admin delivery: %s %s %v", adminState, adminOutcome, e)
+	}
 	t.Setenv("SEARCH_WORKLOAD_PER_MINUTE", "10")
 	// A failed Telegram send keeps an encrypted retry and does not charge.
 	if _, err = db.Exec(ctx, `INSERT INTO bot_users(telegram_id,approved,daily_limit,plan_expires_at) VALUES(105,true,100,now()+interval '30 days'),(106,true,100,now()+interval '30 days'),(107,true,100,now()+interval '30 days')`); err != nil {

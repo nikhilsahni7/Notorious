@@ -19,6 +19,16 @@ var telegramPhone = regexp.MustCompile(`^[0-9]{10,15}$`)
 var telegramMaster = regexp.MustCompile(`^[a-zA-Z0-9_-]{8,64}$`)
 
 func (h *SearchHandler) TelegramSearch(secret string) gin.HandlerFunc {
+	return h.telegramSearch(secret, false)
+}
+
+// TelegramAdminSearch is mounted only on the loopback-only service listener.
+// The bot selects it exclusively for configured administrator Telegram IDs.
+func (h *SearchHandler) TelegramAdminSearch(secret string) gin.HandlerFunc {
+	return h.telegramSearch(secret, true)
+}
+
+func (h *SearchHandler) telegramSearch(secret string, admin bool) gin.HandlerFunc {
 	// Restrict expensive searches independently from ordinary web searches.
 	slots := make(chan struct{}, 4)
 	return func(c *gin.Context) {
@@ -52,12 +62,14 @@ func (h *SearchHandler) TelegramSearch(secret string) gin.HandlerFunc {
 			c.JSON(400, gin.H{"error": "invalid search value"})
 			return
 		}
-		select {
-		case slots <- struct{}{}:
-			defer func() { <-slots }()
-		default:
-			c.JSON(503, gin.H{"error": "search busy"})
-			return
+		if !admin {
+			select {
+			case slots <- struct{}{}:
+				defer func() { <-slots }()
+			default:
+				c.JSON(503, gin.H{"error": "search busy"})
+				return
+			}
 		}
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 12*time.Second)
 		defer cancel()

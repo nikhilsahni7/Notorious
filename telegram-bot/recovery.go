@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -63,6 +64,11 @@ func (a *app) wakeRecovery() {
 // locking serializes it with admin blocks and plan changes.
 func (a *app) queueSearchDelivery(ctx context.Context, uid, updateID int64, state string, result searchResult) (bool, error) {
 	pages := formatResults(result, state == "repeat")
+	if state == "admin" {
+		for i := range pages {
+			pages[i] = strings.Replace(pages[i], "1 credit after delivery", "Admin search · no credit used", 1)
+		}
+	}
 	encrypted, err := a.encryptDelivery(uid, updateID, pages)
 	if err != nil {
 		return false, err
@@ -71,6 +77,9 @@ func (a *app) queueSearchDelivery(ctx context.Context, uid, updateID int64, stat
 	chargeable := true
 	if result.Hits.Total.Value == 0 {
 		outcome = "no_results"
+		chargeable = false
+	} else if state == "admin" {
+		outcome = "admin"
 		chargeable = false
 	} else if state == "repeat" {
 		outcome = "repeat"
@@ -82,7 +91,7 @@ func (a *app) queueSearchDelivery(ctx context.Context, uid, updateID int64, stat
 	}
 	defer tx.Rollback(ctx)
 	var active bool
-	err = tx.QueryRow(ctx, `SELECT approved AND NOT blocked AND COALESCE(plan_expires_at>now(),false) FROM bot_users WHERE telegram_id=$1 FOR UPDATE`, uid).Scan(&active)
+	err = tx.QueryRow(ctx, `SELECT NOT blocked AND ($2 OR (approved AND COALESCE(plan_expires_at>now(),false))) FROM bot_users WHERE telegram_id=$1 FOR UPDATE`, uid, a.admins[uid]).Scan(&active)
 	if err != nil {
 		return false, err
 	}
@@ -110,7 +119,7 @@ func (a *app) deliverSearch(ctx context.Context, updateID, uid int64) error {
 	}
 	defer tx.Rollback(ctx)
 	var active bool
-	err = tx.QueryRow(ctx, `SELECT approved AND NOT blocked AND COALESCE(plan_expires_at>now(),false) FROM bot_users WHERE telegram_id=$1 FOR UPDATE`, uid).Scan(&active)
+	err = tx.QueryRow(ctx, `SELECT NOT blocked AND ($2 OR (approved AND COALESCE(plan_expires_at>now(),false))) FROM bot_users WHERE telegram_id=$1 FOR UPDATE`, uid, a.admins[uid]).Scan(&active)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -206,7 +215,7 @@ func (a *app) recoverAbandoned(ctx context.Context, updateID, uid int64) error {
 	}
 	defer tx.Rollback(ctx)
 	var active bool
-	err = tx.QueryRow(ctx, `SELECT approved AND NOT blocked AND COALESCE(plan_expires_at>now(),false) FROM bot_users WHERE telegram_id=$1 FOR UPDATE`, uid).Scan(&active)
+	err = tx.QueryRow(ctx, `SELECT NOT blocked AND ($2 OR (approved AND COALESCE(plan_expires_at>now(),false))) FROM bot_users WHERE telegram_id=$1 FOR UPDATE`, uid, a.admins[uid]).Scan(&active)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}

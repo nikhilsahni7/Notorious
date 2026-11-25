@@ -42,3 +42,16 @@ func TestTelegramSearchRejectsInvalidRequests(t *testing.T) {
 		})
 	}
 }
+
+func TestTelegramAdminSearchStillRequiresSecret(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	h := &SearchHandler{}
+	router.POST("/admin", h.TelegramAdminSearch(strings.Repeat("x", 32)))
+	request := httptest.NewRequest(http.MethodPost, "/admin", strings.NewReader(`{"type":"phone","value":"9876543210","region":"pan-india"}`))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("admin route accepted unauthenticated request: %d", response.Code)
+	}
+}

@@ -289,6 +289,7 @@ func main() {
 			}
 			internal.Use(gin.Recovery())
 			internal.POST("/internal/telegram/search", middleware.NewRateLimiter(120, time.Minute).Limit(), searchHandler.TelegramSearch(secret))
+			internal.POST("/internal/telegram/admin/search", searchHandler.TelegramAdminSearch(secret))
 			listener, err := net.Listen("tcp", "127.0.0.1:8081")
 			if err != nil {
 				log.Fatalf("cannot start private search listener: %v", err)

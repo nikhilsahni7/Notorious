@@ -64,6 +64,9 @@ type visitor struct {
 }
 
 func (a *app) allow(user int64) bool {
+	if a.admins[user] {
+		return true
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.visitors == nil {
@@ -374,7 +377,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 			return a.send(ctx, uid, "Search limit reached for now. Please wait before trying again. Your daily credits have not changed.")
 		}
 		a.wakeRecovery()
-		result, code, e := a.search(ctx, kind, value, region)
+		result, code, e := a.search(ctx, kind, value, region, a.admins[uid])
 		if e != nil || code/100 != 2 {
 			if _, err = a.db.Exec(ctx, `UPDATE search_requests SET state='released',outcome='failed' WHERE update_id=$1 AND state='reserved'`, u.ID); err != nil {
 				return err
@@ -415,27 +418,30 @@ func (a *app) reserve(ctx context.Context, updateID, uid int64, kind, value stri
 	if exists {
 		return "duplicate", "", tx.Commit(ctx)
 	}
-	if !approved || blocked {
+	isAdmin := a.admins[uid]
+	if blocked || (!isAdmin && !approved) {
 		return "denied", "", tx.Commit(ctx)
 	}
-	var busy bool
-	e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM search_requests WHERE telegram_id=$1 AND state='reserved')`, uid).Scan(&busy)
-	if e != nil {
-		return "", "", e
-	}
-	if busy {
-		return "busy", "", tx.Commit(ctx)
-	}
-	// Count all accepted searches, including repeats, empty results and failures.
-	// This workload limit is separate from paid credits and survives restarts.
-	var lastMinute, lastHour int
-	e = tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE created_at > clock_timestamp()-interval '1 minute'), count(*) FROM search_requests WHERE telegram_id=$1 AND created_at > clock_timestamp()-interval '1 hour'`, uid).Scan(&lastMinute, &lastHour)
-	if e != nil {
-		return "", "", e
-	}
-	minuteLimit, hourLimit := searchWorkloadLimits()
-	if lastMinute >= minuteLimit || lastHour >= hourLimit {
-		return "rate_limited", "", tx.Commit(ctx)
+	if !isAdmin {
+		var busy bool
+		e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM search_requests WHERE telegram_id=$1 AND state='reserved')`, uid).Scan(&busy)
+		if e != nil {
+			return "", "", e
+		}
+		if busy {
+			return "busy", "", tx.Commit(ctx)
+		}
+		// Count all accepted searches, including repeats, empty results and failures.
+		// This workload limit is separate from paid credits and survives restarts.
+		var lastMinute, lastHour int
+		e = tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE created_at > clock_timestamp()-interval '1 minute'), count(*) FROM search_requests WHERE telegram_id=$1 AND created_at > clock_timestamp()-interval '1 hour'`, uid).Scan(&lastMinute, &lastHour)
+		if e != nil {
+			return "", "", e
+		}
+		minuteLimit, hourLimit := searchWorkloadLimits()
+		if lastMinute >= minuteLimit || lastHour >= hourLimit {
+			return "rate_limited", "", tx.Commit(ctx)
+		}
 	}
 	key := a.searchKey(uid, kind, value, region)
 	var repeat bool
@@ -448,7 +454,7 @@ func (a *app) reserve(ctx context.Context, updateID, uid int64, kind, value stri
 	if e != nil {
 		return "", "", e
 	}
-	if used >= limit && !repeat {
+	if !isAdmin && used >= limit && !repeat {
 		return "denied", "", tx.Commit(ctx)
 	}
 	encrypted, e := a.encryptHistory(uid, updateID, kind, value)
@@ -458,6 +464,9 @@ func (a *app) reserve(ctx context.Context, updateID, uid int64, kind, value stri
 	_, e = tx.Exec(ctx, `INSERT INTO search_requests(update_id,telegram_id,quota_day,state,search_type,masked_value,search_key,encrypted_value,created_at) VALUES($1,$2,(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date,'reserved',$3,$4,$5,$6,clock_timestamp())`, updateID, uid, kind, maskSearch(kind, value), key, encrypted)
 	if e != nil {
 		return "", "", e
+	}
+	if isAdmin {
+		return "admin", region, tx.Commit(ctx)
 	}
 	if repeat {
 		return "repeat", region, tx.Commit(ctx)
@@ -479,12 +488,16 @@ func (a *app) searchKey(uid int64, kind, value, region string) string {
 	fmt.Fprintf(m, "search-v1\x00%d\x00%s\x00%s\x00%s", uid, kind, strings.ToLower(strings.TrimSpace(value)), region)
 	return hex.EncodeToString(m.Sum(nil))
 }
-func (a *app) search(ctx context.Context, kind, value, region string) (searchResult, int, error) {
+func (a *app) search(ctx context.Context, kind, value, region string, admin bool) (searchResult, int, error) {
 	var out searchResult
 	body, _ := json.Marshal(map[string]string{"type": kind, "value": value, "region": region})
+	url := a.searchURL
+	if admin {
+		url = strings.TrimSuffix(url, "/search") + "/admin/search"
+	}
 	for attempt := 0; attempt < 2; attempt++ {
 		reqCtx, cancel := context.WithTimeout(ctx, 14*time.Second)
-		req, err := http.NewRequestWithContext(reqCtx, "POST", a.searchURL, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(reqCtx, "POST", url, bytes.NewReader(body))
 		if err != nil {
 			cancel()
 			return out, 0, err
@@ -842,6 +855,9 @@ func (a *app) account(ctx context.Context, uid int64) error {
 	err := a.db.QueryRow(ctx, `SELECT (approved AND COALESCE(plan_expires_at>now(),false)),blocked,daily_limit,plan_name,region,COALESCE(to_char(plan_expires_at AT TIME ZONE 'Asia/Kolkata','DD Mon YYYY HH24:MI') || ' IST','Not assigned'),(SELECT count(*) FROM search_requests r WHERE telegram_id=$1 AND quota_day=(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date AND state IN ('reserved','charged','uncertain') AND created_at > COALESCE((SELECT reset_at FROM quota_resets WHERE telegram_id=$1 AND quota_day=r.quota_day),'-infinity'::timestamptz)) FROM bot_users WHERE telegram_id=$1`, uid).Scan(&active, &blocked, &limit, &name, &region, &expires, &used)
 	if err != nil {
 		return err
+	}
+	if a.admins[uid] && !blocked {
+		return a.send(ctx, uid, "My account\n\nAdministrator access\nSearches: unlimited · no credits used\n\n/history — search history\n/admin — management commands")
 	}
 	status := "Active"
 	if !active || blocked {

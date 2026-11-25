@@ -35,6 +35,34 @@ func TestLimitPerUser(t *testing.T) {
 	}
 }
 
+func TestAdminRequestsBypassUserThrottle(t *testing.T) {
+	a := &app{admins: map[int64]bool{1: true}}
+	for i := 0; i < 100; i++ {
+		if !a.allow(1) {
+			t.Fatalf("admin blocked on request %d", i)
+		}
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestAdminSearchUsesPrivateAdminRoute(t *testing.T) {
+	var path string
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		path = r.URL.Path
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"hits":{"total":{"value":0},"hits":[]}}`)), Header: make(http.Header)}, nil
+	})
+	a := &app{searchURL: "http://search.example/internal/telegram/search", client: &http.Client{Transport: transport}}
+	if _, _, err := a.search(context.Background(), "phone", "9876543210", "pan-india", true); err != nil {
+		t.Fatal(err)
+	}
+	if path != "/internal/telegram/admin/search" {
+		t.Fatalf("unexpected route %q", path)
+	}
+}
+
 func TestMaskSearch(t *testing.T) {
 	for _, tc := range []struct{ kind, value, want string }{{"phone", "9876543210", "****3210"}, {"email", "person@example.com", "***@example.com"}, {"master_id", "ABCD1234", "****1234"}} {
 		if got := maskSearch(tc.kind, tc.value); got != tc.want {
@@ -140,7 +168,7 @@ func TestSearchRetryAndMalformedResponse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tr := &retrySearchTransport{successBody: tc.body}
 			a := &app{searchURL: "https://search.example", searchSecret: "secret", client: &http.Client{Transport: tr}}
-			_, _, err := a.search(context.Background(), "email", "test@example.com", "pan-india")
+			_, _, err := a.search(context.Background(), "email", "test@example.com", "pan-india", false)
 			if (err != nil) != tc.wantErr || tr.calls != 2 {
 				t.Fatalf("calls=%d err=%v", tr.calls, err)
 			}
