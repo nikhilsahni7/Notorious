@@ -300,8 +300,13 @@ func (a *app) handle(ctx context.Context, u update) error {
 		}
 	}
 	switch cmd {
-	case "/start", "/help":
+	case "/start":
+		if a.admins[uid] {
+			return a.sendMessage(ctx, uid, "Welcome to SHAKIL INTEL X\n\nAdministrator access is active. Use the search buttons below or /help for commands. Your searches do not use credits.\n\nUse /admin to manage users, plans and payments.", true)
+		}
 		return a.sendMessage(ctx, uid, "Welcome to SHAKIL INTEL X\n\nChoose a search below and enter a phone number, email or master ID. We’ll show up to 3 linked records.\n\nYour searches\n• A new search with results uses 1 credit.\n• Repeats and no-result searches are free.\n• Your allowance resets at midnight IST.\n\nNeed access? Open Plans to choose a plan. Use My account to check your balance, or History to see recent searches.\n\nUse /cancel to leave any step.", true)
+	case "/help":
+		return a.sendMessage(ctx, uid, helpText(a.admins[uid]), true)
 
 	case "/plans":
 		return a.listPlans(ctx, uid)
@@ -397,6 +402,14 @@ func (a *app) handle(ctx context.Context, u update) error {
 	default:
 		return a.send(ctx, uid, "Use /help to see available commands.")
 	}
+}
+
+func helpText(admin bool) string {
+	text := "SHAKIL INTEL X · Help\n\nSearch using the buttons or commands:\n/search phone 9876543210\n/search email name@example.com\n/search id MASTERID\n\nUp to 3 linked records are shown. New searches with results use one credit; repeats and searches with no results are free. Daily credits reset at midnight IST.\n\nPlans & payments\n/plans — available plans\n/buy PLAN — choose a plan\n/paid REFERENCE — submit your UPI reference\n/mypayments — payment status\n\nAccount\n/account — plan and remaining searches\n/history — recent searches\n/history 2 — next history page\n/cancel — leave the current step\n/support — get help"
+	if admin {
+		text += "\n\nAdministrator\n/admin — users, plans, payment reviews and other admin commands\nYour administrator searches do not use credits."
+	}
+	return text
 }
 func (a *app) reserve(ctx context.Context, updateID, uid int64, kind, value string) (state, region string, err error) {
 	tx, e := a.db.Begin(ctx)

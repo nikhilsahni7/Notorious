@@ -44,6 +44,17 @@ func TestAdminRequestsBypassUserThrottle(t *testing.T) {
 	}
 }
 
+func TestHelpExplainsAvailableCommands(t *testing.T) {
+	for _, cmd := range []string{"/search phone", "/search email", "/search id", "/plans", "/buy", "/paid", "/mypayments", "/account", "/history", "/cancel", "/support"} {
+		if !strings.Contains(helpText(false), cmd) {
+			t.Fatalf("help missing %s", cmd)
+		}
+	}
+	if strings.Contains(helpText(false), "/admin") || !strings.Contains(helpText(true), "/admin") {
+		t.Fatal("admin help is not scoped to admins")
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
