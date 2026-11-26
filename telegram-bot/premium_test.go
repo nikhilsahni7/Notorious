@@ -153,6 +153,10 @@ func TestPaymentUpgradeAndReferenceEditsPostgres(t *testing.T) {
 	if err = db.QueryRow(ctx, `SELECT transaction_reference FROM payment_orders WHERE id=102`).Scan(&ref); err != nil || ref != "NEWREF102" {
 		t.Fatal("reference changed after review started", err)
 	}
+	var pending *int64
+	if err = db.QueryRow(ctx, `SELECT pending_ref_order FROM bot_users WHERE telegram_id=2`).Scan(&pending); err != nil || pending != nil {
+		t.Fatal("locked review left user stuck in edit mode", err)
+	}
 	if _, err = db.Exec(ctx, `UPDATE payment_orders SET status='approved' WHERE id=102`); err != nil {
 		t.Fatal(err)
 	}

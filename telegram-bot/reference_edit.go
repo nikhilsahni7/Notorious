@@ -73,6 +73,12 @@ func (a *app) handleCallback(ctx context.Context, callbackID string, uid int64, 
 		return err
 	}
 	if status != "pending_review" || reviewing || candidate == nil || blocked {
+		if _, err = tx.Exec(ctx, `UPDATE bot_users SET pending_ref_order=NULL,pending_ref_value=NULL WHERE telegram_id=$1 AND pending_ref_order=$2`, uid, id); err != nil {
+			return err
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return err
+		}
 		return a.telegramMethod(ctx, "answerCallbackQuery", map[string]interface{}{"callback_query_id": callbackID, "text": "This edit is no longer available"})
 	}
 	ref, ok := normalizeReference(*candidate)
@@ -134,6 +140,9 @@ func (a *app) stageReferenceEdit(ctx context.Context, uid, id int64, input strin
 		return err
 	}
 	if tag.RowsAffected() == 0 {
+		if _, err = a.db.Exec(ctx, `UPDATE bot_users SET pending_ref_order=NULL,pending_ref_value=NULL WHERE telegram_id=$1 AND pending_ref_order=$2`, uid, id); err != nil {
+			return err
+		}
 		return a.send(ctx, uid, "This request can no longer be edited. Check Payment status.")
 	}
 	return a.sendPayload(ctx, map[string]interface{}{"chat_id": uid, "text": premiumHTML(fmt.Sprintf("Confirm reference\n\nNew reference: %s\n\nConfirm only if this matches your UPI transaction.", ref)), "parse_mode": "HTML", "protect_content": true, "reply_markup": map[string]interface{}{"inline_keyboard": [][]map[string]string{{{"text": "Confirm reference", "callback_data": fmt.Sprintf("confirmref:%d:%s", id, a.referenceConfirmToken(uid, id, ref)), "style": "primary"}}}}})
