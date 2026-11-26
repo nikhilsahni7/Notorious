@@ -1,6 +1,6 @@
 # SHAKIL INTEL X
 
-The bot uses a separate PostgreSQL database. Users without an active plan receive three one-time trial searches with results. Each search with results, including a repeat, uses one search; no-result and failed searches do not. Paid daily allowances reset at midnight IST. Plain phone numbers, emails and document numbers can be sent directly; select the document-number button for an all-numeric value that resembles a phone number.
+The bot uses a separate PostgreSQL database. Users without an active plan receive three one-time trial searches with results. Each search with results, including a repeat, uses one search; no-result and failed searches do not. Paid daily allowances reset at midnight IST. Plain phone numbers, emails and document numbers can be sent directly; all-numeric inputs search both phone and document-number fields in one request.
 
 The backend expands exact document IDs and one bounded hop through alternate phone numbers, without following names or addresses. It scans at most 500 records per stage and returns up to five records, marking incomplete expansion. Search results can be copied from Telegram and downloaded as CSV. Reports are encrypted at rest, available to the requesting user until midnight IST on the search date and cleaned on a later search. CSV cells that could execute formulas in spreadsheet software are escaped.
 

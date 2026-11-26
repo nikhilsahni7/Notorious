@@ -52,6 +52,37 @@ func (deliveryFailureTransport) RoundTrip(*http.Request) (*http.Response, error)
 
 type searchFlowTransport struct{}
 
+type autoSearchCaptureTransport struct{ kinds []string }
+
+func (tr *autoSearchCaptureTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.URL.Host == "search.example" {
+		var q struct {
+			Type string `json:"type"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&q); err != nil {
+			return nil, err
+		}
+		tr.kinds = append(tr.kinds, q.Type)
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"hits":{"total":{"value":1},"hits":[{"_source":{"name":"Example","id":"document123"}}]}}`)), Header: make(http.Header)}, nil
+	}
+	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"ok":true}`)), Header: make(http.Header)}, nil
+}
+
+type planKeyboardCaptureTransport struct{ rows [][]map[string]string }
+
+func (tr *planKeyboardCaptureTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	var payload struct {
+		Markup struct {
+			Keyboard [][]map[string]string `json:"keyboard"`
+		} `json:"reply_markup"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		return nil, err
+	}
+	tr.rows = payload.Markup.Keyboard
+	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"ok":true}`)), Header: make(http.Header)}, nil
+}
+
 func (searchFlowTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	body := `{"ok":true}`
 	if r.URL.Host == "search.example" {
@@ -505,6 +536,32 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	}
 	if reportTransport.documents != 1 {
 		t.Fatal("previous IST day's report remained downloadable")
+	}
+	if _, err = db.Exec(ctx, `INSERT INTO bot_users(telegram_id) VALUES(110)`); err != nil {
+		t.Fatal(err)
+	}
+	auto := &autoSearchCaptureTransport{}
+	a.client = &http.Client{Transport: auto, Timeout: time.Second}
+	if err = a.handle(ctx, testSearchUpdate(t, 806, 110, "123456789012")); err != nil {
+		t.Fatal(err)
+	}
+	if len(auto.kinds) != 1 || auto.kinds[0] != "auto" {
+		t.Fatalf("numeric input was not a single combined search: %v", auto.kinds)
+	}
+	if err = a.deliverSearch(ctx, 806, 110); err != nil {
+		t.Fatal(err)
+	}
+	var autoCount int
+	if err = db.QueryRow(ctx, `SELECT count(*) FROM search_requests WHERE telegram_id=110 AND state='charged'`).Scan(&autoCount); err != nil || autoCount != 1 {
+		t.Fatalf("numeric search charge count %d: %v", autoCount, err)
+	}
+	keys := &planKeyboardCaptureTransport{}
+	a.client = &http.Client{Transport: keys, Timeout: time.Second}
+	if err = a.listPlans(ctx, 110); err != nil {
+		t.Fatal(err)
+	}
+	if len(keys.rows) < 2 || len(keys.rows[0]) != 2 {
+		t.Fatalf("plan buttons were not placed side by side: %v", keys.rows)
 	}
 	var deadline, expected time.Time
 	if err = db.QueryRow(ctx, `SELECT ((('2026-11-26 23:59:00'::timestamp AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata')::date + 1)::timestamp AT TIME ZONE 'Asia/Kolkata', '2026-11-27 00:00:00'::timestamp AT TIME ZONE 'Asia/Kolkata'`).Scan(&deadline, &expected); err != nil || !deadline.Equal(expected) {

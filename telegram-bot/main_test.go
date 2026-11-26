@@ -61,7 +61,7 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestDetectSearchType(t *testing.T) {
-	for _, tc := range []struct{ value, want string }{{"9876543210", "phone"}, {"Person@example.com", "email"}, {"ABCD1234", "id"}, {"bad@@example.com", ""}, {"123", ""}} {
+	for _, tc := range []struct{ value, want string }{{"9876543210", "auto"}, {"123456789012", "auto"}, {"Person@example.com", "email"}, {"ABCD1234", "id"}, {"bad@@example.com", ""}, {"123", ""}} {
 		if got := detectSearchType(tc.value); got != tc.want {
 			t.Errorf("%q: got %q want %q", tc.value, got, tc.want)
 		}

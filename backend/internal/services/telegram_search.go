@@ -28,6 +28,8 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 	switch kind {
 	case "phone":
 		query = map[string]interface{}{"bool": map[string]interface{}{"should": []interface{}{map[string]interface{}{"term": map[string]interface{}{"mobile": value}}, map[string]interface{}{"term": map[string]interface{}{"alt": value}}}, "minimum_should_match": 1}}
+	case "auto":
+		query = map[string]interface{}{"bool": map[string]interface{}{"should": []interface{}{map[string]interface{}{"term": map[string]interface{}{"mobile": value}}, map[string]interface{}{"term": map[string]interface{}{"alt": value}}, map[string]interface{}{"term": map[string]interface{}{"id": value}}}, "minimum_should_match": 1}}
 	case "email":
 		query = map[string]interface{}{"term": map[string]interface{}{"email": value}}
 	case "master_id":

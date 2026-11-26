@@ -56,7 +56,7 @@ func TestTelegramSearchExpandsAlternatePhoneAndIDs(t *testing.T) {
 }
 
 func TestTelegramSearchTypesAndEmptyResults(t *testing.T) {
-	for _, tc := range []struct{ kind, value, field string }{{"phone", "9876543210", "mobile"}, {"email", "user@example.com", "email"}, {"master_id", "master123", "id"}} {
+	for _, tc := range []struct{ kind, value, field string }{{"phone", "9876543210", "mobile"}, {"auto", "123456789012", "id"}, {"email", "user@example.com", "email"}, {"master_id", "master123", "id"}} {
 		t.Run(tc.kind, func(t *testing.T) {
 			calls := 0
 			transport := mockTransport(func(r *http.Request) (*http.Response, error) {
@@ -64,6 +64,9 @@ func TestTelegramSearchTypesAndEmptyResults(t *testing.T) {
 				data, _ := io.ReadAll(r.Body)
 				if !strings.Contains(string(data), `"`+tc.field+`":"`+tc.value+`"`) {
 					t.Errorf("wrong initial query: %s", data)
+				}
+				if tc.kind == "auto" && (!strings.Contains(string(data), `"mobile":"`+tc.value+`"`) || !strings.Contains(string(data), `"alt":"`+tc.value+`"`)) {
+					t.Errorf("automatic lookup missing phone fields: %s", data)
 				}
 				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"hits":{"total":{"value":0,"relation":"eq"},"hits":[]}}`))}, nil
 			})

@@ -50,7 +50,7 @@ func (h *SearchHandler) telegramSearch(secret string, admin bool) gin.HandlerFun
 		req.Value = strings.TrimSpace(req.Value)
 		valid := false
 		switch req.Type {
-		case "phone":
+		case "phone", "auto":
 			valid = telegramPhone.MatchString(req.Value)
 		case "master_id":
 			valid = telegramMaster.MatchString(req.Value)

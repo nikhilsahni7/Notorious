@@ -381,7 +381,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 		}
 		valid := false
 		switch kind {
-		case "phone":
+		case "phone", "auto":
 			valid = phone.MatchString(value)
 		case "master_id":
 			valid = master.MatchString(value)
@@ -434,7 +434,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 
 func detectSearchType(value string) string {
 	if phone.MatchString(value) {
-		return "phone"
+		return "auto"
 	}
 	if addr, err := mail.ParseAddress(value); err == nil && addr.Address == value && len(value) <= 254 {
 		return "email"
@@ -776,8 +776,11 @@ func (a *app) listPlans(ctx context.Context, user int64) error {
 		if err := rows.Scan(&name, &price, &limit, &days); err != nil {
 			return err
 		}
-		fmt.Fprintf(&b, "%s · ₹%d.%02d\n%d searches per day  |  %d days\n\n", name, price/100, price%100, limit, days)
-		keyboard = append(keyboard, []map[string]string{{"text": "Buy " + name}})
+		fmt.Fprintf(&b, "%s · ₹%d.%02d · %d/day · %d days\n", name, price/100, price%100, limit, days)
+		if count%2 == 0 {
+			keyboard = append(keyboard, []map[string]string{})
+		}
+		keyboard[len(keyboard)-1] = append(keyboard[len(keyboard)-1], map[string]string{"text": "Buy " + name})
 		count++
 	}
 	if err := rows.Err(); err != nil {
@@ -786,7 +789,7 @@ func (a *app) listPlans(ctx context.Context, user int64) error {
 	if count == 0 {
 		b.WriteString("Contact your administrator for available plans.\n")
 	}
-	b.WriteString("Select a plan below. Your payment will be reviewed by an admin.")
+	b.WriteString("\nSelect a plan below. Your payment will be reviewed by an admin.")
 	keyboard = append(keyboard, []map[string]string{{"text": "Payment status"}, {"text": "Home"}})
 	return a.sendPayload(ctx, map[string]interface{}{"chat_id": user, "text": b.String(), "protect_content": true, "reply_markup": map[string]interface{}{"keyboard": keyboard, "resize_keyboard": true}})
 }
@@ -986,6 +989,9 @@ func (a *app) history(ctx context.Context, uid int64, parts []string) error {
 		if kind == "master_id" {
 			kind = "Document number"
 		}
+		if kind == "auto" {
+			kind = "Phone or document number"
+		}
 		if value == "" {
 			value = "(details unavailable)"
 		}
@@ -1104,6 +1110,9 @@ func (a *app) adminHistory(ctx context.Context, actor int64, p []string) error {
 		label := kind
 		if label == "master_id" {
 			label = "Document number"
+		}
+		if label == "auto" {
+			label = "Phone or document number"
 		}
 		fmt.Fprintf(&b, "%s IST · %s\n%s · %s\n\n", date, label, value, outcome)
 		n++
