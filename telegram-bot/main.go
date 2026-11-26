@@ -353,9 +353,9 @@ func (a *app) handle(ctx context.Context, u update) error {
 	switch cmd {
 	case "/start":
 		if a.admins[uid] {
-			return a.sendMessage(ctx, uid, "Welcome to SHAKIL INTEL X\n\nAdministrator access is active. Use the search buttons below or /help for commands. Your searches do not use credits.\n\nUse /admin to manage users, plans and payments.", true)
+			return a.sendMessage(ctx, uid, "Welcome to Telegram Tracing bot By Shakil Bhai\n\nAdministrator access is active. Use the search buttons below or /help for commands. Your searches do not use credits.\n\nUse /admin to manage users, plans and payments.", true)
 		}
-		return a.sendMessage(ctx, uid, "Welcome to SHAKIL INTEL X\n\nChoose a search below and enter a phone number, email or document number. We’ll show up to 5 linked records.\n\nYour searches\n• Searches with results use one search, including repeats.\n• No-result searches are free.\n• Your allowance resets at midnight IST.\n\nYou get 3 free trial searches with results. Open Plans for paid access. Use My account to check your balance, or History to see recent searches.\n\nUse /cancel to leave any step.", true)
+		return a.sendMessage(ctx, uid, "Welcome to Telegram Tracing bot By Shakil Bhai\n\nChoose a search below and enter a phone number, email or document number. We’ll show up to 5 linked records.\n\nYour searches\n• Searches with results use one search, including repeats.\n• No-result searches are free.\n• Your allowance resets at midnight IST.\n\nYou get 3 free trial searches with results. Open Plans for paid access. Use My account to check your balance, or History to see recent searches.\n\nUse /cancel to leave any step.", true)
 	case "/help":
 		return a.sendMessage(ctx, uid, helpText(a.admins[uid]), true)
 
@@ -384,7 +384,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 	case "/mypayments":
 		return a.myPayments(ctx, uid)
 	case "/support":
-		return a.send(ctx, uid, "Need help?\n\nContact the administrator who gave you access to SHAKIL INTEL X. For payment issues, include your transaction reference.")
+		return a.send(ctx, uid, "Need help?\n\nContact the administrator who gave you access to Telegram Tracing bot By Shakil Bhai. For payment issues, include your transaction reference.")
 	case "/balance", "/account":
 		return a.account(ctx, uid)
 	case "/history":
@@ -466,7 +466,7 @@ func detectSearchType(value string) string {
 }
 
 func helpText(admin bool) string {
-	text := "SHAKIL INTEL X · Help\n\nSearch using the buttons or commands:\n/search phone 9876543210\n/search email name@example.com\n/search id DOCUMENTNUMBER\n\nUp to 5 linked records are shown. Each search with results uses one credit, including repeats. No-result searches are free. Paid credits reset at midnight IST.\n\nPlans & payments\n/plans — available plans\n/buy PLAN — choose a plan\n/paid REFERENCE — submit your UPI reference\n/mypayments — payment status\n\nAccount\n/account — plan and remaining searches\n/history — recent searches\n/history 2 — next history page\n/cancel — leave the current step\n/support — get help"
+	text := "Telegram Tracing bot By Shakil Bhai · Help\n\nSearch using the buttons or commands:\n/search phone 9876543210\n/search email name@example.com\n/search id DOCUMENTNUMBER\n\nUp to 5 linked records are shown. Each search with results uses one credit, including repeats. No-result searches are free. Paid credits reset at midnight IST.\n\nPlans & payments\n/plans — available plans\n/buy PLAN — choose a plan\n/paid REFERENCE — submit your UPI reference\n/mypayments — payment status\n\nAccount\n/account — plan and remaining searches\n/history — recent searches\n/history 2 — next history page\n/cancel — leave the current step\n/support — get help"
 	if admin {
 		text += "\n\nAdministrator\n/admin — users, plans, payment reviews and other admin commands\nYour administrator searches do not use credits."
 	}
