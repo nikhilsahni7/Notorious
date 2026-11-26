@@ -110,17 +110,26 @@ func TestTelegramSearchHandlesLargeDirectMatches(t *testing.T) {
 			if body["size"] != float64(500) {
 				t.Fatalf("wrong scan size: %v", body["size"])
 			}
+			if body["track_total_hits"] != float64(501) {
+				t.Fatalf("scan count must be bounded: %v", body["track_total_hits"])
+			}
 			result := `{"hits":{"total":{"value":501,"relation":"eq"},"hits":[{"_score":1,"_source":{"id":"master123"}},{"_score":1,"_source":{"id":123}}]}}`
 			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(result))}, nil
 		}
 		if calls == 2 {
+			if body["track_total_hits"] != float64(501) {
+				t.Fatal("linked count must be bounded")
+			}
 			result := `{"hits":{"total":{"value":1,"relation":"eq"},"hits":[{"_score":1,"_source":{"id":"master123"}}]}}`
 			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(result))}, nil
 		}
 		if body["size"] != float64(5) {
 			t.Fatalf("wrong output size: %v", body["size"])
 		}
-		result := `{"hits":{"total":{"value":10,"relation":"eq"},"hits":[{"_score":1,"_source":{"id":"master123","name":"Test"}}]}}`
+		if body["track_total_hits"] != false {
+			t.Fatal("final query must not count all matches")
+		}
+		result := `{"hits":{"hits":[{"_score":1,"_source":{"id":"master123","name":"Test"}}]}}`
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(result))}, nil
 	})
 	client, err := opensearchapi.NewClient(opensearchapi.Config{Client: opensearch.Config{Addresses: []string{"http://localhost:9200"}, Transport: transport}})
@@ -132,7 +141,7 @@ func TestTelegramSearchHandlesLargeDirectMatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Partial || result.Hits.Total.Value != 10 || calls != 3 {
+	if !result.Partial || result.Hits.Total.Value != 1 || calls != 3 {
 		t.Fatalf("unexpected result %+v calls %d", result, calls)
 	}
 }

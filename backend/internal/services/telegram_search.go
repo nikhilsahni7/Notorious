@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/opensearch-project/opensearch-go/v3/opensearchapi"
 )
@@ -37,22 +39,28 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 	default:
 		return nil, fmt.Errorf("invalid search type")
 	}
-	search := func(q map[string]interface{}, size int, source interface{}) (*opensearchapi.SearchResp, error) {
-		body, err := json.Marshal(map[string]interface{}{"query": addRegionFilter(q, region), "size": size, "_source": source, "track_total_hits": true, "timeout": "5s"})
+	search := func(stage string, q map[string]interface{}, size int, source interface{}, track interface{}) (*opensearchapi.SearchResp, error) {
+		body, err := json.Marshal(map[string]interface{}{"query": addRegionFilter(q, region), "size": size, "_source": source, "track_total_hits": track, "timeout": "5s"})
 		if err != nil {
 			return nil, err
 		}
+		started := time.Now()
 		resp, err := s.api.Search(ctx, &opensearchapi.SearchReq{Indices: s.cfg.OpenSearchIndices, Body: bytes.NewReader(body)})
 		if err != nil {
+			log.Printf("telegram search stage=%s type=%s failed duration=%s", stage, kind, time.Since(started).Round(time.Millisecond))
 			return nil, ErrTelegramSearchUpstream
 		}
 		if resp.Timeout || resp.Shards.Failed > 0 {
+			log.Printf("telegram search stage=%s type=%s incomplete duration=%s", stage, kind, time.Since(started).Round(time.Millisecond))
 			return nil, ErrTelegramSearchIncomplete
+		}
+		if time.Since(started) > 2*time.Second {
+			log.Printf("telegram search stage=%s type=%s slow duration=%s", stage, kind, time.Since(started).Round(time.Millisecond))
 		}
 		return resp, nil
 	}
 	const maxDirectMatches = 500
-	initial, err := search(query, maxDirectMatches, []string{"id", "mobile", "alt"})
+	initial, err := search("direct", query, maxDirectMatches, []string{"id", "mobile", "alt"}, maxDirectMatches+1)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +89,7 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 	sort.Strings(values)
 	linked := initial
 	if len(values) > 0 {
-		linked, err = search(map[string]interface{}{"terms": map[string]interface{}{"id": values}}, maxDirectMatches, []string{"id", "mobile", "alt"})
+		linked, err = search("documents", map[string]interface{}{"terms": map[string]interface{}{"id": values}}, maxDirectMatches, []string{"id", "mobile", "alt"}, maxDirectMatches+1)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +112,7 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 		}
 		sort.Strings(numbers)
 		q := map[string]interface{}{"bool": map[string]interface{}{"should": []interface{}{map[string]interface{}{"terms": map[string]interface{}{"mobile": numbers}}, map[string]interface{}{"terms": map[string]interface{}{"alt": numbers}}}, "minimum_should_match": 1}}
-		alternate, e := search(q, maxDirectMatches, []string{"id"})
+		alternate, e := search("alternates", q, maxDirectMatches, []string{"id"}, maxDirectMatches+1)
 		if e != nil {
 			return nil, e
 		}
@@ -135,7 +143,7 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 		sort.Strings(numbers)
 		should = append(should, map[string]interface{}{"terms": map[string]interface{}{"mobile": numbers}}, map[string]interface{}{"terms": map[string]interface{}{"alt": numbers}})
 	}
-	expanded, err := search(map[string]interface{}{"bool": map[string]interface{}{"should": should, "minimum_should_match": 1}}, 5, true)
+	expanded, err := search("results", map[string]interface{}{"bool": map[string]interface{}{"should": should, "minimum_should_match": 1}}, 5, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +151,9 @@ func (s *OpenSearchService) TelegramSearch(ctx context.Context, kind, value, reg
 	if err != nil {
 		return nil, ErrTelegramSearchInvalidRecord
 	}
+	// The final query deliberately does not count every match. The bot only
+	// needs to distinguish zero results from the records actually returned.
+	result.Hits.Total.Value = len(result.Hits.Hits)
 	result.Partial = partial
 	return result, nil
 }
