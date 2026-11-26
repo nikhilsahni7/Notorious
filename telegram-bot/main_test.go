@@ -131,7 +131,7 @@ func TestFormatResults(t *testing.T) {
 		t.Fatal("missing results")
 	}
 	combined := strings.Join(pages, "\n")
-	for _, v := range []string{"Result 1\n", "Alternate address: Second address", "1 credit after delivery"} {
+	for _, v := range []string{"Result 1\n", "📞 Phone: 9876543210", "👤 Full name:", "Alternate address: Second address", "1 credit after delivery"} {
 		if !strings.Contains(combined, v) {
 			t.Errorf("missing %q", v)
 		}

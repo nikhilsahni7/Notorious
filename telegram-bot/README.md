@@ -1,4 +1,4 @@
-# Telegram Tracing bot By Shakil Bhai
+# Tracing bot By Shakil Bhai
 
 The bot uses a separate PostgreSQL database. Users without an active plan receive three one-time trial searches with results. Each search with results, including a repeat, uses one search; no-result and failed searches do not. Paid daily allowances reset at midnight IST. Plain phone numbers, emails and document numbers can be sent directly; all-numeric inputs search both phone and document-number fields in one request.
 

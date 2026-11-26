@@ -14,8 +14,8 @@ import (
 )
 
 func TestPremiumHTMLAlwaysEscapesRecordValues(t *testing.T) {
-	got := premiumHTML("Search results\n\nResult 1\nName: <script>&value\nAddress: <b>unsafe</b>")
-	if strings.Contains(got, "<script>") || strings.Contains(got, "<b>unsafe</b>") || !strings.Contains(got, "&lt;script&gt;&amp;value") || !strings.Contains(got, "<b>Result 1</b>") {
+	got := premiumHTML("Search results\n\nResult 1\nName: <script>&value\nAddress: <b>unsafe</b>\n📞 Phone: <unsafe>")
+	if strings.Contains(got, "<script>") || strings.Contains(got, "<b>unsafe</b>") || !strings.Contains(got, "&lt;script&gt;&amp;value") || !strings.Contains(got, "<b>Result 1</b>") || !strings.Contains(got, "<b>📞 Phone:</b> &lt;unsafe&gt;") {
 		t.Fatalf("unsafe formatted text: %s", got)
 	}
 }

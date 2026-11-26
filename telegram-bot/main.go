@@ -240,7 +240,7 @@ func (a *app) sendMessage(ctx context.Context, chat int64, msg string, menu bool
 // Format only trusted structural labels; escape all content supplied by users or search records.
 func premiumHTML(text string) string {
 	lines := strings.Split(text, "\n")
-	labels := map[string]bool{"Name": true, "Father's name": true, "Phone": true, "Alternate": true, "Email": true, "Document number": true, "Address": true, "Alternate address": true}
+	labels := map[string]bool{"Name": true, "Father's name": true, "Phone": true, "Alternate": true, "Email": true, "Document number": true, "Address": true, "Alternate address": true, "📞 Phone": true, "📞 Alternate phone": true, "🏘️ Address": true, "🏘️ Alternate address": true, "🃏 Document number": true, "👤 Full name": true, "👨 Father's name": true, "📩 Email": true}
 	for i, line := range lines {
 		if i == 0 || (strings.HasPrefix(line, "Result ") && len(strings.Fields(line)) == 2) || strings.Contains(line, " remaining of ") {
 			lines[i] = "<b>" + html.EscapeString(line) + "</b>"
@@ -353,9 +353,9 @@ func (a *app) handle(ctx context.Context, u update) error {
 	switch cmd {
 	case "/start":
 		if a.admins[uid] {
-			return a.sendMessage(ctx, uid, "Welcome to Telegram Tracing bot By Shakil Bhai\n\nAdministrator access is active. Use the search buttons below or /help for commands. Your searches do not use credits.\n\nUse /admin to manage users, plans and payments.", true)
+			return a.sendMessage(ctx, uid, "Welcome to Tracing bot By Shakil Bhai\n\nAdministrator access is active. Use the search buttons below or /help for commands. Your searches do not use credits.\n\nUse /admin to manage users, plans and payments.", true)
 		}
-		return a.sendMessage(ctx, uid, "Welcome to Telegram Tracing bot By Shakil Bhai\n\nChoose a search below and enter a phone number, email or document number. We’ll show up to 5 linked records.\n\nYour searches\n• Searches with results use one search, including repeats.\n• No-result searches are free.\n• Your allowance resets at midnight IST.\n\nYou get 3 free trial searches with results. Open Plans for paid access. Use My account to check your balance, or History to see recent searches.\n\nUse /cancel to leave any step.", true)
+		return a.sendMessage(ctx, uid, "Welcome to Tracing bot By Shakil Bhai\n\nChoose a search below and enter a phone number, email or document number. We’ll show up to 5 linked records.\n\nYour searches\n• Searches with results use one search, including repeats.\n• No-result searches are free.\n• Your allowance resets at midnight IST.\n\nYou get 3 free trial searches with results. Open Plans for paid access. Use My account to check your balance, or History to see recent searches.\n\nUse /cancel to leave any step.", true)
 	case "/help":
 		return a.sendMessage(ctx, uid, helpText(a.admins[uid]), true)
 
@@ -466,7 +466,7 @@ func detectSearchType(value string) string {
 }
 
 func helpText(admin bool) string {
-	text := "Telegram Tracing bot By Shakil Bhai · Help\n\nSearch using the buttons or commands:\n/search phone 9876543210\n/search email name@example.com\n/search id DOCUMENTNUMBER\n\nUp to 5 linked records are shown. Each search with results uses one credit, including repeats. No-result searches are free. Paid credits reset at midnight IST.\n\nPlans & payments\n/plans — available plans\n/buy PLAN — choose a plan\n/paid REFERENCE — submit your UPI reference\n/mypayments — payment status\n\nAccount\n/account — plan and remaining searches\n/history — recent searches\n/history 2 — next history page\n/cancel — leave the current step\n/support — get help"
+	text := "Tracing bot By Shakil Bhai · Help\n\nSearch using the buttons or commands:\n/search phone 9876543210\n/search email name@example.com\n/search id DOCUMENTNUMBER\n\nUp to 5 linked records are shown. Each search with results uses one credit, including repeats. No-result searches are free. Paid credits reset at midnight IST.\n\nPlans & payments\n/plans — available plans\n/buy PLAN — choose a plan\n/paid REFERENCE — submit your UPI reference\n/mypayments — payment status\n\nAccount\n/account — plan and remaining searches\n/history — recent searches\n/history 2 — next history page\n/cancel — leave the current step\n/support — get help"
 	if admin {
 		text += "\n\nAdministrator\n/admin — users, plans, payment reviews and other admin commands\nYour administrator searches do not use credits."
 	}
@@ -658,7 +658,7 @@ func formatResults(r searchResult, repeat bool) []string {
 		d := hit.Source
 		var entry strings.Builder
 		fmt.Fprintf(&entry, "Result %d\n", i+1)
-		fields := []struct{ label, value string }{{"Name", d.Name}, {"Father's name", d.Fname}, {"Phone", d.Mobile}, {"Alternate", d.Alt}, {"Email", d.Email}, {"Document number", d.ID}, {"Address", d.Address}, {"Alternate address", d.AltAddress}}
+		fields := []struct{ label, value string }{{"📞 Phone", d.Mobile}, {"📞 Alternate phone", d.Alt}, {"🏘️ Address", d.Address}, {"🏘️ Alternate address", d.AltAddress}, {"🃏 Document number", d.ID}, {"👤 Full name", d.Name}, {"👨 Father's name", d.Fname}, {"📩 Email", d.Email}}
 		for _, f := range fields {
 			if v := cleanResultField(f.value); v != "" {
 				fmt.Fprintf(&entry, "%s: %s\n", f.label, v)
