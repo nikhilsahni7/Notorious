@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/csv"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -59,6 +60,33 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
+func TestDetectSearchType(t *testing.T) {
+	for _, tc := range []struct{ value, want string }{{"9876543210", "phone"}, {"Person@example.com", "email"}, {"ABCD1234", "id"}, {"bad@@example.com", ""}, {"123", ""}} {
+		if got := detectSearchType(tc.value); got != tc.want {
+			t.Errorf("%q: got %q want %q", tc.value, got, tc.want)
+		}
+	}
+}
+
+func TestCSVProtectsSpreadsheetFormulas(t *testing.T) {
+	var result searchResult
+	var hit struct {
+		Source document `json:"_source"`
+	}
+	hit.Source.Name = "=HYPERLINK(\"https://example.com\")"
+	hit.Source.Address = "a, b\nsecond line"
+	result.Hits.Hits = append(result.Hits.Hits, hit)
+	b, err := buildCSV(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := csv.NewReader(strings.NewReader(string(b)))
+	rows, err := r.ReadAll()
+	if err != nil || len(rows) != 2 || !strings.HasPrefix(rows[1][0], "'=") || rows[1][6] != hit.Source.Address {
+		t.Fatalf("invalid CSV: %v %v", rows, err)
+	}
+}
+
 func TestAdminSearchUsesPrivateAdminRoute(t *testing.T) {
 	var path string
 	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -113,8 +141,8 @@ func TestFormatResults(t *testing.T) {
 			t.Errorf("page too long: %d", len(page))
 		}
 	}
-	if strings.Contains(combined, "Result 4\n") {
-		t.Fatal("more than three results shown")
+	if !strings.Contains(combined, "Result 5\n") || strings.Contains(combined, "Result 6\n") {
+		t.Fatal("result limit should be five")
 	}
 	repeatPages := formatResults(r, true)
 	if !strings.Contains(repeatPages[0], "no credit used") {

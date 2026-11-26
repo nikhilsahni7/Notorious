@@ -35,7 +35,20 @@ import (
 var schema string
 
 type update struct {
-	ID      int64 `json:"update_id"`
+	ID            int64 `json:"update_id"`
+	CallbackQuery *struct {
+		ID   string `json:"id"`
+		Data string `json:"data"`
+		From struct {
+			ID int64 `json:"id"`
+		} `json:"from"`
+		Message *struct {
+			Chat struct {
+				ID   int64  `json:"id"`
+				Type string `json:"type"`
+			} `json:"chat"`
+		} `json:"message"`
+	} `json:"callback_query"`
 	Message *struct {
 		Text string `json:"text"`
 		Chat struct {
@@ -179,6 +192,22 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid", 400)
 		return
 	}
+	if u.CallbackQuery != nil {
+		q := u.CallbackQuery
+		if q.Message == nil || q.Message.Chat.Type != "private" || q.Message.Chat.ID != q.From.ID || !a.allow(q.From.ID) {
+			w.WriteHeader(200)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+		if err := a.handleReportCallback(ctx, q.ID, q.From.ID, q.Data); err != nil {
+			log.Printf("report callback failed: %v", err)
+			http.Error(w, "temporary error", 503)
+			return
+		}
+		w.WriteHeader(200)
+		return
+	}
 	if u.Message == nil || u.Message.Chat.Type != "private" || u.Message.From.ID != u.Message.Chat.ID {
 		w.WriteHeader(200)
 		return
@@ -202,7 +231,7 @@ func (a *app) send(ctx context.Context, chat int64, msg string) error {
 func (a *app) sendMessage(ctx context.Context, chat int64, msg string, menu bool) error {
 	payload := map[string]interface{}{"chat_id": chat, "text": msg, "protect_content": true}
 	if menu {
-		payload["reply_markup"] = map[string]interface{}{"keyboard": [][]map[string]string{{{"text": "Search phone"}, {"text": "Search email"}}, {{"text": "Search master ID"}, {"text": "My account"}}, {{"text": "Plans"}, {"text": "Payment status"}}, {{"text": "History"}, {"text": "Help"}}}, "resize_keyboard": true}
+		payload["reply_markup"] = map[string]interface{}{"keyboard": [][]map[string]string{{{"text": "Search phone"}, {"text": "Search email"}}, {{"text": "Search document number"}, {"text": "My account"}}, {{"text": "Plans"}, {"text": "Payment status"}}, {{"text": "History"}, {"text": "Help"}}}, "resize_keyboard": true}
 	}
 	return a.sendPayload(ctx, payload)
 }
@@ -237,13 +266,13 @@ func (a *app) handle(ctx context.Context, u update) error {
 		return err
 	}
 	parts := strings.Fields(m.Text)
-	selected := map[string]string{"Search phone": "phone", "Search email": "email", "Search master ID": "id"}
+	selected := map[string]string{"Search phone": "phone", "Search email": "email", "Search document number": "id", "Search master ID": "id"}
 	if kind, ok := selected[m.Text]; ok {
 		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_search=$2,pending_payment=false WHERE telegram_id=$1`, uid, kind); err != nil {
 			return err
 		}
-		prompt := map[string]string{"phone": "Phone search\n\nEnter a phone number using 10–15 digits.\nExample: 9876543210", "email": "Email search\n\nEnter the full email address.\nExample: name@example.com", "id": "Master ID search\n\nEnter the complete master ID."}[kind]
-		return a.send(ctx, uid, prompt+"\n\nRepeat and no-result searches are free. Send /cancel to go back.")
+		prompt := map[string]string{"phone": "Phone search\n\nEnter a phone number using 10–15 digits.\nExample: 9876543210", "email": "Email search\n\nEnter the full email address.\nExample: name@example.com", "id": "Document number search\n\nEnter the complete document number."}[kind]
+		return a.send(ctx, uid, prompt+"\n\nNo-result searches are free. Send /cancel to go back.")
 	}
 	if strings.HasPrefix(m.Text, "Buy ") {
 		parts = []string{"/buy", strings.TrimSpace(strings.TrimPrefix(m.Text, "Buy "))}
@@ -264,6 +293,8 @@ func (a *app) handle(ctx context.Context, u update) error {
 			parts = []string{"/paid", parts[0]}
 		} else if pending != "" {
 			parts = []string{"/search", pending, parts[0]}
+		} else if kind := detectSearchType(parts[0]); kind != "" {
+			parts = []string{"/search", kind, parts[0]}
 		}
 	}
 	if len(parts) == 0 {
@@ -271,7 +302,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 	}
 	cmd := strings.Split(strings.ToLower(parts[0]), "@")[0]
 	if a.admins[uid] && cmd == "/admin" {
-		return a.send(ctx, uid, "Admin commands:\n/users [PAGE] — list users\n/user USER_ID — account profile\n/setplan NAME PRICE_INR DAILY_LIMIT DAYS\n/assign USER_ID PLAN\n/block USER_ID\n/check USER_ID\n/resetquota USER_ID — reset today\n/userhistory USER_ID [PAGE] — search history\n/pending — payment reviews\n/approvepayment ORDER_ID\n/rejectpayment ORDER_ID REASON\nVerify receipt in your bank before approval.")
+		return a.send(ctx, uid, "Admin commands:\n/users [PAGE] — list users\n/user USER_ID — account profile\n/setplan NAME PRICE_INR DAILY_LIMIT DAYS\n/assign USER_ID PLAN\n/block USER_ID\n/check USER_ID\n/resetquota USER_ID — reset today\n/userhistory USER_ID [PAGE] — search history\n/pending — payment reviews\n/orderplan ORDER_ID PLAN — correct a pending plan\n/approvepayment ORDER_ID\n/rejectpayment ORDER_ID REASON\nVerify receipt in your bank before approval.")
 	}
 	if a.admins[uid] && cmd == "/users" {
 		return a.adminUsers(ctx, uid, parts)
@@ -288,7 +319,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 	if a.admins[uid] && (cmd == "/setplan" || cmd == "/assign") {
 		return a.configure(ctx, u.ID, uid, cmd, parts)
 	}
-	if a.admins[uid] && (cmd == "/pending" || cmd == "/approvepayment" || cmd == "/rejectpayment") {
+	if a.admins[uid] && (cmd == "/pending" || cmd == "/orderplan" || cmd == "/approvepayment" || cmd == "/rejectpayment") {
 		return a.paymentAdmin(ctx, u.ID, uid, cmd, parts)
 	}
 	if a.admins[uid] && (cmd == "/block" || cmd == "/check") {
@@ -304,7 +335,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 		if a.admins[uid] {
 			return a.sendMessage(ctx, uid, "Welcome to SHAKIL INTEL X\n\nAdministrator access is active. Use the search buttons below or /help for commands. Your searches do not use credits.\n\nUse /admin to manage users, plans and payments.", true)
 		}
-		return a.sendMessage(ctx, uid, "Welcome to SHAKIL INTEL X\n\nChoose a search below and enter a phone number, email or master ID. We’ll show up to 3 linked records.\n\nYour searches\n• A new search with results uses 1 credit.\n• Repeats and no-result searches are free.\n• Your allowance resets at midnight IST.\n\nNeed access? Open Plans to choose a plan. Use My account to check your balance, or History to see recent searches.\n\nUse /cancel to leave any step.", true)
+		return a.sendMessage(ctx, uid, "Welcome to SHAKIL INTEL X\n\nChoose a search below and enter a phone number, email or document number. We’ll show up to 5 linked records.\n\nYour searches\n• Searches with results use one search, including repeats.\n• No-result searches are free.\n• Your allowance resets at midnight IST.\n\nYou get 3 free trial searches with results. Open Plans for paid access. Use My account to check your balance, or History to see recent searches.\n\nUse /cancel to leave any step.", true)
 	case "/help":
 		return a.sendMessage(ctx, uid, helpText(a.admins[uid]), true)
 
@@ -324,9 +355,6 @@ func (a *app) handle(ctx context.Context, u update) error {
 				return a.send(ctx, uid, "That reference doesn’t look right. Enter 6–64 letters or numbers, or send /cancel.")
 			}
 		}
-		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=false WHERE telegram_id=$1`, uid); err != nil {
-			return err
-		}
 		return a.submitPayment(ctx, uid, parts)
 	case "/cancel":
 		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=false,pending_search='' WHERE telegram_id=$1`, uid); err != nil {
@@ -344,7 +372,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 
 	case "/search":
 		if len(parts) != 3 {
-			return a.send(ctx, uid, "Use /search phone NUMBER, /search email EMAIL or /search id MASTERID.")
+			return a.send(ctx, uid, "Use /search phone NUMBER, /search email EMAIL or /search id DOCUMENTNUMBER.")
 		}
 		kind := strings.ToLower(parts[1])
 		value := parts[2]
@@ -375,7 +403,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 		case "duplicate":
 			return nil
 		case "denied":
-			return a.send(ctx, uid, "Search unavailable\n\nYour plan may be inactive or today’s allowance may be used. Open My account to check your status, or Plans to review options.")
+			return a.send(ctx, uid, "Search unavailable\n\nYour free searches or today’s plan allowance may be used. Open My account to check your status, or Plans to review options.")
 		case "busy":
 			return a.send(ctx, uid, "A search is already in progress. Wait for it to finish, then try again.")
 		case "rate_limited":
@@ -404,8 +432,21 @@ func (a *app) handle(ctx context.Context, u update) error {
 	}
 }
 
+func detectSearchType(value string) string {
+	if phone.MatchString(value) {
+		return "phone"
+	}
+	if addr, err := mail.ParseAddress(value); err == nil && addr.Address == value && len(value) <= 254 {
+		return "email"
+	}
+	if master.MatchString(value) {
+		return "id"
+	}
+	return ""
+}
+
 func helpText(admin bool) string {
-	text := "SHAKIL INTEL X · Help\n\nSearch using the buttons or commands:\n/search phone 9876543210\n/search email name@example.com\n/search id MASTERID\n\nUp to 3 linked records are shown. New searches with results use one credit; repeats and searches with no results are free. Daily credits reset at midnight IST.\n\nPlans & payments\n/plans — available plans\n/buy PLAN — choose a plan\n/paid REFERENCE — submit your UPI reference\n/mypayments — payment status\n\nAccount\n/account — plan and remaining searches\n/history — recent searches\n/history 2 — next history page\n/cancel — leave the current step\n/support — get help"
+	text := "SHAKIL INTEL X · Help\n\nSearch using the buttons or commands:\n/search phone 9876543210\n/search email name@example.com\n/search id DOCUMENTNUMBER\n\nUp to 5 linked records are shown. Each search with results uses one credit, including repeats. No-result searches are free. Paid credits reset at midnight IST.\n\nPlans & payments\n/plans — available plans\n/buy PLAN — choose a plan\n/paid REFERENCE — submit your UPI reference\n/mypayments — payment status\n\nAccount\n/account — plan and remaining searches\n/history — recent searches\n/history 2 — next history page\n/cancel — leave the current step\n/support — get help"
 	if admin {
 		text += "\n\nAdministrator\n/admin — users, plans, payment reviews and other admin commands\nYour administrator searches do not use credits."
 	}
@@ -432,7 +473,7 @@ func (a *app) reserve(ctx context.Context, updateID, uid int64, kind, value stri
 		return "duplicate", "", tx.Commit(ctx)
 	}
 	isAdmin := a.admins[uid]
-	if blocked || (!isAdmin && !approved) {
+	if blocked {
 		return "denied", "", tx.Commit(ctx)
 	}
 	if !isAdmin {
@@ -457,32 +498,38 @@ func (a *app) reserve(ctx context.Context, updateID, uid int64, kind, value stri
 		}
 	}
 	key := a.searchKey(uid, kind, value, region)
-	var repeat bool
-	e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM search_requests WHERE telegram_id=$1 AND search_key=$2 AND state='charged')`, uid, key).Scan(&repeat)
-	if e != nil {
-		return "", "", e
+	billing := "paid"
+	if isAdmin {
+		billing = "admin"
+	} else if !approved {
+		billing = "trial"
 	}
 	var used int
-	e = tx.QueryRow(ctx, `SELECT count(*) FROM search_requests r WHERE telegram_id=$1 AND quota_day=(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date AND state IN ('reserved','charged','uncertain') AND created_at > COALESCE((SELECT reset_at FROM quota_resets WHERE telegram_id=$1 AND quota_day=r.quota_day),'-infinity'::timestamptz)`, uid).Scan(&used)
+	if billing == "trial" {
+		e = tx.QueryRow(ctx, `SELECT count(*) FROM search_requests WHERE telegram_id=$1 AND billing_kind='trial' AND state IN ('reserved','charged','uncertain')`, uid).Scan(&used)
+		limit = 3
+	} else {
+		e = tx.QueryRow(ctx, `SELECT count(*) FROM search_requests r WHERE telegram_id=$1 AND billing_kind='paid' AND quota_day=(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date AND state IN ('reserved','charged','uncertain') AND created_at > COALESCE((SELECT reset_at FROM quota_resets WHERE telegram_id=$1 AND quota_day=r.quota_day),'-infinity'::timestamptz)`, uid).Scan(&used)
+	}
 	if e != nil {
 		return "", "", e
 	}
-	if !isAdmin && used >= limit && !repeat {
+	if !isAdmin && used >= limit {
 		return "denied", "", tx.Commit(ctx)
 	}
 	encrypted, e := a.encryptHistory(uid, updateID, kind, value)
 	if e != nil {
 		return "", "", e
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO search_requests(update_id,telegram_id,quota_day,state,search_type,masked_value,search_key,encrypted_value,created_at) VALUES($1,$2,(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date,'reserved',$3,$4,$5,$6,clock_timestamp())`, updateID, uid, kind, maskSearch(kind, value), key, encrypted)
+	_, e = tx.Exec(ctx, `INSERT INTO search_requests(update_id,telegram_id,quota_day,state,search_type,masked_value,search_key,encrypted_value,billing_kind,created_at) VALUES($1,$2,(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date,'reserved',$3,$4,$5,$6,$7,clock_timestamp())`, updateID, uid, kind, maskSearch(kind, value), key, encrypted, billing)
 	if e != nil {
 		return "", "", e
 	}
 	if isAdmin {
 		return "admin", region, tx.Commit(ctx)
 	}
-	if repeat {
-		return "repeat", region, tx.Commit(ctx)
+	if billing == "trial" {
+		return "trial", region, tx.Commit(ctx)
 	}
 	return "reserved", region, tx.Commit(ctx)
 }
@@ -585,13 +632,13 @@ func formatResults(r searchResult, repeat bool) []string {
 	var bodies []string
 	var b strings.Builder
 	for i, hit := range r.Hits.Hits {
-		if i >= 3 {
+		if i >= 5 {
 			break
 		}
 		d := hit.Source
 		var entry strings.Builder
 		fmt.Fprintf(&entry, "Result %d\n", i+1)
-		fields := []struct{ label, value string }{{"Name", d.Name}, {"Father's name", d.Fname}, {"Phone", d.Mobile}, {"Alternate", d.Alt}, {"Email", d.Email}, {"Master ID", d.ID}, {"Address", d.Address}, {"Alternate address", d.AltAddress}}
+		fields := []struct{ label, value string }{{"Name", d.Name}, {"Father's name", d.Fname}, {"Phone", d.Mobile}, {"Alternate", d.Alt}, {"Email", d.Email}, {"Document number", d.ID}, {"Address", d.Address}, {"Alternate address", d.AltAddress}}
 		for _, f := range fields {
 			if v := cleanResultField(f.value); v != "" {
 				fmt.Fprintf(&entry, "%s: %s\n", f.label, v)
@@ -613,7 +660,7 @@ func formatResults(r searchResult, repeat bool) []string {
 		if repeat {
 			charge = "Repeat search · no credit used"
 		}
-		header := fmt.Sprintf("Search results\n\nUp to 3 records · %s\n", charge)
+		header := fmt.Sprintf("Search results\n\nUp to 5 records · %s\n", charge)
 		if r.Partial {
 			header += "More matches may exist.\n"
 		}
@@ -719,7 +766,7 @@ func (a *app) listPlans(ctx context.Context, user int64) error {
 	}
 	defer rows.Close()
 	var b strings.Builder
-	b.WriteString("Choose your plan\n\nEvery plan includes phone, email and master ID search.\n\n")
+	b.WriteString("Choose your plan\n\nEvery plan includes phone, email and document number search.\n\n")
 	count := 0
 	keyboard := [][]map[string]string{}
 	for rows.Next() {
@@ -830,6 +877,18 @@ func (a *app) poll() error {
 			continue
 		}
 		for _, u := range data.Result {
+			if q := u.CallbackQuery; q != nil {
+				if q.Message != nil && q.Message.Chat.Type == "private" && q.Message.Chat.ID == q.From.ID && a.allow(q.From.ID) {
+					ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+					err = a.handleReportCallback(ctx, q.ID, q.From.ID, q.Data)
+					cancel()
+					if err != nil {
+						break
+					}
+				}
+				offset = u.ID + 1
+				continue
+			}
 			if u.Message == nil || u.Message.Chat.Type != "private" || u.Message.From.ID != u.Message.Chat.ID || !a.allow(u.Message.From.ID) {
 				offset = u.ID + 1
 				continue
@@ -865,12 +924,19 @@ func (a *app) account(ctx context.Context, uid int64) error {
 	var active, blocked bool
 	var limit, used int
 	var name, region, expires string
-	err := a.db.QueryRow(ctx, `SELECT (approved AND COALESCE(plan_expires_at>now(),false)),blocked,daily_limit,plan_name,region,COALESCE(to_char(plan_expires_at AT TIME ZONE 'Asia/Kolkata','DD Mon YYYY HH24:MI') || ' IST','Not assigned'),(SELECT count(*) FROM search_requests r WHERE telegram_id=$1 AND quota_day=(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date AND state IN ('reserved','charged','uncertain') AND created_at > COALESCE((SELECT reset_at FROM quota_resets WHERE telegram_id=$1 AND quota_day=r.quota_day),'-infinity'::timestamptz)) FROM bot_users WHERE telegram_id=$1`, uid).Scan(&active, &blocked, &limit, &name, &region, &expires, &used)
+	err := a.db.QueryRow(ctx, `SELECT (approved AND COALESCE(plan_expires_at>now(),false)),blocked,daily_limit,plan_name,region,COALESCE(to_char(plan_expires_at AT TIME ZONE 'Asia/Kolkata','DD Mon YYYY HH24:MI') || ' IST','Not assigned'),(SELECT count(*) FROM search_requests r WHERE telegram_id=$1 AND billing_kind='paid' AND quota_day=(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date AND state IN ('reserved','charged','uncertain') AND created_at > COALESCE((SELECT reset_at FROM quota_resets WHERE telegram_id=$1 AND quota_day=r.quota_day),'-infinity'::timestamptz)) FROM bot_users WHERE telegram_id=$1`, uid).Scan(&active, &blocked, &limit, &name, &region, &expires, &used)
 	if err != nil {
 		return err
 	}
 	if a.admins[uid] && !blocked {
 		return a.send(ctx, uid, "My account\n\nAdministrator access\nSearches: unlimited · no credits used\n\n/history — search history\n/admin — management commands")
+	}
+	if !active && !blocked {
+		var trialUsed int
+		if err := a.db.QueryRow(ctx, `SELECT count(*) FROM search_requests WHERE telegram_id=$1 AND billing_kind='trial' AND state IN ('reserved','charged','uncertain')`, uid).Scan(&trialUsed); err != nil {
+			return err
+		}
+		return a.send(ctx, uid, fmt.Sprintf("My account\n\nFree trial searches remaining: %d of 3\n\nResults use one trial search; no-result searches are free. Open Plans to choose paid access.", max(0, 3-trialUsed)))
 	}
 	status := "Active"
 	if !active || blocked {
@@ -916,6 +982,9 @@ func (a *app) history(ctx context.Context, uid int64, parts []string) error {
 		}
 		if kind == "" {
 			kind = "Search"
+		}
+		if kind == "master_id" {
+			kind = "Document number"
 		}
 		if value == "" {
 			value = "(details unavailable)"
@@ -1032,7 +1101,11 @@ func (a *app) adminHistory(ctx context.Context, actor int64, p []string) error {
 		} else if masked != "" {
 			value = masked + " (older masked record)"
 		}
-		fmt.Fprintf(&b, "%s IST · %s\n%s · %s\n\n", date, kind, value, outcome)
+		label := kind
+		if label == "master_id" {
+			label = "Document number"
+		}
+		fmt.Fprintf(&b, "%s IST · %s\n%s · %s\n\n", date, label, value, outcome)
 		n++
 	}
 	err = rows.Err()

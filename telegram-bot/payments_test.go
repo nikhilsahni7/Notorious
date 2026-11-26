@@ -37,6 +37,15 @@ func (tr *historyCaptureTransport) RoundTrip(r *http.Request) (*http.Response, e
 
 type deliveryFailureTransport struct{}
 
+type reportCaptureTransport struct{ documents int }
+
+func (tr *reportCaptureTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if strings.HasSuffix(r.URL.Path, "/sendDocument") {
+		tr.documents++
+	}
+	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"ok":true}`)), Header: make(http.Header)}, nil
+}
+
 func (deliveryFailureTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return &http.Response{StatusCode: 503, Body: io.NopCloser(strings.NewReader(`{}`)), Header: make(http.Header)}, nil
 }
@@ -195,8 +204,8 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 		t.Fatalf("exceeded quota: %s %v", state, err)
 	}
 	repeatState, _, err := a.reserve(ctx, 201, 101, "phone", "****3210")
-	if err != nil || repeatState != "repeat" {
-		t.Fatalf("repeat at limit: %s %v", repeatState, err)
+	if err != nil || repeatState != "denied" {
+		t.Fatalf("repeat at limit must be denied: %s %v", repeatState, err)
 	}
 	if _, err = db.Exec(ctx, `UPDATE search_requests SET state='released' WHERE update_id=201`); err != nil {
 		t.Fatal(err)
@@ -233,7 +242,7 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	if err = db.QueryRow(ctx, `SELECT count(*) FROM payment_orders WHERE transaction_reference='TXN777777'`).Scan(&matched); err != nil || matched != 1 {
 		t.Fatal("identical orders were not matched", err)
 	}
-	// Different plans are ambiguous, until the customer names their plan.
+	// Different plans select the most recently selected plan for admin review.
 	if _, err = db.Exec(ctx, `INSERT INTO plans(name,price_paise,daily_limit,days) VALUES('Pro',90000,200,30)`); err != nil {
 		t.Fatal(err)
 	}
@@ -243,16 +252,28 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	if err = a.submitPayment(ctx, 102, []string{"/paid", "TXN888888"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.QueryRow(ctx, `SELECT count(*) FROM payment_orders WHERE transaction_reference='TXN888888'`).Scan(&matched); err != nil || matched != 0 {
-		t.Fatal("different plans were guessed", err)
-	}
-	if err = a.submitPayment(ctx, 102, []string{"/paid", "Pro", "TXN888888"}); err != nil {
-		t.Fatal(err)
-	}
+
 	if err = db.QueryRow(ctx, `SELECT count(*) FROM payment_orders WHERE transaction_reference='TXN888888' AND plan_name='Pro'`).Scan(&matched); err != nil || matched != 1 {
 		t.Fatal("named plan was not selected", err)
 	}
-	// End-to-end handling reserves once, releases duplicate and zero-result searches.
+	var correctionID int64
+	if err = db.QueryRow(ctx, `SELECT id FROM payment_orders WHERE transaction_reference='TXN888888'`).Scan(&correctionID); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.paymentAdmin(ctx, 8010, 999, "/orderplan", []string{"/orderplan", strconv.FormatInt(correctionID, 10), "Plus"}); err != nil {
+		t.Fatal(err)
+	}
+	var corrected string
+	if err = db.QueryRow(ctx, `SELECT plan_name FROM payment_orders WHERE id=$1`, correctionID).Scan(&corrected); err != nil || corrected != "Plus" {
+		t.Fatal("plan correction failed", err)
+	}
+	if err = a.paymentAdmin(ctx, 8010, 999, "/orderplan", []string{"/orderplan", strconv.FormatInt(correctionID, 10), "Pro"}); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.QueryRow(ctx, `SELECT plan_name FROM payment_orders WHERE id=$1`, correctionID).Scan(&corrected); err != nil || corrected != "Plus" {
+		t.Fatal("replayed plan correction changed order", err)
+	}
+	// Every search with results charges; zero results remain free.
 	a.webhookSecret = "test-secret"
 	a.searchURL = "https://search.example/search"
 	a.client = &http.Client{Transport: searchFlowTransport{}, Timeout: time.Second}
@@ -284,9 +305,10 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	if err = a.deliverSearch(ctx, 302, 101); err != nil {
 		t.Fatal(err)
 	}
-	if countCharged() != after {
-		t.Fatal("repeat search charged")
+	if countCharged() != after+1 {
+		t.Fatal("repeat search was not charged")
 	}
+	after++
 	if err = a.handle(ctx, testSearchUpdate(t, 303, 101, "/search email noresults@example.com")); err != nil {
 		t.Fatal(err)
 	}
@@ -433,6 +455,46 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	limited, _, err := a.reserve(ctx, 603, 104, "phone", "1111111111")
 	if err != nil || limited != "rate_limited" {
 		t.Fatalf("unmetered workload not limited: %s %v", limited, err)
+	}
+	t.Setenv("SEARCH_WORKLOAD_PER_MINUTE", "10")
+	// One-time trial counts only delivered nonempty results, including repeats.
+	if _, err = db.Exec(ctx, `INSERT INTO bot_users(telegram_id) VALUES(109)`); err != nil {
+		t.Fatal(err)
+	}
+	a.client = &http.Client{Transport: searchFlowTransport{}, Timeout: time.Second}
+	a.searchURL = "https://search.example/search"
+	for _, tc := range []struct {
+		id    int64
+		value string
+	}{{801, "noresults@example.com"}, {802, "person@example.com"}, {803, "person@example.com"}, {804, "person@example.com"}} {
+		if err = a.handle(ctx, testSearchUpdate(t, tc.id, 109, tc.value)); err != nil {
+			t.Fatal(err)
+		}
+		if err = a.deliverSearch(ctx, tc.id, 109); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var trialUsed int
+	if err = db.QueryRow(ctx, `SELECT count(*) FROM search_requests WHERE telegram_id=109 AND billing_kind='trial' AND state='charged'`).Scan(&trialUsed); err != nil || trialUsed != 3 {
+		t.Fatalf("trial usage %d: %v", trialUsed, err)
+	}
+	if st, _, e := a.reserve(ctx, 805, 109, "phone", "1111111111"); e != nil || st != "denied" {
+		t.Fatalf("trial limit %s: %v", st, e)
+	}
+	var ciphertext []byte
+	if err = db.QueryRow(ctx, `SELECT encrypted_result FROM search_reports WHERE update_id=802 AND telegram_id=109`).Scan(&ciphertext); err != nil || strings.Contains(string(ciphertext), "Example") {
+		t.Fatal("report must be encrypted", err)
+	}
+	reportTransport := &reportCaptureTransport{}
+	a.client = &http.Client{Transport: reportTransport, Timeout: time.Second}
+	if err = a.handleReportCallback(ctx, "test", 109, "report:802"); err != nil {
+		t.Fatal("owner report:", err)
+	}
+	if err = a.handleReportCallback(ctx, "test", 101, "report:802"); err != nil {
+		t.Fatal("other user report rejection:", err)
+	}
+	if reportTransport.documents != 1 {
+		t.Fatal("report leaked to a different user")
 	}
 	// Admins can search without a paid plan, credits, workload or in-flight limits.
 	if _, err = db.Exec(ctx, `INSERT INTO bot_users(telegram_id) VALUES(999)`); err != nil {

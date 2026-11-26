@@ -41,6 +41,7 @@ ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS masked_value TEXT NOT NULL 
 ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS search_key TEXT NOT NULL DEFAULT '';
 ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS encrypted_value BYTEA;
 ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS outcome TEXT NOT NULL DEFAULT '';
+ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS billing_kind TEXT NOT NULL DEFAULT 'paid';
 CREATE INDEX IF NOT EXISTS search_requests_previous_idx ON search_requests (telegram_id, search_key) WHERE state='charged' AND search_key <> '';
 CREATE TABLE IF NOT EXISTS quota_resets (
  telegram_id BIGINT NOT NULL REFERENCES bot_users(telegram_id),
@@ -63,6 +64,13 @@ CREATE TABLE IF NOT EXISTS search_deliveries (
  updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 CREATE INDEX IF NOT EXISTS search_deliveries_pending_idx ON search_deliveries(next_retry_at) WHERE status='pending';
+CREATE TABLE IF NOT EXISTS search_reports (
+ update_id BIGINT PRIMARY KEY REFERENCES search_requests(update_id),
+ telegram_id BIGINT NOT NULL REFERENCES bot_users(telegram_id),
+ encrypted_result BYTEA NOT NULL,
+ expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS search_reports_expiry_idx ON search_reports(expires_at);
 
 CREATE TABLE IF NOT EXISTS payment_orders (
  id BIGSERIAL PRIMARY KEY,
