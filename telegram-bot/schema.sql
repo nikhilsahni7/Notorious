@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS plans (
 
 ALTER TABLE bot_users ADD COLUMN IF NOT EXISTS pending_search TEXT NOT NULL DEFAULT '';
 ALTER TABLE bot_users ADD COLUMN IF NOT EXISTS pending_payment BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE bot_users ADD COLUMN IF NOT EXISTS pending_ref_order BIGINT;
+ALTER TABLE bot_users ADD COLUMN IF NOT EXISTS pending_ref_value TEXT;
 
 ALTER TABLE bot_users ALTER COLUMN daily_limit SET DEFAULT 0;
 ALTER TABLE bot_users ALTER COLUMN plan_name SET DEFAULT 'Unassigned';
@@ -41,6 +43,7 @@ ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS masked_value TEXT NOT NULL 
 ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS search_key TEXT NOT NULL DEFAULT '';
 ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS encrypted_value BYTEA;
 ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS outcome TEXT NOT NULL DEFAULT '';
+ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS result_count INTEGER;
 ALTER TABLE search_requests ADD COLUMN IF NOT EXISTS billing_kind TEXT NOT NULL DEFAULT 'paid';
 CREATE INDEX IF NOT EXISTS search_requests_previous_idx ON search_requests (telegram_id, search_key) WHERE state='charged' AND search_key <> '';
 CREATE TABLE IF NOT EXISTS quota_resets (
@@ -90,9 +93,30 @@ CREATE TABLE IF NOT EXISTS payment_orders (
  reviewed_at TIMESTAMPTZ
 );
 CREATE UNIQUE INDEX IF NOT EXISTS payment_orders_reference_unique ON payment_orders (upper(transaction_reference)) WHERE transaction_reference IS NOT NULL;
+CREATE TABLE IF NOT EXISTS payment_reference_audit (
+ id BIGSERIAL PRIMARY KEY, order_id BIGINT NOT NULL REFERENCES payment_orders(id),
+ user_id BIGINT NOT NULL, previous_reference TEXT NOT NULL, new_reference TEXT NOT NULL,
+ changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS payment_reference_ledger (
+ reference_upper TEXT PRIMARY KEY, order_id BIGINT NOT NULL REFERENCES payment_orders(id)
+);
+INSERT INTO payment_reference_ledger(reference_upper,order_id)
+ SELECT upper(transaction_reference),id FROM payment_orders WHERE transaction_reference IS NOT NULL
+ ON CONFLICT(reference_upper) DO NOTHING;
+INSERT INTO payment_reference_ledger(reference_upper,order_id)
+ SELECT upper(previous_reference),order_id FROM payment_reference_audit WHERE previous_reference<>''
+ ON CONFLICT(reference_upper) DO NOTHING;
+CREATE TABLE IF NOT EXISTS payment_upgrade_confirmations (
+ admin_id BIGINT NOT NULL, order_id BIGINT NOT NULL REFERENCES payment_orders(id),
+ reference TEXT NOT NULL, plan_name TEXT NOT NULL, amount_paise BIGINT NOT NULL,
+ daily_limit INT NOT NULL, plan_days INT NOT NULL, old_plan TEXT NOT NULL, old_expiry TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY(admin_id,order_id)
+);
 CREATE INDEX IF NOT EXISTS payment_orders_review_idx ON payment_orders (status, submitted_at);
 CREATE INDEX IF NOT EXISTS payment_orders_user_idx ON payment_orders (user_id, created_at DESC);
 ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS review_started_at TIMESTAMPTZ;
 
 -- All bot searches now use the same fixed coverage.
 ALTER TABLE bot_users ALTER COLUMN region SET DEFAULT 'pan-india';

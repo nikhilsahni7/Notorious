@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -200,7 +201,7 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
-		if err := a.handleReportCallback(ctx, q.ID, q.From.ID, q.Data); err != nil {
+		if err := a.handleCallback(ctx, q.ID, q.From.ID, q.Data); err != nil {
 			log.Printf("report callback failed: %v", err)
 			http.Error(w, "temporary error", 503)
 			return
@@ -229,11 +230,27 @@ func (a *app) send(ctx context.Context, chat int64, msg string) error {
 	return a.sendMessage(ctx, chat, msg, false)
 }
 func (a *app) sendMessage(ctx context.Context, chat int64, msg string, menu bool) error {
-	payload := map[string]interface{}{"chat_id": chat, "text": msg, "protect_content": true}
+	payload := map[string]interface{}{"chat_id": chat, "text": premiumHTML(msg), "parse_mode": "HTML", "protect_content": true}
 	if menu {
 		payload["reply_markup"] = map[string]interface{}{"keyboard": [][]map[string]string{{{"text": "Search phone"}, {"text": "Search email"}}, {{"text": "Search document number"}, {"text": "My account"}}, {{"text": "Plans"}, {"text": "Payment status"}}, {{"text": "History"}, {"text": "Help"}}}, "resize_keyboard": true}
 	}
 	return a.sendPayload(ctx, payload)
+}
+
+// Format only trusted structural labels; escape all content supplied by users or search records.
+func premiumHTML(text string) string {
+	lines := strings.Split(text, "\n")
+	labels := map[string]bool{"Name": true, "Father's name": true, "Phone": true, "Alternate": true, "Email": true, "Document number": true, "Address": true, "Alternate address": true}
+	for i, line := range lines {
+		if i == 0 || (strings.HasPrefix(line, "Result ") && len(strings.Fields(line)) == 2) || strings.Contains(line, " remaining of ") {
+			lines[i] = "<b>" + html.EscapeString(line) + "</b>"
+		} else if label, value, ok := strings.Cut(line, ": "); ok && labels[label] {
+			lines[i] = "<b>" + html.EscapeString(label) + ":</b> " + html.EscapeString(value)
+		} else {
+			lines[i] = html.EscapeString(line)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 func (a *app) sendPayload(ctx context.Context, payload map[string]interface{}) error {
 	body, _ := json.Marshal(payload)
@@ -268,7 +285,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 	parts := strings.Fields(m.Text)
 	selected := map[string]string{"Search phone": "phone", "Search email": "email", "Search document number": "id", "Search master ID": "id"}
 	if kind, ok := selected[m.Text]; ok {
-		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_search=$2,pending_payment=false WHERE telegram_id=$1`, uid, kind); err != nil {
+		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_search=$2,pending_payment=false,pending_ref_order=NULL,pending_ref_value=NULL WHERE telegram_id=$1`, uid, kind); err != nil {
 			return err
 		}
 		prompt := map[string]string{"phone": "Phone search\n\nEnter a phone number using 10–15 digits.\nExample: 9876543210", "email": "Email search\n\nEnter the full email address.\nExample: name@example.com", "id": "Document number search\n\nEnter the complete document number."}[kind]
@@ -286,10 +303,13 @@ func (a *app) handle(ctx context.Context, u update) error {
 	if len(parts) == 1 && !strings.HasPrefix(parts[0], "/") {
 		var pending string
 		var payment bool
-		if err := a.db.QueryRow(ctx, `SELECT pending_search,pending_payment FROM bot_users WHERE telegram_id=$1`, uid).Scan(&pending, &payment); err != nil {
+		var editOrder *int64
+		if err := a.db.QueryRow(ctx, `SELECT pending_search,pending_payment,pending_ref_order FROM bot_users WHERE telegram_id=$1`, uid).Scan(&pending, &payment, &editOrder); err != nil {
 			return err
 		}
-		if payment {
+		if editOrder != nil {
+			return a.stageReferenceEdit(ctx, uid, *editOrder, parts[0])
+		} else if payment {
 			parts = []string{"/paid", parts[0]}
 		} else if pending != "" {
 			parts = []string{"/search", pending, parts[0]}
@@ -302,7 +322,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 	}
 	cmd := strings.Split(strings.ToLower(parts[0]), "@")[0]
 	if a.admins[uid] && cmd == "/admin" {
-		return a.send(ctx, uid, "Admin commands:\n/users [PAGE] — list users\n/user USER_ID — account profile\n/setplan NAME PRICE_INR DAILY_LIMIT DAYS\n/assign USER_ID PLAN\n/block USER_ID\n/check USER_ID\n/resetquota USER_ID — reset today\n/userhistory USER_ID [PAGE] — search history\n/pending — payment reviews\n/orderplan ORDER_ID PLAN — correct a pending plan\n/approvepayment ORDER_ID\n/rejectpayment ORDER_ID REASON\nVerify receipt in your bank before approval.")
+		return a.send(ctx, uid, "Admin commands:\n/users [PAGE] — list users\n/user USER_ID — account profile\n/setplan NAME PRICE_INR DAILY_LIMIT DAYS\n/assign USER_ID PLAN\n/block USER_ID\n/check USER_ID\n/resetquota USER_ID — reset today\n/userhistory USER_ID [PAGE] — search history\n/pending — payment reviews\n/reviewpayment ORDER_ID — lock reference\n/orderplan ORDER_ID PLAN — correct a pending plan\n/approvepayment ORDER_ID\n/upgradepayment ORDER_ID — confirm plan change\n/rejectpayment ORDER_ID REASON\nVerify receipt in your bank before approval.")
 	}
 	if a.admins[uid] && cmd == "/users" {
 		return a.adminUsers(ctx, uid, parts)
@@ -319,14 +339,14 @@ func (a *app) handle(ctx context.Context, u update) error {
 	if a.admins[uid] && (cmd == "/setplan" || cmd == "/assign") {
 		return a.configure(ctx, u.ID, uid, cmd, parts)
 	}
-	if a.admins[uid] && (cmd == "/pending" || cmd == "/orderplan" || cmd == "/approvepayment" || cmd == "/rejectpayment") {
+	if a.admins[uid] && (cmd == "/pending" || cmd == "/reviewpayment" || cmd == "/orderplan" || cmd == "/approvepayment" || cmd == "/upgradepayment" || cmd == "/rejectpayment") {
 		return a.paymentAdmin(ctx, u.ID, uid, cmd, parts)
 	}
 	if a.admins[uid] && (cmd == "/block" || cmd == "/check") {
 		return a.admin(ctx, u.ID, uid, cmd, parts)
 	}
 	if cmd == "/start" || cmd == "/help" || cmd == "/plans" || cmd == "/account" || cmd == "/balance" || cmd == "/history" || cmd == "/mypayments" || cmd == "/support" {
-		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_search='',pending_payment=false WHERE telegram_id=$1`, uid); err != nil {
+		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_search='',pending_payment=false,pending_ref_order=NULL,pending_ref_value=NULL WHERE telegram_id=$1`, uid); err != nil {
 			return err
 		}
 	}
@@ -345,7 +365,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 		return a.buy(ctx, u.ID, uid, parts)
 	case "/paid":
 		if len(parts) == 1 {
-			if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=true,pending_search='' WHERE telegram_id=$1`, uid); err != nil {
+			if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=true,pending_search='',pending_ref_order=NULL,pending_ref_value=NULL WHERE telegram_id=$1`, uid); err != nil {
 				return err
 			}
 			return a.send(ctx, uid, "Submit payment\n\nEnter the transaction reference from your UPI app.\n\nSend /cancel to go back.")
@@ -357,7 +377,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 		}
 		return a.submitPayment(ctx, uid, parts)
 	case "/cancel":
-		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=false,pending_search='' WHERE telegram_id=$1`, uid); err != nil {
+		if _, err := a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=false,pending_search='',pending_ref_order=NULL,pending_ref_value=NULL WHERE telegram_id=$1`, uid); err != nil {
 			return err
 		}
 		return a.sendMessage(ctx, uid, "Cancelled\n\nChoose an option below to continue.", true)
@@ -766,7 +786,7 @@ func (a *app) listPlans(ctx context.Context, user int64) error {
 	}
 	defer rows.Close()
 	var b strings.Builder
-	b.WriteString("Choose your plan\n\nEvery plan includes phone, email and document number search.\n\n")
+	b.WriteString("<b>Choose your plan</b>\n\nPhone, email and document number searches are included.\n\n")
 	count := 0
 	keyboard := [][]map[string]string{}
 	for rows.Next() {
@@ -776,7 +796,7 @@ func (a *app) listPlans(ctx context.Context, user int64) error {
 		if err := rows.Scan(&name, &price, &limit, &days); err != nil {
 			return err
 		}
-		fmt.Fprintf(&b, "%s · ₹%d.%02d · %d/day · %d days\n", name, price/100, price%100, limit, days)
+		fmt.Fprintf(&b, "<b>%s</b> · ₹%d.%02d · %d/day · %d days\n", html.EscapeString(name), price/100, price%100, limit, days)
 		if count%2 == 0 {
 			keyboard = append(keyboard, []map[string]string{})
 		}
@@ -791,7 +811,7 @@ func (a *app) listPlans(ctx context.Context, user int64) error {
 	}
 	b.WriteString("\nSelect a plan below. Your payment will be reviewed by an admin.")
 	keyboard = append(keyboard, []map[string]string{{"text": "Payment status"}, {"text": "Home"}})
-	return a.sendPayload(ctx, map[string]interface{}{"chat_id": user, "text": b.String(), "protect_content": true, "reply_markup": map[string]interface{}{"keyboard": keyboard, "resize_keyboard": true}})
+	return a.sendPayload(ctx, map[string]interface{}{"chat_id": user, "text": b.String(), "parse_mode": "HTML", "protect_content": true, "reply_markup": map[string]interface{}{"keyboard": keyboard, "resize_keyboard": true}})
 }
 func (a *app) configure(ctx context.Context, updateID, actor int64, cmd string, p []string) error {
 	if (cmd == "/setplan" && len(p) != 5) || (cmd == "/assign" && len(p) != 3) {
@@ -883,7 +903,7 @@ func (a *app) poll() error {
 			if q := u.CallbackQuery; q != nil {
 				if q.Message != nil && q.Message.Chat.Type == "private" && q.Message.Chat.ID == q.From.ID && a.allow(q.From.ID) {
 					ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-					err = a.handleReportCallback(ctx, q.ID, q.From.ID, q.Data)
+					err = a.handleCallback(ctx, q.ID, q.From.ID, q.Data)
 					cancel()
 					if err != nil {
 						break
@@ -965,7 +985,7 @@ func (a *app) history(ctx context.Context, uid int64, parts []string) error {
 			return a.send(ctx, uid, "Enter a valid history page number, for example /history 2.")
 		}
 	}
-	rows, err := a.db.Query(ctx, `SELECT search_type,masked_value,state,outcome,to_char(created_at AT TIME ZONE 'Asia/Kolkata','DD Mon YYYY HH24:MI') FROM search_requests WHERE telegram_id=$1 ORDER BY created_at DESC,update_id DESC LIMIT 11 OFFSET $2`, uid, (page-1)*10)
+	rows, err := a.db.Query(ctx, `SELECT search_type,masked_value,state,outcome,to_char(created_at AT TIME ZONE 'Asia/Kolkata','DD Mon YYYY HH24:MI'),result_count FROM search_requests WHERE telegram_id=$1 ORDER BY created_at DESC,update_id DESC LIMIT 11 OFFSET $2`, uid, (page-1)*10)
 	if err != nil {
 		return err
 	}
@@ -976,7 +996,8 @@ func (a *app) history(ctx context.Context, uid int64, parts []string) error {
 	more := false
 	for rows.Next() {
 		var kind, value, state, outcome, date string
-		if err := rows.Scan(&kind, &value, &state, &outcome, &date); err != nil {
+		var resultCount *int
+		if err := rows.Scan(&kind, &value, &state, &outcome, &date, &resultCount); err != nil {
 			return err
 		}
 		if count == 10 {
@@ -995,9 +1016,23 @@ func (a *app) history(ctx context.Context, uid int64, parts []string) error {
 		if value == "" {
 			value = "(details unavailable)"
 		}
-		label := map[string]string{"charged": "completed", "reserved": "in progress", "released": "credit released", "uncertain": "needs review"}[state]
-		if v, ok := map[string]string{"success": "completed · 1 credit", "repeat": "repeat · free", "no_results": "no results · free", "failed": "failed · free", "uncertain": "needs review"}[outcome]; ok {
-			label = v
+		label := "Results not recorded"
+		if state == "reserved" {
+			label = "Search in progress"
+		} else if outcome == "failed" || outcome == "cancelled" {
+			label = "Search not completed"
+		} else if outcome == "no_results" {
+			label = "No results found"
+		} else if resultCount != nil {
+			if *resultCount == 0 {
+				label = "No results found"
+			} else {
+				word := "results"
+				if *resultCount == 1 {
+					word = "result"
+				}
+				label = fmt.Sprintf("%d %s shown", *resultCount, word)
+			}
 		}
 		fmt.Fprintf(&b, "%s IST\n%s · %s\n%s\n\n", date, kind, value, label)
 		count++

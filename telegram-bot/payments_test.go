@@ -52,6 +52,18 @@ func (deliveryFailureTransport) RoundTrip(*http.Request) (*http.Response, error)
 
 type searchFlowTransport struct{}
 
+type searchMessageCapture struct{ payload map[string]interface{} }
+
+func (tr *searchMessageCapture) RoundTrip(r *http.Request) (*http.Response, error) {
+	if strings.HasSuffix(r.URL.Path, "/sendMessage") {
+		if err := json.NewDecoder(r.Body).Decode(&tr.payload); err != nil {
+			return nil, err
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"ok":true}`)), Header: make(http.Header)}, nil
+	}
+	return (searchFlowTransport{}).RoundTrip(r)
+}
+
 type autoSearchCaptureTransport struct{ kinds []string }
 
 func (tr *autoSearchCaptureTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -349,6 +361,15 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	if countCharged() != after {
 		t.Fatal("zero-result search charged")
 	}
+	historyCheck := &historyCaptureTransport{}
+	a.client = &http.Client{Transport: historyCheck, Timeout: time.Second}
+	if err = a.history(ctx, 101, []string{"/history"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(historyCheck.text, "1 result shown") || !strings.Contains(historyCheck.text, "No results found") {
+		t.Fatalf("history missing result counts: %s", historyCheck.text)
+	}
+	a.client = &http.Client{Transport: searchFlowTransport{}, Timeout: time.Second}
 	// Full values are encrypted in storage, readable only using the configured key and audit identity.
 	var cipherText []byte
 	if err = db.QueryRow(ctx, `SELECT encrypted_value FROM search_requests WHERE update_id=301`).Scan(&cipherText); err != nil {
@@ -492,7 +513,8 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	if _, err = db.Exec(ctx, `INSERT INTO bot_users(telegram_id) VALUES(109)`); err != nil {
 		t.Fatal(err)
 	}
-	a.client = &http.Client{Transport: searchFlowTransport{}, Timeout: time.Second}
+	styledSearch := &searchMessageCapture{}
+	a.client = &http.Client{Transport: styledSearch, Timeout: time.Second}
 	a.searchURL = "https://search.example/search"
 	for _, tc := range []struct {
 		id    int64
@@ -508,6 +530,10 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	var trialUsed int
 	if err = db.QueryRow(ctx, `SELECT count(*) FROM search_requests WHERE telegram_id=109 AND billing_kind='trial' AND state='charged'`).Scan(&trialUsed); err != nil || trialUsed != 3 {
 		t.Fatalf("trial usage %d: %v", trialUsed, err)
+	}
+	markup, _ := json.Marshal(styledSearch.payload["reply_markup"])
+	if styledSearch.payload["parse_mode"] != "HTML" || !strings.Contains(string(markup), `"style":"primary"`) {
+		t.Fatalf("CSV button lacks theme-aware style: %s", markup)
 	}
 	if st, _, e := a.reserve(ctx, 805, 109, "phone", "1111111111"); e != nil || st != "denied" {
 		t.Fatalf("trial limit %s: %v", st, e)

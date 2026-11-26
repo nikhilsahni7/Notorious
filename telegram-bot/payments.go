@@ -64,14 +64,14 @@ func (a *app) buy(ctx context.Context, updateID, uid int64, p []string) error {
 	if o.IsTest != testMode {
 		return a.send(ctx, uid, "This order belongs to a different payment mode. Please create a new order.")
 	}
-	if _, err = a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=true,pending_search='' WHERE telegram_id=$1`, uid); err != nil {
+	if _, err = a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=true,pending_search='',pending_ref_order=NULL,pending_ref_value=NULL WHERE telegram_id=$1`, uid); err != nil {
 		return err
 	}
 	text := fmt.Sprintf("Your %s plan\n\n%s  ·  %d searches per day  ·  %d days\n\n1. Pay %s to %s using UPI.\n2. Tap Submit payment and enter the transaction reference.\n3. An admin will review your payment and activate your plan.\n\nOpen Payment status anytime to check your request.", o.Plan, money(o.Amount), o.Limit, o.Days, money(o.Amount), upi)
 	if testMode {
 		text = fmt.Sprintf("Test · %s plan\n\nSimulated price: %s\n%d searches per day  ·  %d days\n\nDO NOT SEND MONEY. Tap Submit payment and enter TEST123456.\n\nAn admin will review this test request.", o.Plan, money(o.Amount), o.Limit, o.Days)
 	}
-	if err = a.sendPayload(ctx, map[string]interface{}{"chat_id": uid, "text": text, "protect_content": true, "reply_markup": map[string]interface{}{"keyboard": [][]map[string]string{{{"text": "Submit payment"}}, {{"text": "Payment status"}, {"text": "Home"}}}, "resize_keyboard": true}}); err != nil {
+	if err = a.sendPayload(ctx, map[string]interface{}{"chat_id": uid, "text": premiumHTML(text), "parse_mode": "HTML", "protect_content": true, "reply_markup": map[string]interface{}{"keyboard": [][]map[string]string{{{"text": "Submit payment"}}, {{"text": "Payment status"}, {"text": "Home"}}}, "resize_keyboard": true}}); err != nil {
 		return err
 	}
 	if path := strings.TrimSpace(os.Getenv("UPI_QR_PATH")); path != "" && !testMode {
@@ -188,9 +188,14 @@ func (a *app) submitPayment(ctx context.Context, uid int64, p []string) error {
 	}
 	var status, existing, planName string
 	var amount int64
-	err = a.db.QueryRow(ctx, `UPDATE payment_orders SET transaction_reference=$3,status='pending_review',submitted_at=now() WHERE id=$1 AND user_id=$2 AND status='awaiting_reference' AND is_test=$4 RETURNING status,transaction_reference,plan_name,amount_paise`, id, uid, ref, paymentTestMode()).Scan(&status, &existing, &planName, &amount)
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	err = tx.QueryRow(ctx, `UPDATE payment_orders SET transaction_reference=$3,status='pending_review',submitted_at=now() WHERE id=$1 AND user_id=$2 AND status='awaiting_reference' AND is_test=$4 RETURNING status,transaction_reference,plan_name,amount_paise`, id, uid, ref, paymentTestMode()).Scan(&status, &existing, &planName, &amount)
 	if errors.Is(err, pgx.ErrNoRows) {
-		err = a.db.QueryRow(ctx, `SELECT status,COALESCE(transaction_reference,'') FROM payment_orders WHERE id=$1 AND user_id=$2`, id, uid).Scan(&status, &existing)
+		err = tx.QueryRow(ctx, `SELECT status,COALESCE(transaction_reference,'') FROM payment_orders WHERE id=$1 AND user_id=$2`, id, uid).Scan(&status, &existing)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return a.send(ctx, uid, "Order not found.")
 		}
@@ -207,6 +212,16 @@ func (a *app) submitPayment(ctx context.Context, uid int64, p []string) error {
 		return a.send(ctx, uid, "That transaction reference has already been submitted. Contact support if this is a mistake.")
 	}
 	if err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, `INSERT INTO payment_reference_ledger(reference_upper,order_id) VALUES($1,$2) ON CONFLICT(reference_upper) DO UPDATE SET order_id=payment_reference_ledger.order_id WHERE payment_reference_ledger.order_id=excluded.order_id`, ref, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return a.send(ctx, uid, "That transaction reference has already been submitted. Contact support if this is a mistake.")
+	}
+	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
 	if _, err = a.db.Exec(ctx, `UPDATE bot_users SET pending_payment=false WHERE telegram_id=$1`, uid); err != nil {
@@ -230,17 +245,19 @@ func (a *app) submitPayment(ctx context.Context, uid int64, p []string) error {
 	return a.send(ctx, uid, fmt.Sprintf("Payment submitted\n\n%s plan · %s\nYour request is waiting for admin review. We’ll verify the payment before activating your plan.\n\nOpen Payment status to check it anytime.", planName, money(amount)))
 }
 func (a *app) myPayments(ctx context.Context, uid int64) error {
-	rows, err := a.db.Query(ctx, `SELECT id,plan_name,amount_paise,status,is_test FROM payment_orders WHERE user_id=$1 ORDER BY id DESC LIMIT 10`, uid)
+	rows, err := a.db.Query(ctx, `SELECT id,plan_name,amount_paise,status,is_test,review_started_at IS NOT NULL FROM payment_orders WHERE user_id=$1 ORDER BY id DESC LIMIT 10`, uid)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	var b strings.Builder
+	buttons := [][]map[string]string{}
 	b.WriteString("Payment status\n\nYour most recent requests:\n\n")
 	n := 0
 	for rows.Next() {
 		var o paymentOrder
-		if err = rows.Scan(&o.ID, &o.Plan, &o.Amount, &o.Status, &o.IsTest); err != nil {
+		var reviewing bool
+		if err = rows.Scan(&o.ID, &o.Plan, &o.Amount, &o.Status, &o.IsTest, &reviewing); err != nil {
 			return err
 		}
 		label := ""
@@ -251,7 +268,13 @@ func (a *app) myPayments(ctx context.Context, uid int64) error {
 		if status == "" {
 			status = "Status unavailable"
 		}
+		if reviewing && o.Status == "pending_review" {
+			status = "Review in progress · reference locked"
+		}
 		fmt.Fprintf(&b, "%s%s · %s\n%s  ·  Ref #%d\n\n", label, o.Plan, money(o.Amount), status, o.ID)
+		if o.Status == "pending_review" && !reviewing {
+			buttons = append(buttons, []map[string]string{{"text": fmt.Sprintf("Edit %s reference", o.Plan), "callback_data": fmt.Sprintf("editref:%d", o.ID)}})
+		}
 		n++
 	}
 	if err = rows.Err(); err != nil {
@@ -260,10 +283,46 @@ func (a *app) myPayments(ctx context.Context, uid int64) error {
 	if n == 0 {
 		b.WriteString("No payment requests yet. Open Plans to choose a plan.")
 	}
-	return a.send(ctx, uid, b.String())
+	if len(buttons) == 0 {
+		return a.send(ctx, uid, b.String())
+	}
+	return a.sendPayload(ctx, map[string]interface{}{"chat_id": uid, "text": premiumHTML(b.String()), "parse_mode": "HTML", "protect_content": true, "reply_markup": map[string]interface{}{"inline_keyboard": buttons}})
 }
 
 func (a *app) paymentAdmin(ctx context.Context, updateID, admin int64, cmd string, p []string) error {
+	if cmd == "/reviewpayment" {
+		if len(p) != 2 {
+			return a.send(ctx, admin, "Use /reviewpayment ORDER_ID to lock the reference before checking the payment.")
+		}
+		id, e := strconv.ParseInt(p[1], 10, 64)
+		if e != nil || id <= 0 {
+			return a.send(ctx, admin, "Enter a valid order ID.")
+		}
+		tx, e := a.db.Begin(ctx)
+		if e != nil {
+			return e
+		}
+		defer tx.Rollback(ctx)
+		var user int64
+		var plan, ref string
+		e = tx.QueryRow(ctx, `UPDATE payment_orders SET review_started_at=clock_timestamp() WHERE id=$1 AND status='pending_review' AND review_started_at IS NULL AND is_test=$2 RETURNING user_id,plan_name,transaction_reference`, id, paymentTestMode()).Scan(&user, &plan, &ref)
+		if errors.Is(e, pgx.ErrNoRows) {
+			return a.send(ctx, admin, "This request is unavailable or already under review.")
+		}
+		if e != nil {
+			return e
+		}
+		if _, e = tx.Exec(ctx, `INSERT INTO admin_audit(admin_id,target_id,action,detail) VALUES($1,$2,'/reviewpayment',$3)`, admin, user, fmt.Sprintf("order %d", id)); e != nil {
+			return e
+		}
+		if e = tx.Commit(ctx); e != nil {
+			return e
+		}
+		if e = a.send(ctx, user, "Payment review started\n\nYour reference is now locked while the admin checks the payment. Contact /support if it needs correction."); e != nil {
+			log.Printf("review notice failed for order %d", id)
+		}
+		return a.send(ctx, admin, fmt.Sprintf("Review started · request #%d\n\nPlan: %s\nReference: %s\n\nThe reference is locked. Verify the bank receipt before approval.", id, plan, ref))
+	}
 	if cmd == "/orderplan" {
 		if len(p) != 3 {
 			return a.send(ctx, admin, "Use /orderplan ORDER_ID PLAN_NAME after checking the payment amount.")
@@ -303,7 +362,7 @@ func (a *app) paymentAdmin(ctx context.Context, updateID, admin int64, cmd strin
 		return a.send(ctx, admin, fmt.Sprintf("Request #%d changed to %s · %s. Verify the bank payment before approving.", id, name, money(amount)))
 	}
 	if cmd == "/pending" {
-		rows, err := a.db.Query(ctx, `SELECT id,user_id,plan_name,amount_paise,daily_limit,plan_days,COALESCE(transaction_reference,''),status FROM payment_orders WHERE status IN ('pending_review','awaiting_reference') AND is_test=$1 ORDER BY CASE WHEN status='pending_review' THEN 0 ELSE 1 END, COALESCE(submitted_at,created_at),id LIMIT 20`, paymentTestMode())
+		rows, err := a.db.Query(ctx, `SELECT id,user_id,plan_name,amount_paise,daily_limit,plan_days,COALESCE(transaction_reference,''),status,review_started_at IS NOT NULL FROM payment_orders WHERE status IN ('pending_review','awaiting_reference') AND is_test=$1 ORDER BY CASE WHEN status='pending_review' THEN 0 ELSE 1 END, COALESCE(submitted_at,created_at),id LIMIT 20`, paymentTestMode())
 		if err != nil {
 			return err
 		}
@@ -317,13 +376,17 @@ func (a *app) paymentAdmin(ctx context.Context, updateID, admin int64, cmd strin
 		n := 0
 		for rows.Next() {
 			var o paymentOrder
-			if err = rows.Scan(&o.ID, &o.UserID, &o.Plan, &o.Amount, &o.Limit, &o.Days, &o.Reference, &o.Status); err != nil {
+			var reviewing bool
+			if err = rows.Scan(&o.ID, &o.UserID, &o.Plan, &o.Amount, &o.Limit, &o.Days, &o.Reference, &o.Status, &reviewing); err != nil {
 				return err
 			}
 			if o.Status == "awaiting_reference" {
 				fmt.Fprintf(&b, "#%d · user %d · %s\n%s · %d/day · %d days\nAwaiting payment reference — cannot approve yet\n\n", o.ID, o.UserID, o.Plan, money(o.Amount), o.Limit, o.Days)
 			} else {
 				fmt.Fprintf(&b, "#%d · user %d · %s\n%s · %d/day · %d days\nReference: %s\n\n", o.ID, o.UserID, o.Plan, money(o.Amount), o.Limit, o.Days, o.Reference)
+				if reviewing {
+					b.WriteString("Review in progress · reference locked\n\n")
+				}
 			}
 			n++
 		}
@@ -336,11 +399,11 @@ func (a *app) paymentAdmin(ctx context.Context, updateID, admin int64, cmd strin
 			if !paymentTestMode() {
 				b.WriteString("Verify the actual bank receipt.\n")
 			}
-			b.WriteString("/orderplan ORDER_ID PLAN — correct plan\n/approvepayment ORDER_ID\n/rejectpayment ORDER_ID REASON")
+			b.WriteString("/reviewpayment ORDER_ID — lock reference\n/orderplan ORDER_ID PLAN — correct plan\n/approvepayment ORDER_ID\n/upgradepayment ORDER_ID — confirm replacement\n/rejectpayment ORDER_ID REASON")
 		}
 		return a.send(ctx, admin, b.String())
 	}
-	if (cmd == "/approvepayment" && len(p) != 2) || (cmd == "/rejectpayment" && len(p) < 3) {
+	if ((cmd == "/approvepayment" || cmd == "/upgradepayment") && len(p) != 2) || (cmd == "/rejectpayment" && len(p) < 3) {
 		return a.send(ctx, admin, "Use /approvepayment ORDER_ID or /rejectpayment ORDER_ID REASON.")
 	}
 	id, err := strconv.ParseInt(p[1], 10, 64)
@@ -360,7 +423,7 @@ func (a *app) paymentAdmin(ctx context.Context, updateID, admin int64, cmd strin
 	}
 	defer tx.Rollback(ctx)
 	var o paymentOrder
-	err = tx.QueryRow(ctx, `SELECT id,user_id,plan_name,amount_paise,daily_limit,plan_days,status,is_test FROM payment_orders WHERE id=$1 FOR UPDATE`, id).Scan(&o.ID, &o.UserID, &o.Plan, &o.Amount, &o.Limit, &o.Days, &o.Status, &o.IsTest)
+	err = tx.QueryRow(ctx, `SELECT id,user_id,plan_name,amount_paise,daily_limit,plan_days,status,is_test,COALESCE(transaction_reference,'') FROM payment_orders WHERE id=$1 FOR UPDATE`, id).Scan(&o.ID, &o.UserID, &o.Plan, &o.Amount, &o.Limit, &o.Days, &o.Status, &o.IsTest, &o.Reference)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a.send(ctx, admin, "Order not found.")
 	}
@@ -373,17 +436,42 @@ func (a *app) paymentAdmin(ctx context.Context, updateID, admin int64, cmd strin
 	if o.Status != "pending_review" {
 		return a.send(ctx, admin, "Order is not pending review; it may already have been processed.")
 	}
-	if cmd == "/approvepayment" {
+	if cmd == "/approvepayment" || cmd == "/upgradepayment" {
 		var blocked, active bool
-		err = tx.QueryRow(ctx, `SELECT blocked, COALESCE(plan_expires_at>now(),false) FROM bot_users WHERE telegram_id=$1 FOR UPDATE`, o.UserID).Scan(&blocked, &active)
+		var oldPlan, oldExpiry, oldExpiryRaw string
+		var used int
+		err = tx.QueryRow(ctx, `SELECT blocked, COALESCE(approved AND plan_expires_at>now(),false),plan_name,COALESCE(to_char(plan_expires_at AT TIME ZONE 'Asia/Kolkata','DD Mon YYYY HH24:MI') || ' IST','Not assigned'),COALESCE(plan_expires_at::text,''),(SELECT count(*) FROM search_requests r WHERE r.telegram_id=$1 AND r.billing_kind='paid' AND r.quota_day=(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date AND r.state IN ('reserved','charged','uncertain') AND r.created_at>COALESCE((SELECT reset_at FROM quota_resets WHERE telegram_id=$1 AND quota_day=r.quota_day),'-infinity'::timestamptz)) FROM bot_users WHERE telegram_id=$1 FOR UPDATE`, o.UserID).Scan(&blocked, &active, &oldPlan, &oldExpiry, &oldExpiryRaw, &used)
 		if err != nil {
 			return err
 		}
 		if blocked {
 			return a.send(ctx, admin, "User is blocked. Resolve the account status before approving.")
 		}
-		if active {
-			return a.send(ctx, admin, "User already has an active plan. Resolve the existing plan before approving this order; no changes were made.")
+		if active && cmd == "/approvepayment" {
+			_, err = tx.Exec(ctx, `INSERT INTO payment_upgrade_confirmations(admin_id,order_id,reference,plan_name,amount_paise,daily_limit,plan_days,old_plan,old_expiry) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(admin_id,order_id) DO UPDATE SET reference=excluded.reference,plan_name=excluded.plan_name,amount_paise=excluded.amount_paise,daily_limit=excluded.daily_limit,plan_days=excluded.plan_days,old_plan=excluded.old_plan,old_expiry=excluded.old_expiry,created_at=now()`, admin, id, o.Reference, o.Plan, o.Amount, o.Limit, o.Days, oldPlan, oldExpiryRaw)
+			if err != nil {
+				return err
+			}
+			if err = tx.Commit(ctx); err != nil {
+				return err
+			}
+			return a.send(ctx, admin, fmt.Sprintf("Confirm plan replacement\n\nCurrent: %s · expires %s\nNew: %s · %d searches/day · %d days · %s\nReference: %s\nUsed today: %d\n\nThe new plan starts immediately and today’s usage carries over. Verify the payment, then send /upgradepayment %d within 15 minutes.", oldPlan, oldExpiry, o.Plan, o.Limit, o.Days, money(o.Amount), o.Reference, used, id))
+		}
+		if !active && cmd == "/upgradepayment" {
+			return a.send(ctx, admin, "This user has no active plan. Use /approvepayment for this request.")
+		}
+		if cmd == "/upgradepayment" {
+			var valid bool
+			err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM payment_upgrade_confirmations WHERE admin_id=$1 AND order_id=$2 AND reference=$3 AND plan_name=$4 AND amount_paise=$5 AND daily_limit=$6 AND plan_days=$7 AND old_plan=$8 AND old_expiry=$9 AND created_at>now()-interval '15 minutes')`, admin, id, o.Reference, o.Plan, o.Amount, o.Limit, o.Days, oldPlan, oldExpiryRaw).Scan(&valid)
+			if err != nil {
+				return err
+			}
+			if !valid {
+				return a.send(ctx, admin, "The confirmation expired or the request changed. Review it again with /approvepayment.")
+			}
+			if _, err = tx.Exec(ctx, `DELETE FROM payment_upgrade_confirmations WHERE order_id=$1`, id); err != nil {
+				return err
+			}
 		}
 		_, err = tx.Exec(ctx, `UPDATE bot_users SET approved=true,region=$2,daily_limit=$3,plan_name=$4,plan_expires_at=now()+($5*interval '1 day') WHERE telegram_id=$1`, o.UserID, region, o.Limit, o.Plan, o.Days)
 		if err != nil {
@@ -404,6 +492,9 @@ func (a *app) paymentAdmin(ctx context.Context, updateID, admin int64, cmd strin
 		return err
 	}
 	notice := fmt.Sprintf("Payment approved\n\nYour %s plan is active. Open My account to see your allowance, then choose a search to get started.", o.Plan)
+	if cmd == "/upgradepayment" {
+		notice = fmt.Sprintf("Plan updated\n\nYour %s plan is active now. Today’s used searches carry over. Open My account to see your allowance.", o.Plan)
+	}
 	if o.IsTest {
 		notice = "TEST — no payment was made. " + notice
 	}

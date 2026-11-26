@@ -46,7 +46,7 @@ func (a *app) decryptDelivery(uid, updateID int64, data []byte) ([]string, error
 	if err = json.Unmarshal(plain, &pages); err != nil {
 		return nil, err
 	}
-	if len(pages) == 0 || len(pages) > 3 {
+	if len(pages) == 0 || len(pages) > 5 {
 		return nil, errors.New("invalid delivery pages")
 	}
 	return pages, nil
@@ -106,6 +106,9 @@ func (a *app) queueSearchDelivery(ctx context.Context, uid, updateID int64, stat
 			return false, err
 		}
 		return false, tx.Commit(ctx)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE search_requests SET result_count=$3 WHERE update_id=$1 AND telegram_id=$2 AND state='reserved'`, updateID, uid, len(result.Hits.Hits)); err != nil {
+		return false, err
 	}
 	if result.Hits.Total.Value > 0 && len(result.Hits.Hits) > 0 {
 		data, e := json.Marshal(result)
@@ -181,10 +184,10 @@ func (a *app) deliverSearch(ctx context.Context, updateID, uid int64) error {
 	}
 	for page < len(pages) {
 		sendCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
-		payload := map[string]interface{}{"chat_id": uid, "text": pages[page]}
+		payload := map[string]interface{}{"chat_id": uid, "text": premiumHTML(pages[page]), "parse_mode": "HTML"}
 		if outcome != "no_results" && outcome != "failed" {
-			payload["text"] = pages[page] + "\nTap and hold a result to copy it."
-			payload["reply_markup"] = map[string]interface{}{"inline_keyboard": [][]map[string]string{{{"text": "Download CSV report", "callback_data": fmt.Sprintf("report:%d", updateID)}}}}
+			payload["text"] = premiumHTML(pages[page] + "\nTap and hold a result to copy it.")
+			payload["reply_markup"] = map[string]interface{}{"inline_keyboard": [][]map[string]string{{{"text": "Download CSV report", "callback_data": fmt.Sprintf("report:%d", updateID), "style": "primary"}}}}
 		}
 		sendErr := a.sendPayload(sendCtx, payload)
 		cancel()
