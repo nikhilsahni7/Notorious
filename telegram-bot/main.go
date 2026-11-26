@@ -232,7 +232,7 @@ func (a *app) send(ctx context.Context, chat int64, msg string) error {
 func (a *app) sendMessage(ctx context.Context, chat int64, msg string, menu bool) error {
 	payload := map[string]interface{}{"chat_id": chat, "text": premiumHTML(msg), "parse_mode": "HTML", "protect_content": true}
 	if menu {
-		payload["reply_markup"] = map[string]interface{}{"keyboard": [][]map[string]string{{{"text": "Search phone"}, {"text": "Search email"}}, {{"text": "Search document number"}, {"text": "My account"}}, {{"text": "Plans"}, {"text": "Payment status"}}, {{"text": "History"}, {"text": "Help"}}}, "resize_keyboard": true}
+		payload["reply_markup"] = map[string]interface{}{"keyboard": [][]map[string]string{{{"text": "Search phone"}, {"text": "Search email"}}, {{"text": "Search document number"}, {"text": "My account"}}, {{"text": "Plans"}, {"text": "Payment status"}}, {{"text": "History"}, {"text": "Help"}, {"text": "Support"}}}, "resize_keyboard": true}
 	}
 	return a.sendPayload(ctx, payload)
 }
@@ -297,7 +297,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 	if m.Text == "Submit payment" {
 		parts = []string{"/paid"}
 	}
-	if command, ok := map[string]string{"My account": "/account", "Plans": "/plans", "Payment status": "/mypayments", "History": "/history", "Help": "/help", "Home": "/start"}[m.Text]; ok {
+	if command, ok := map[string]string{"My account": "/account", "Plans": "/plans", "Payment status": "/mypayments", "History": "/history", "Help": "/help", "Support": "/support", "Home": "/start"}[m.Text]; ok {
 		parts = []string{command}
 	}
 	if len(parts) == 1 && !strings.HasPrefix(parts[0], "/") {
@@ -384,7 +384,7 @@ func (a *app) handle(ctx context.Context, u update) error {
 	case "/mypayments":
 		return a.myPayments(ctx, uid)
 	case "/support":
-		return a.send(ctx, uid, "Need help?\n\nContact the administrator who gave you access to Telegram Tracing bot By Shakil Bhai. For payment issues, include your transaction reference.")
+		return a.send(ctx, uid, "Support\n\nEmail: khanimranali1989@gmail.com\nPhone: 8629819641\n\nFor payment issues, include your transaction reference.")
 	case "/balance", "/account":
 		return a.account(ctx, uid)
 	case "/history":
