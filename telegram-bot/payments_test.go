@@ -496,6 +496,20 @@ func TestPaymentWorkflowPostgres(t *testing.T) {
 	if reportTransport.documents != 1 {
 		t.Fatal("report leaked to a different user")
 	}
+	// Existing 24-hour reports must also stop working at the IST day boundary.
+	if _, err = db.Exec(ctx, `UPDATE search_requests SET created_at=clock_timestamp()-interval '2 days' WHERE update_id=802; UPDATE search_reports SET expires_at=clock_timestamp()+interval '1 day' WHERE update_id=802`); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.handleReportCallback(ctx, "test", 109, "report:802"); err != nil {
+		t.Fatal(err)
+	}
+	if reportTransport.documents != 1 {
+		t.Fatal("previous IST day's report remained downloadable")
+	}
+	var deadline, expected time.Time
+	if err = db.QueryRow(ctx, `SELECT ((('2026-11-26 23:59:00'::timestamp AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata')::date + 1)::timestamp AT TIME ZONE 'Asia/Kolkata', '2026-11-27 00:00:00'::timestamp AT TIME ZONE 'Asia/Kolkata'`).Scan(&deadline, &expected); err != nil || !deadline.Equal(expected) {
+		t.Fatalf("IST midnight deadline: %v %v %v", deadline, expected, err)
+	}
 	// Admins can search without a paid plan, credits, workload or in-flight limits.
 	if _, err = db.Exec(ctx, `INSERT INTO bot_users(telegram_id) VALUES(999)`); err != nil {
 		t.Fatal(err)

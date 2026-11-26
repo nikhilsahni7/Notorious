@@ -58,7 +58,7 @@ func (a *app) handleReportCallback(ctx context.Context, callbackID string, uid i
 	}
 	// A callback is never authorized by the button data alone.
 	var encrypted []byte
-	err = a.db.QueryRow(ctx, `SELECT r.encrypted_result FROM search_reports r JOIN bot_users u ON u.telegram_id=r.telegram_id JOIN search_deliveries d ON d.update_id=r.update_id WHERE r.update_id=$1 AND r.telegram_id=$2 AND NOT u.blocked AND r.expires_at>now() AND d.status='delivered'`, id, uid).Scan(&encrypted)
+	err = a.db.QueryRow(ctx, `SELECT r.encrypted_result FROM search_reports r JOIN search_requests s ON s.update_id=r.update_id AND s.telegram_id=r.telegram_id JOIN bot_users u ON u.telegram_id=r.telegram_id JOIN search_deliveries d ON d.update_id=r.update_id WHERE r.update_id=$1 AND r.telegram_id=$2 AND NOT u.blocked AND r.expires_at>clock_timestamp() AND (s.created_at AT TIME ZONE 'Asia/Kolkata')::date=(clock_timestamp() AT TIME ZONE 'Asia/Kolkata')::date AND d.status='delivered'`, id, uid).Scan(&encrypted)
 	answer := "Preparing your report"
 	if err == pgx.ErrNoRows {
 		answer = "Report is unavailable or expired. Please search again."

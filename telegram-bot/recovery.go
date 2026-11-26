@@ -116,7 +116,7 @@ func (a *app) queueSearchDelivery(ctx context.Context, uid, updateID int64, stat
 		if e != nil {
 			return false, e
 		}
-		if _, e = tx.Exec(ctx, `INSERT INTO search_reports(update_id,telegram_id,encrypted_result,expires_at) VALUES($1,$2,$3,now()+interval '24 hours') ON CONFLICT(update_id) DO NOTHING`, updateID, uid, report); e != nil {
+		if _, e = tx.Exec(ctx, `INSERT INTO search_reports(update_id,telegram_id,encrypted_result,expires_at) SELECT update_id,telegram_id,$3,(((created_at AT TIME ZONE 'Asia/Kolkata')::date + 1)::timestamp AT TIME ZONE 'Asia/Kolkata') FROM search_requests WHERE update_id=$1 AND telegram_id=$2 ON CONFLICT(update_id) DO NOTHING`, updateID, uid, report); e != nil {
 			return false, e
 		}
 	}
