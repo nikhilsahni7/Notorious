@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -160,5 +161,36 @@ func TestPaymentUpgradeAndReferenceEditsPostgres(t *testing.T) {
 	}
 	if err = db.QueryRow(ctx, `SELECT transaction_reference FROM payment_orders WHERE id=102`).Scan(&ref); err != nil || ref != "NEWREF102" {
 		t.Fatal("approved reference changed", err)
+	}
+	if _, err = db.Exec(ctx, `INSERT INTO bot_users(telegram_id) VALUES(4),(5); INSERT INTO payment_orders(id,create_update_id,user_id,plan_name,amount_paise,daily_limit,plan_days,status,transaction_reference) VALUES(104,204,4,'New',10000,10,30,'pending_review','ORIGINAL4'),(105,205,5,'New',10000,10,30,'pending_review','ORIGINAL5')`); err != nil {
+		t.Fatal(err)
+	}
+	for _, x := range []struct{ uid, id int64 }{{4, 104}, {5, 105}} {
+		if err = a.handleCallback(ctx, "start", x.uid, fmt.Sprintf("editref:%d", x.id)); err != nil {
+			t.Fatal(err)
+		}
+		if err = a.stageReferenceEdit(ctx, x.uid, x.id, "SAME12345"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, x := range []struct{ uid, id int64 }{{4, 104}, {5, 105}} {
+		wg.Add(1)
+		go func(uid, id int64) {
+			defer wg.Done()
+			errs <- a.handleCallback(ctx, "confirm", uid, fmt.Sprintf("confirmref:%d:%s", id, a.referenceConfirmToken(uid, id, "SAME12345")))
+		}(x.uid, x.id)
+	}
+	wg.Wait()
+	close(errs)
+	for e := range errs {
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	var shared int
+	if err = db.QueryRow(ctx, `SELECT count(*) FROM payment_orders WHERE transaction_reference='SAME12345'`).Scan(&shared); err != nil || shared != 1 {
+		t.Fatalf("reference accepted by %d orders: %v", shared, err)
 	}
 }
