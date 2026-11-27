@@ -32,9 +32,9 @@ function AddressMapLink({ address, label }: { address: string | undefined; label
       rel="noopener noreferrer"
       aria-label={`Search ${label} on Google Maps`}
       title="Search on Google Maps"
-      className="inline-flex shrink-0 items-center justify-center rounded p-2 text-sky-200 hover:bg-sky-900/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"
+      className="inline-flex shrink-0 items-center justify-center rounded p-2 text-red-400 hover:bg-red-950/50 hover:text-red-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-300"
     >
-      <MapPin className="h-4 w-4" aria-hidden="true" />
+      <MapPin className="h-5 w-5" aria-hidden="true" />
     </a>
   );
 }
