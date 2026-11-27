@@ -221,6 +221,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // Handle incoming WebSocket messages
   const handleWSMessage = useCallback((envelope: WSEnvelope) => {
     switch (envelope.type) {
+      case "message_deleted": {
+        const msg: ChatMessage = envelope.payload.message;
+        messageListenersRef.current.forEach((cb) => cb(msg));
+        if (token) chatService.getConversations(token).then(setConversations).catch(console.error);
+        break;
+      }
       case WS_TYPES.NEW_MESSAGE: {
         const msg: ChatMessage = envelope.payload.message;
         messageListenersRef.current.forEach((cb) => cb(msg));

@@ -240,6 +240,7 @@ func main() {
 			chatRoutes.GET("/conversations", chatHandler.GetConversations)
 			chatRoutes.GET("/admins", chatHandler.GetChatAdmins)
 			chatRoutes.GET("/messages/:userId", chatHandler.GetMessages)
+			chatRoutes.DELETE("/messages/:messageId", chatHandler.DeleteMessage)
 			chatRoutes.GET("/unread", chatHandler.GetUnreadCount)
 			chatRoutes.POST("/read/:userId", chatHandler.MarkAsRead)
 			chatRoutes.GET("/broadcasts", chatHandler.GetBroadcasts)

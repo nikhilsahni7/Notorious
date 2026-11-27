@@ -96,7 +96,7 @@ func (r *ChatRepository) GetMessages(ctx context.Context, conversationID uuid.UU
 	if beforeSeq > 0 {
 		query = `
 			SELECT id, conversation_id, sender_id, receiver_id, content, sequence_num,
-			       status, sent_at, delivered_at, read_at
+			       status, sent_at, delivered_at, read_at, deleted_by_admin
 			FROM chat_messages
 			WHERE conversation_id = $1 AND sequence_num < $2
 			ORDER BY sequence_num DESC
@@ -106,7 +106,7 @@ func (r *ChatRepository) GetMessages(ctx context.Context, conversationID uuid.UU
 	} else {
 		query = `
 			SELECT id, conversation_id, sender_id, receiver_id, content, sequence_num,
-			       status, sent_at, delivered_at, read_at
+			       status, sent_at, delivered_at, read_at, deleted_by_admin
 			FROM chat_messages
 			WHERE conversation_id = $1
 			ORDER BY sequence_num DESC
@@ -127,7 +127,7 @@ func (r *ChatRepository) GetMessages(ctx context.Context, conversationID uuid.UU
 		if err := rows.Scan(
 			&m.ID, &m.ConversationID, &m.SenderID, &m.ReceiverID,
 			&m.Content, &m.SequenceNum, &m.Status, &m.SentAt,
-			&m.DeliveredAt, &m.ReadAt,
+			&m.DeliveredAt, &m.ReadAt, &m.DeletedByAdmin,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
 		}
@@ -432,4 +432,20 @@ func (r *ChatRepository) GetChatAdmins(ctx context.Context) ([]models.ChatContac
 		contacts = append(contacts, contact)
 	}
 	return contacts, rows.Err()
+}
+
+// DeleteMessageForEveryone removes the content while retaining the conversation history.
+func (r *ChatRepository) DeleteMessageForEveryone(ctx context.Context, messageID, adminID uuid.UUID) (*models.ChatMessage, error) {
+	var m models.ChatMessage
+	err := r.db.Pool.QueryRow(ctx, `
+		UPDATE chat_messages SET content = 'Deleted by admin', deleted_by_admin = true
+		WHERE id = $1 AND (sender_id = $2 OR receiver_id = $2)
+		RETURNING id, conversation_id, sender_id, receiver_id, content, sequence_num,
+		          status, sent_at, delivered_at, read_at, deleted_by_admin
+	`, messageID, adminID).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ReceiverID,
+		&m.Content, &m.SequenceNum, &m.Status, &m.SentAt, &m.DeliveredAt, &m.ReadAt, &m.DeletedByAdmin)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
 }

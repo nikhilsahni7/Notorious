@@ -78,6 +78,7 @@ export default function ChatPage() {
   // For new conversations (no existing conversation yet)
   const [directChatUser, setDirectChatUser] = useState<SimpleUser | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const deletedMessagesRef = useRef(new Map<string, ChatMessage>());
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   const pendingMessagesRef = useRef<PendingMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -237,7 +238,7 @@ export default function ChatPage() {
       .then((res) => {
         if (cancelled) return;
         setMessages((current) => {
-          const history = res.messages || [];
+          const history = (res.messages || []).map((message) => deletedMessagesRef.current.get(message.id) || message);
           const seen = new Set(history.map((message) => message.id));
           return [...history, ...current.filter((message) => !seen.has(message.id) && (message.sender_id === activeChatUserId || message.receiver_id === activeChatUserId))];
         });
@@ -249,7 +250,7 @@ export default function ChatPage() {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeChatUserId, token]);
+  }, [activeChatUserId, token, isConnected]);
 
   useEffect(() => {
     if (activeChatUserId && isConnected) sendReadReceipt(activeChatUserId);
@@ -263,12 +264,15 @@ export default function ChatPage() {
   // Listen for new messages
   useEffect(() => {
     const unsubMessage = onNewMessage((msg) => {
+      if (msg.deleted_by_admin) deletedMessagesRef.current.set(msg.id, msg);
       if (
         activeChatUserId &&
         (msg.sender_id === activeChatUserId ||
           msg.receiver_id === activeChatUserId)
       ) {
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => msg.deleted_by_admin
+          ? prev.map((existing) => existing.id === msg.id ? msg : existing)
+          : [...prev, deletedMessagesRef.current.get(msg.id) || msg]);
         if (msg.sender_id === activeChatUserId) {
           sendReadReceipt(activeChatUserId);
         }
@@ -437,7 +441,7 @@ export default function ChatPage() {
         token,
         firstMsg.sequence_num
       );
-      setMessages((prev) => [...(res.messages || []), ...prev]);
+      setMessages((prev) => [...(res.messages || []).map((message) => deletedMessagesRef.current.get(message.id) || message), ...prev]);
       setHasMore(res.has_more);
     } catch (err) {
       console.error("Failed to load more:", err);
@@ -1010,7 +1014,18 @@ export default function ChatPage() {
                     <ChatBubble
                       message={msg}
                       isOwn={msg.sender_id === user?.id}
-                      onForward={(message) => openForward(message.content)}
+                      onForward={msg.deleted_by_admin ? undefined : (message) => openForward(message.content)}
+                      onDelete={isAdmin && !msg.deleted_by_admin && token ? async () => {
+                        if (!window.confirm("Delete this message for everyone?")) return;
+                        try {
+                          const deleted = await chatService.deleteMessage(msg.id, token);
+                          deletedMessagesRef.current.set(deleted.id, deleted);
+                          setMessages((prev) => prev.map((item) => item.id === deleted.id ? deleted : item));
+                          refreshConversations();
+                        } catch {
+                          window.alert("Could not delete the message. Please try again.");
+                        }
+                      } : undefined}
                     />
                   </div>
                 );

@@ -37,6 +37,7 @@ type ChatMessage struct {
 	SenderID       uuid.UUID  `json:"sender_id"`
 	ReceiverID     uuid.UUID  `json:"receiver_id"`
 	Content        string     `json:"content"`
+	DeletedByAdmin bool       `json:"deleted_by_admin"`
 	SequenceNum    int64      `json:"sequence_num"`
 	Status         string     `json:"status"`
 	SentAt         time.Time  `json:"sent_at"`

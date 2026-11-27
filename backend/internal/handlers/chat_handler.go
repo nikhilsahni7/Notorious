@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
+	"errors"
+	"github.com/jackc/pgx/v5"
 	"net/http"
 	"strconv"
 
@@ -233,4 +236,30 @@ func (h *ChatHandler) GetChatAdmins(c *gin.Context) {
 // GetBroadcastCapabilities lets clients safely detect exclusion support.
 func (h *ChatHandler) GetBroadcastCapabilities(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"supports_exclusions": true})
+}
+
+func (h *ChatHandler) DeleteMessage(c *gin.Context) {
+	if c.GetString("user_role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+		return
+	}
+	id, err := uuid.Parse(c.Param("messageId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid message ID"})
+		return
+	}
+	message, err := h.chatRepo.DeleteMessageForEveryone(c.Request.Context(), id, c.MustGet("user_id").(uuid.UUID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "message not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete message"})
+		return
+	}
+	payload, _ := json.Marshal(gin.H{"message": message})
+	envelope := &models.WSEnvelope{Type: "message_deleted", Payload: payload}
+	h.hub.SendToUser(message.SenderID, envelope)
+	h.hub.SendToUser(message.ReceiverID, envelope)
+	c.JSON(http.StatusOK, message)
 }

@@ -8,6 +8,7 @@ export interface ChatMessage {
   sender_id: string;
   receiver_id: string;
   content: string;
+  deleted_by_admin?: boolean;
   sequence_num: number;
   status: "sent" | "delivered" | "read";
   sent_at: string;
@@ -87,6 +88,10 @@ export const chatService = {
       method: "GET",
       token,
     });
+  },
+
+  deleteMessage: async (messageId: string, token: string): Promise<ChatMessage> => {
+    return apiRequest(`/api/chat/messages/${messageId}`, { method: "DELETE", token });
   },
 
   getUnreadCount: async (token: string): Promise<UnreadCount> => {
