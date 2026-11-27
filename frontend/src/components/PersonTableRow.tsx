@@ -1,5 +1,5 @@
 import { Person } from "@/types/person";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, MapPin } from "lucide-react";
 
 interface PersonTableRowProps {
   readonly person: Person;
@@ -16,6 +16,28 @@ const formatAddress = (address: string | undefined) => {
     .replace(/^,/g, "")
     .replace(/,$/g, "");
 };
+
+function AddressMapLink({ address, label }: { address: string | undefined; label: string }) {
+  const query = formatAddress(address).trim();
+  if (!query || !/[\p{L}\p{N}]/u.test(query)) return null;
+
+  const url = new URL("https://www.google.com/maps/search/");
+  url.searchParams.set("api", "1");
+  url.searchParams.set("query", query);
+
+  return (
+    <a
+      href={url.toString()}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Search ${label} on Google Maps`}
+      title="Search on Google Maps"
+      className="inline-flex shrink-0 items-center justify-center rounded p-2 text-sky-200 hover:bg-sky-900/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"
+    >
+      <MapPin className="h-4 w-4" aria-hidden="true" />
+    </a>
+  );
+}
 
 export function PersonTableRow({
   person,
@@ -108,16 +130,18 @@ export function PersonTableRow({
               <div className="text-[10px] text-sky-300 uppercase mb-1 font-bold">
                 Address
               </div>
-              <div className="text-xs text-white break-words">
-                {formatAddress(person.address)}
+              <div className="flex items-start gap-1">
+                <div className="min-w-0 flex-1 text-xs text-white break-words">{formatAddress(person.address)}</div>
+                <AddressMapLink address={person.address} label="address" />
               </div>
             </div>
             <div className="bg-[#164d72]/20 border border-[#164d72] rounded p-2">
               <div className="text-[10px] text-sky-300 uppercase mb-1 font-bold">
                 Alt Address
               </div>
-              <div className="text-xs text-white break-words">
-                {formatAddress(person.alt_address)}
+              <div className="flex items-start gap-1">
+                <div className="min-w-0 flex-1 text-xs text-white break-words">{formatAddress(person.alt_address)}</div>
+                <AddressMapLink address={person.alt_address} label="alternate address" />
               </div>
             </div>
           </div>
@@ -165,16 +189,18 @@ export function PersonTableRow({
 
       {/* Address */}
       <div className="col-span-3 bg-[#164d72] text-white p-2 flex items-center overflow-hidden min-w-0">
-        <div className="text-[11px] break-words w-full overflow-hidden">
+        <div className="text-[11px] break-words min-w-0 flex-1">
           {formatAddress(person.address)}
         </div>
+        <AddressMapLink address={person.address} label="address" />
       </div>
 
       {/* Alt Address */}
       <div className="col-span-3 bg-[#164d72] text-white p-2 flex items-center overflow-hidden min-w-0">
-        <div className="text-[11px] break-words w-full overflow-hidden">
+        <div className="text-[11px] break-words min-w-0 flex-1">
           {formatAddress(person.alt_address)}
         </div>
+        <AddressMapLink address={person.alt_address} label="alternate address" />
       </div>
 
       {/* Year */}
